@@ -1,0 +1,13 @@
+{
+  "name": "@packages/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "scripts": {
+    "build": "echo 'nothing to build'",
+    "typecheck": "echo 'no typecheck for eslint-config'",
+    "lint": "echo 'no linter configured yet'",
+    "test": "echo 'no tests yet'"
+  }
+}

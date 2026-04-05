@@ -1,0 +1,10 @@
+node_modules/
+.turbo/
+.claude/
+dist/
+.next/
+.expo/
+*.env
+*.env.local
+.env.*
+!.env.example
