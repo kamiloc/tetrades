@@ -1,6 +1,7 @@
 # Threat Model
 
 ## Critical assets
+
 - Supabase-authenticated user identities
 - public athlete profile data
 - private profile data
@@ -12,6 +13,7 @@
 - audit logs
 
 ## Trust boundaries
+
 - public web client
 - mobile client
 - Fastify + tRPC API
@@ -22,6 +24,7 @@
 - local development and test environments
 
 ## Top risks
+
 1. cross-tenant data leakage because of an overly broad RLS policy
 2. agent-generated Prisma queries that over-fetch sensitive relations
 3. accidental exposure of unverified OCR data in UI/API responses
@@ -33,6 +36,7 @@
 9. direct HTTP self-calls from Next.js Server Components creating brittle architecture and leaking internal endpoints
 
 ## Primary mitigations
+
 - one-policy-file-per-table + RLS tests
 - `select`-only Prisma queries
 - verified-data-only display rule

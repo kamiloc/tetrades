@@ -4,5 +4,14 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"],
+  "references": [
+    { "path": "../../packages/validators" },
+    { "path": "../../packages/auth" },
+    { "path": "../../packages/crypto" },
+    { "path": "../../packages/shared-logic" },
+    { "path": "../../packages/queue" },
+    { "path": "../../packages/api-client" }
+  ]
 }

@@ -1,0 +1,493 @@
+// Athlete Passport — Prisma schema
+// Source of truth: docs/erm.mmd
+// Every field carries a data classification tag (L0/L1/L2/L3) per CLAUDE.md.
+// Encrypted (L2) columns use Bytes and are named with the `_enc` suffix.
+// L3 secrets (keys) never appear in this schema — they live in env only.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum UserRole {
+  ATHLETE
+  SYSTEM
+
+  @@map("user_role")
+}
+
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+
+  @@map("account_status")
+}
+
+enum ProfileStatus {
+  DRAFT
+  ACTIVE
+  HIDDEN
+  LOCKED
+
+  @@map("profile_status")
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IDENTITY_PENDING
+  CONSENT_PENDING
+  COMPLETE
+
+  @@map("onboarding_status")
+}
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+
+  @@map("document_status")
+}
+
+enum OcrJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+
+  @@map("ocr_job_status")
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+
+  @@map("connection_status")
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+
+  @@map("verification_status")
+}
+
+enum PhotoVariant {
+  ORIGINAL
+  THUMB_150
+  CARD_400
+  FULL_1200
+
+  @@map("photo_variant")
+}
+
+enum ProcessingStatus {
+  QUEUED
+  RUNNING
+  READY
+  FAILED
+
+  @@map("processing_status")
+}
+
+enum DataLifecycleType {
+  EXPORT
+  DELETION
+  RECTIFICATION
+
+  @@map("data_lifecycle_type")
+}
+
+enum DataLifecycleStatus {
+  REQUESTED
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED_LEGAL_HOLD
+  FAILED
+
+  @@map("data_lifecycle_status")
+}
+
+// ============================================================================
+// Identity & Classification
+// ============================================================================
+
+model UserAccount {
+  /// L1-INTERNAL
+  id             String        @id @default(cuid())
+  /// L1-INTERNAL
+  supabaseUserId String        @unique @map("supabase_user_id")
+  /// L1-INTERNAL
+  role           UserRole
+  /// L1-INTERNAL
+  status         AccountStatus
+  /// L1-INTERNAL
+  createdAt      DateTime      @default(now()) @map("created_at")
+  /// L1-INTERNAL
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  athlete                Athlete?
+  verifiedDocuments      MedicalDocument[]      @relation("MedicalDocumentVerifier")
+  auditEvents            AuditEvent[]
+  submittedLifecycleReqs DataLifecycleRequest[] @relation("LifecycleRequester")
+
+  @@map("user_accounts")
+}
+
+model Sport {
+  /// L0-PUBLIC
+  id       String  @id @default(cuid())
+  /// L0-PUBLIC
+  name     String  @unique
+  /// L0-PUBLIC
+  category String
+  /// L0-PUBLIC
+  isActive Boolean @default(true) @map("is_active")
+
+  athletes Athlete[]
+
+  @@map("sports")
+}
+
+model Athlete {
+  /// L0-PUBLIC
+  id               String        @id @default(cuid())
+  /// L1-INTERNAL
+  userAccountId    String        @unique @map("user_account_id")
+  /// L0-PUBLIC
+  slug             String        @unique
+  /// L0-PUBLIC
+  displayName      String        @map("display_name")
+  /// L0-PUBLIC
+  sportId          String        @map("sport_id")
+  /// L0-PUBLIC
+  countryCode      String        @map("country_code")
+  /// L1-INTERNAL
+  profileStatus    ProfileStatus @default(DRAFT) @map("profile_status")
+  /// L1-INTERNAL
+  isUnderLegalHold Boolean       @default(false) @map("is_under_legal_hold")
+  /// L1-INTERNAL
+  createdAt        DateTime      @default(now()) @map("created_at")
+  /// L1-INTERNAL
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  userAccount          UserAccount            @relation(fields: [userAccountId], references: [id], onDelete: Restrict)
+  sport                Sport                  @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  publicProfile        AthletePublicProfile?
+  privateProfile       AthletePrivateProfile?
+  photos               ProfilePhotoAsset[]
+  achievements         AthleteAchievement[]
+  medicalDocuments     MedicalDocument[]
+  consentLogs          PiiConsentLog[]
+  auditEvents          AuditEvent[]
+  lifecycleRequests    DataLifecycleRequest[]
+  requestedConnections AthleteConnection[]    @relation("ConnectionRequester")
+  receivedConnections  AthleteConnection[]    @relation("ConnectionAddressee")
+
+  @@index([sportId, profileStatus])
+  @@index([countryCode, sportId])
+  @@map("athletes")
+}
+
+// ============================================================================
+// Profiles
+// ============================================================================
+
+model AthletePublicProfile {
+  /// L0-PUBLIC
+  athleteId            String   @id @map("athlete_id")
+  /// L0-PUBLIC
+  publicBio            String?  @map("public_bio") @db.Text
+  /// L0-PUBLIC
+  city                 String?
+  /// L0-PUBLIC
+  primaryPosition      String?  @map("primary_position")
+  /// L0-PUBLIC
+  connectionCountCache Int      @default(0) @map("connection_count_cache")
+  /// L0-PUBLIC
+  avatarAssetId        String?  @unique @map("avatar_asset_id")
+  /// L0-PUBLIC
+  isSearchable         Boolean  @default(true) @map("is_searchable")
+  /// L0-PUBLIC
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  athlete     Athlete            @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  avatarAsset ProfilePhotoAsset? @relation("PublicProfileAvatar", fields: [avatarAssetId], references: [id], onDelete: Restrict)
+
+  @@map("athlete_public_profiles")
+}
+
+model AthletePrivateProfile {
+  /// L2-CONFIDENTIAL
+  athleteId            String           @id @map("athlete_id")
+  /// L2-CONFIDENTIAL
+  exactDobEnc          Bytes?           @map("exact_dob_enc")
+  /// L2-CONFIDENTIAL
+  contactEmailEnc      Bytes?           @map("contact_email_enc")
+  /// L2-CONFIDENTIAL
+  contactPhoneEnc      Bytes?           @map("contact_phone_enc")
+  /// L2-CONFIDENTIAL
+  govIdEnc             Bytes?           @map("gov_id_enc")
+  /// L1-INTERNAL
+  encryptionKeyVersion String           @map("encryption_key_version")
+  /// L1-INTERNAL
+  onboardingStatus     OnboardingStatus @default(NOT_STARTED) @map("onboarding_status")
+  /// L1-INTERNAL
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@map("athlete_private_profiles")
+}
+
+model ProfilePhotoAsset {
+  /// L0-PUBLIC
+  id               String           @id @default(cuid())
+  /// L0-PUBLIC
+  athleteId        String           @map("athlete_id")
+  /// L0-PUBLIC
+  variant          PhotoVariant
+  /// L1-INTERNAL
+  objectPath       String           @map("object_path")
+  /// L0-PUBLIC
+  width            Int
+  /// L0-PUBLIC
+  height           Int
+  /// L1-INTERNAL
+  processingStatus ProcessingStatus @default(QUEUED) @map("processing_status")
+  /// L1-INTERNAL
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  athlete           Athlete               @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  publicProfileLink AthletePublicProfile? @relation("PublicProfileAvatar")
+
+  @@index([athleteId, variant])
+  @@map("profile_photo_assets")
+}
+
+// ============================================================================
+// Activities
+// ============================================================================
+
+model AthleteAchievement {
+  /// L0-PUBLIC
+  id                 String             @id @default(cuid())
+  /// L0-PUBLIC
+  athleteId          String             @map("athlete_id")
+  /// L0-PUBLIC
+  title              String
+  /// L0-PUBLIC
+  organization       String
+  /// L0-PUBLIC
+  achievedOn         DateTime           @map("achieved_on") @db.Date
+  /// L0-PUBLIC
+  verificationStatus VerificationStatus @default(UNVERIFIED) @map("verification_status")
+  /// L0-PUBLIC
+  verificationSource String?            @map("verification_source")
+  /// L0-PUBLIC
+  createdAt          DateTime           @default(now()) @map("created_at")
+
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@index([athleteId, verificationStatus])
+  @@map("athlete_achievements")
+}
+
+model AthleteConnection {
+  /// L1-INTERNAL
+  id          String           @id @default(cuid())
+  /// L1-INTERNAL
+  requesterId String           @map("requester_id")
+  /// L1-INTERNAL
+  addresseeId String           @map("addressee_id")
+  /// L1-INTERNAL
+  status      ConnectionStatus @default(PENDING)
+  /// L1-INTERNAL
+  createdAt   DateTime         @default(now()) @map("created_at")
+  /// L1-INTERNAL
+  respondedAt DateTime?        @map("responded_at")
+
+  requester Athlete @relation("ConnectionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  addressee Athlete @relation("ConnectionAddressee", fields: [addresseeId], references: [id], onDelete: Restrict)
+
+  @@unique([requesterId, addresseeId])
+  @@index([requesterId, status])
+  @@index([addresseeId, status])
+  @@map("athlete_connections")
+}
+
+// ============================================================================
+// Medical & OCR
+// ============================================================================
+
+model MedicalDocument {
+  /// L2-CONFIDENTIAL
+  id                      String         @id @default(cuid())
+  /// L2-CONFIDENTIAL
+  athleteId               String         @map("athlete_id")
+  /// L2-CONFIDENTIAL
+  documentType            String         @map("document_type")
+  /// L2-CONFIDENTIAL
+  objectPath              String         @map("object_path")
+  /// L1-INTERNAL
+  mimeType                String         @map("mime_type")
+  /// L1-INTERNAL
+  sha256                  String
+  /// L2-CONFIDENTIAL
+  status                  DocumentStatus @default(UPLOADED)
+  /// L2-CONFIDENTIAL
+  verifiedData            Json?          @map("verified_data")
+  /// L2-CONFIDENTIAL
+  ocrRawOutput            Bytes?         @map("ocr_raw_output")
+  /// L2-CONFIDENTIAL
+  ocrParsedData           Json?          @map("ocr_parsed_data")
+  /// L1-INTERNAL
+  verifiedByUserAccountId String?        @map("verified_by_user_account_id")
+  /// L2-CONFIDENTIAL
+  uploadedAt              DateTime       @default(now()) @map("uploaded_at")
+  /// L2-CONFIDENTIAL
+  verifiedAt              DateTime?      @map("verified_at")
+
+  athlete    Athlete      @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  verifiedBy UserAccount? @relation("MedicalDocumentVerifier", fields: [verifiedByUserAccountId], references: [id], onDelete: Restrict)
+  ocrJobs    OcrJob[]
+
+  @@index([athleteId, status])
+  @@index([athleteId, documentType])
+  @@map("medical_documents")
+}
+
+model OcrJob {
+  /// L1-INTERNAL
+  id                String       @id @default(cuid())
+  /// L2-CONFIDENTIAL
+  medicalDocumentId String       @map("medical_document_id")
+  /// L1-INTERNAL
+  modelName         String       @map("model_name")
+  /// L1-INTERNAL
+  promptVersion     String       @map("prompt_version")
+  /// L1-INTERNAL
+  status            OcrJobStatus @default(QUEUED)
+  /// L2-CONFIDENTIAL
+  confidenceMap     Json?        @map("confidence_map")
+  /// L1-INTERNAL
+  schemaValid       Boolean      @default(false) @map("schema_valid")
+  /// L1-INTERNAL
+  retryCount        Int          @default(0) @map("retry_count")
+  /// L1-INTERNAL
+  requestId         String       @map("request_id")
+  /// L1-INTERNAL
+  startedAt         DateTime?    @map("started_at")
+  /// L1-INTERNAL
+  finishedAt        DateTime?    @map("finished_at")
+
+  medicalDocument MedicalDocument @relation(fields: [medicalDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([medicalDocumentId, status])
+  @@map("ocr_jobs")
+}
+
+// ============================================================================
+// Compliance & Audit
+// ============================================================================
+
+model PiiConsentLog {
+  /// L1-INTERNAL
+  id             String    @id @default(cuid())
+  /// L1-INTERNAL
+  athleteId      String    @map("athlete_id")
+  /// L1-INTERNAL
+  purposeCode    String    @map("purpose_code")
+  /// L1-INTERNAL
+  consentVersion String    @map("consent_version")
+  /// L1-INTERNAL
+  granted        Boolean
+  /// L1-INTERNAL
+  grantedAt      DateTime  @default(now()) @map("granted_at")
+  /// L1-INTERNAL
+  revokedAt      DateTime? @map("revoked_at")
+  /// L1-INTERNAL
+  evidenceRef    String?   @map("evidence_ref")
+
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@index([athleteId, purposeCode])
+  @@map("pii_consent_log")
+}
+
+model AuditEvent {
+  /// L1-INTERNAL
+  id            String   @id @default(cuid())
+  /// L1-INTERNAL
+  userAccountId String?  @map("user_account_id")
+  /// L1-INTERNAL
+  athleteId     String?  @map("athlete_id")
+  /// L1-INTERNAL
+  eventType     String   @map("event_type")
+  /// L1-INTERNAL
+  targetType    String   @map("target_type")
+  /// L1-INTERNAL
+  targetId      String   @map("target_id")
+  /// L1-INTERNAL
+  purposeCode   String   @map("purpose_code")
+  /// L1-INTERNAL
+  requestId     String   @map("request_id")
+  /// L1-INTERNAL
+  metadata      Json?
+  /// L1-INTERNAL
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  userAccount UserAccount? @relation(fields: [userAccountId], references: [id], onDelete: Restrict)
+  athlete     Athlete?     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@index([userAccountId, createdAt])
+  @@index([athleteId, createdAt])
+  @@index([eventType, createdAt])
+  @@map("audit_log")
+}
+
+model DataLifecycleRequest {
+  /// L1-INTERNAL
+  id           String              @id @default(cuid())
+  /// L1-INTERNAL
+  athleteId    String              @map("athlete_id")
+  /// L1-INTERNAL
+  requestedBy  String              @map("requested_by")
+  /// L1-INTERNAL
+  requestType  DataLifecycleType   @map("request_type")
+  /// L1-INTERNAL
+  status       DataLifecycleStatus @default(REQUESTED)
+  /// L1-INTERNAL
+  artifactPath String?             @map("artifact_path")
+  /// L1-INTERNAL
+  createdAt    DateTime            @default(now()) @map("created_at")
+  /// L1-INTERNAL
+  expiresAt    DateTime?           @map("expires_at")
+  /// L1-INTERNAL
+  completedAt  DateTime?           @map("completed_at")
+
+  athlete         Athlete     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  requestedByUser UserAccount @relation("LifecycleRequester", fields: [requestedBy], references: [id], onDelete: Restrict)
+
+  @@index([athleteId, status])
+  @@index([status, createdAt])
+  @@map("data_lifecycle_requests")
+}

@@ -8,8 +8,9 @@
     "dev": "expo start",
     "build": "echo 'mobile build handled by EAS'",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'no linter configured yet'",
-    "test": "echo 'no tests yet'"
+    "lint": "eslint .",
+    "test": "echo 'no tests yet'",
+    "clean": "rm -rf .expo .turbo"
   },
   "dependencies": {
     "expo": "~52.0.0",

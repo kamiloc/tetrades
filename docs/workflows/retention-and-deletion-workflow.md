@@ -1,9 +1,11 @@
 # Retention and Deletion Workflow
 
 ## Goal
+
 Meet Habeas Data deletion/export obligations while preventing accidental orphaned records or storage objects.
 
 ## Flow
+
 1. A protected deletion/export endpoint validates consent and actor scope.
 2. The API persists a deletion/export request.
 3. A BullMQ job performs the heavy work.
@@ -12,6 +14,7 @@ Meet Habeas Data deletion/export obligations while preventing accidental orphane
 6. Audit logs capture request, execution, and verification outcomes.
 
 ## Required guardrails
+
 - never delete data without an auditable request record
 - deletion jobs must be idempotent
 - storage objects and DB rows must be reconciled

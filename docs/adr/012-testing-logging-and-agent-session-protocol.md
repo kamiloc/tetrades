@@ -4,9 +4,11 @@
 - **Date:** 2026-04-02
 
 ## Decision
+
 Use Vitest + Pino + an explicit agent workflow to keep generated code verifiable.
 
 ## Rules
+
 - every procedure gets success, invalid-input, auth, and not-found tests
 - do not mock Prisma in integration tests
 - no skipped failing tests

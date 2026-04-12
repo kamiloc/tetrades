@@ -16,22 +16,22 @@
 
 ## Stack Reference
 
-| Layer | Technology | Location |
-|-------|-----------|----------|
-| Orchestration | Turborepo | Root `turbo.json` |
-| Public Web (SEO) | Next.js 14+ (App Router) | `apps/web/` |
-| Mobile App | Expo + React Native (expo-router) | `apps/mobile/` |
-| Backend API | Fastify + tRPC v11 | `apps/api/` |
-| Database | PostgreSQL via Supabase | `prisma/schema.prisma` |
-| ORM | Prisma | `apps/api/` |
-| Validation | Zod | `packages/validators/` |
-| Auth | Supabase Auth (Magic Link + OTP) | `packages/auth/` |
-| Encryption | node:crypto AES-256-GCM | `packages/crypto/` |
-| Storage | Supabase Storage (Signed URLs) | Via `storageRouter` in API |
-| Medical OCR | Claude Sonnet via Anthropic API | Via `medicalRouter` in API |
-| Background Jobs | BullMQ + Redis | `packages/queue/` |
-| Styling (Web) | Tailwind CSS | `apps/web/` |
-| Styling (Mobile) | NativeWind | `apps/mobile/` |
+| Layer            | Technology                        | Location                   |
+| ---------------- | --------------------------------- | -------------------------- |
+| Orchestration    | Turborepo                         | Root `turbo.json`          |
+| Public Web (SEO) | Next.js 14+ (App Router)          | `apps/web/`                |
+| Mobile App       | Expo + React Native (expo-router) | `apps/mobile/`             |
+| Backend API      | Fastify + tRPC v11                | `apps/api/`                |
+| Database         | PostgreSQL via Supabase           | `prisma/schema.prisma`     |
+| ORM              | Prisma                            | `apps/api/`                |
+| Validation       | Zod                               | `packages/validators/`     |
+| Auth             | Supabase Auth (Magic Link + OTP)  | `packages/auth/`           |
+| Encryption       | node:crypto AES-256-GCM           | `packages/crypto/`         |
+| Storage          | Supabase Storage (Signed URLs)    | Via `storageRouter` in API |
+| Medical OCR      | Claude Sonnet via Anthropic API   | Via `medicalRouter` in API |
+| Background Jobs  | BullMQ + Redis                    | `packages/queue/`          |
+| Styling (Web)    | Tailwind CSS                      | `apps/web/`                |
+| Styling (Mobile) | NativeWind                        | `apps/mobile/`             |
 
 ---
 
@@ -40,12 +40,12 @@
 > Every field in every model belongs to exactly one classification level.
 > When in doubt, classify UP (treat it as more sensitive, not less).
 
-| Level | Label | Examples | Storage Rule | Logging Rule |
-|-------|-------|----------|-------------|-------------|
-| **L0** | `PUBLIC` | Athlete name, sport, public bio, verified achievements, connection count | Plaintext. Served via public API and SSR. | May appear in logs. |
-| **L1** | `INTERNAL` | Email address, account creation date, login timestamps, device tokens | Plaintext. Accessible only by the owning athlete and system services. | May appear in structured logs, NEVER in error messages returned to clients. |
-| **L2** | `CONFIDENTIAL` | Medical test values, diagnoses, medication names, doctor names, clinic addresses, personal identification numbers | Encrypted at rest via `@packages/crypto` AND Supabase Vault. Signed URLs with 15-min expiry for documents. | NEVER logged at any level. Decryption requires an audit event. |
-| **L3** | `RESTRICTED` | Master encryption keys, Supabase service-role keys, Anthropic API keys | Environment variables only. Never in source, seed files, .env.example, or CI logs. | NEVER logged. NEVER passed as function arguments outside `@packages/crypto`. |
+| Level  | Label          | Examples                                                                                                          | Storage Rule                                                                                               | Logging Rule                                                                 |
+| ------ | -------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **L0** | `PUBLIC`       | Athlete name, sport, public bio, verified achievements, connection count                                          | Plaintext. Served via public API and SSR.                                                                  | May appear in logs.                                                          |
+| **L1** | `INTERNAL`     | Email address, account creation date, login timestamps, device tokens                                             | Plaintext. Accessible only by the owning athlete and system services.                                      | May appear in structured logs, NEVER in error messages returned to clients.  |
+| **L2** | `CONFIDENTIAL` | Medical test values, diagnoses, medication names, doctor names, clinic addresses, personal identification numbers | Encrypted at rest via `@packages/crypto` AND Supabase Vault. Signed URLs with 15-min expiry for documents. | NEVER logged at any level. Decryption requires an audit event.               |
+| **L3** | `RESTRICTED`   | Master encryption keys, Supabase service-role keys, Anthropic API keys                                            | Environment variables only. Never in source, seed files, .env.example, or CI logs.                         | NEVER logged. NEVER passed as function arguments outside `@packages/crypto`. |
 
 ### Classification Rules
 
@@ -212,17 +212,17 @@ tetrades/
 > Every package and app declares what it owns, what it exports, and what it must never do.
 > AI agents MUST respect these boundaries. If a task requires violating a contract, STOP and ask the user.
 
-| Package / App | May Import From | Exports | NEVER Do |
-|---|---|---|---|
-| `@packages/validators` | `zod` only | Zod schemas, inferred TS types | Import from any other package or app |
-| `@packages/shared-logic` | Standard library only (`Intl`, `Date`) | Pure functions, constants, enums | Import React, Zod, Prisma, or any package |
-| `@packages/auth` | `@supabase/supabase-js`, `@supabase/ssr`, `react` (hooks.ts ONLY) | `useAuth`, `useSession`, `useSignIn`, `useSignOut`, `verifyToken`, `createClient` | Import from `react-native`, `expo-*`, or any app |
-| `@packages/crypto` | `node:crypto` only | `encryptPII()`, `decryptPII()` — nothing else | Export internal helpers, import any external crypto lib |
-| `@packages/api-client` | `@trpc/react-query`, `@trpc/client`, `@packages/validators` | Typed tRPC hooks, client config | Contain business logic, call Prisma, import from apps |
-| `@packages/queue` | `bullmq`, `ioredis` | Queue instances, typed job payloads | Contain job execution logic (workers live in `apps/api/src/jobs/`) |
-| `@app/api` | Any `@packages/*`, `@prisma/client`, `fastify`, `@trpc/server` | tRPC router type (for client inference) | Import from `react`, `react-native`, `apps/web`, `apps/mobile` |
-| `@app/web` | `@packages/validators`, `@packages/api-client`, `@packages/auth`, `@packages/shared-logic`, `next`, `react` | Nothing (leaf app) | Import from `react-native`, `expo-*`, `apps/mobile`, `apps/api` (use tRPC caller) |
-| `@app/mobile` | `@packages/validators`, `@packages/api-client`, `@packages/auth`, `@packages/shared-logic`, `expo-*`, `react-native` | Nothing (leaf app) | Import from `react-dom`, `next`, `apps/web`, `apps/api` |
+| Package / App            | May Import From                                                                                                      | Exports                                                                           | NEVER Do                                                                          |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `@packages/validators`   | `zod` only                                                                                                           | Zod schemas, inferred TS types                                                    | Import from any other package or app                                              |
+| `@packages/shared-logic` | Standard library only (`Intl`, `Date`)                                                                               | Pure functions, constants, enums                                                  | Import React, Zod, Prisma, or any package                                         |
+| `@packages/auth`         | `@supabase/supabase-js`, `@supabase/ssr`, `react` (hooks.ts ONLY)                                                    | `useAuth`, `useSession`, `useSignIn`, `useSignOut`, `verifyToken`, `createClient` | Import from `react-native`, `expo-*`, or any app                                  |
+| `@packages/crypto`       | `node:crypto` only                                                                                                   | `encryptPII()`, `decryptPII()` — nothing else                                     | Export internal helpers, import any external crypto lib                           |
+| `@packages/api-client`   | `@trpc/react-query`, `@trpc/client`, `@packages/validators`                                                          | Typed tRPC hooks, client config                                                   | Contain business logic, call Prisma, import from apps                             |
+| `@packages/queue`        | `bullmq`, `ioredis`                                                                                                  | Queue instances, typed job payloads                                               | Contain job execution logic (workers live in `apps/api/src/jobs/`)                |
+| `@app/api`               | Any `@packages/*`, `@prisma/client`, `fastify`, `@trpc/server`                                                       | tRPC router type (for client inference)                                           | Import from `react`, `react-native`, `apps/web`, `apps/mobile`                    |
+| `@app/web`               | `@packages/validators`, `@packages/api-client`, `@packages/auth`, `@packages/shared-logic`, `next`, `react`          | Nothing (leaf app)                                                                | Import from `react-native`, `expo-*`, `apps/mobile`, `apps/api` (use tRPC caller) |
+| `@app/mobile`            | `@packages/validators`, `@packages/api-client`, `@packages/auth`, `@packages/shared-logic`, `expo-*`, `react-native` | Nothing (leaf app)                                                                | Import from `react-dom`, `next`, `apps/web`, `apps/api`                           |
 
 **Clarification on `@packages/auth`:** This package MAY import from `react` because
 `hooks.ts` exports React hooks (`useAuth`, etc.). However, it MUST NOT import from
@@ -618,8 +618,7 @@ CREATE POLICY "[table]_select_own"
 ### Document Status Flow
 
 ```
-UPLOADED → PROCESSING → PENDING_REVIEW → VERIFIED
-                                       → REJECTED
+UPLOADED → PROCESSING → PENDING_REVIEW → VERIFIED → REJECTED
 
 No other transitions are allowed. NEVER skip a state.
 ```
@@ -806,23 +805,23 @@ No other transitions are allowed. NEVER skip a state.
 ```typescript
 // ALWAYS use TRPCError with appropriate codes:
 throw new TRPCError({
-  code: 'NOT_FOUND',        // Resource doesn't exist
+  code: 'NOT_FOUND', // Resource doesn't exist
   message: 'Athlete not found',
 });
 
 throw new TRPCError({
-  code: 'FORBIDDEN',        // Auth valid, but not authorized for this resource
+  code: 'FORBIDDEN', // Auth valid, but not authorized for this resource
   message: 'You can only view your own medical records',
 });
 
 throw new TRPCError({
-  code: 'BAD_REQUEST',      // Invalid input (beyond what Zod catches)
+  code: 'BAD_REQUEST', // Invalid input (beyond what Zod catches)
   message: 'Cannot connect with yourself',
 });
 
 throw new TRPCError({
-  code: 'INTERNAL_SERVER_ERROR',  // Unexpected failure
-  message: 'Failed to process document',  // User-facing, no stack traces
+  code: 'INTERNAL_SERVER_ERROR', // Unexpected failure
+  message: 'Failed to process document', // User-facing, no stack traces
 });
 
 // NEVER throw raw Error objects. ALWAYS use TRPCError.

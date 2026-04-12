@@ -4,9 +4,11 @@
 - **Date:** 2026-04-02
 
 ## Decision
+
 Treat RLS as the highest-risk security layer and manage it through dedicated SQL files plus mandatory tests.
 
 ## Rules
+
 - one SQL file per table under `supabase/policies`
 - do not place RLS in migrations or app code
 - every file enables and forces RLS
@@ -16,4 +18,5 @@ Treat RLS as the highest-risk security layer and manage it through dedicated SQL
 - policy changes require running the full RLS suite
 
 ## Note
+
 Watch out for PostgreSQL OR-composition across multiple policies of the same command type.

@@ -1,1 +1,1 @@
-export const CRYPTO_PACKAGE = "@packages/crypto" as const;
+export const CRYPTO_PACKAGE = '@packages/crypto' as const;

@@ -1,0 +1,182 @@
+---
+config:
+  theme: dark
+  layout: dagre
+---
+
+
+erDiagram
+  %% === Identity & Classification ===
+  USER_ACCOUNT {
+    string id PK
+    string supabase_user_id UK
+    string role
+    string status
+    datetime created_at
+    datetime updated_at
+  }
+
+  SPORT {
+    string id PK
+    string name UK
+    string category
+    boolean is_active
+  }
+
+  ATHLETE {
+    string id PK
+    string user_account_id FK,UK
+    string slug UK
+    string display_name
+    string sport_id FK
+    string country_code
+    string profile_status
+    boolean is_under_legal_hold
+    datetime created_at
+    datetime updated_at
+  }
+
+  USER_ACCOUNT ||--|| ATHLETE : "owns"
+  SPORT ||--o{ ATHLETE : "classified_by"
+
+  %% === Profiles ===
+  ATHLETE_PUBLIC_PROFILE {
+    string athlete_id PK,FK
+    text public_bio
+    string city
+    string primary_position
+    int connection_count_cache
+    string avatar_asset_id FK
+    boolean is_searchable
+    datetime updated_at
+  }
+
+  ATHLETE_PRIVATE_PROFILE {
+    string athlete_id PK,FK
+    bytes exact_dob_enc
+    bytes contact_email_enc
+    bytes contact_phone_enc
+    bytes gov_id_enc
+    string encryption_key_version
+    string onboarding_status
+    datetime updated_at
+  }
+
+  PROFILE_PHOTO_ASSET {
+    string id PK
+    string athlete_id FK
+    string variant
+    string object_path
+    int width
+    int height
+    string processing_status
+    datetime created_at
+  }
+
+  ATHLETE ||--|| ATHLETE_PUBLIC_PROFILE : "has_public_profile"
+  ATHLETE ||--|| ATHLETE_PRIVATE_PROFILE : "has_private_profile"
+  ATHLETE ||--o{ PROFILE_PHOTO_ASSET : "uploads_photo"
+  ATHLETE_PUBLIC_PROFILE ||--o| PROFILE_PHOTO_ASSET : "avatar_photo"
+
+  %% === Activities ===
+  ATHLETE_ACHIEVEMENT {
+    string id PK
+    string athlete_id FK
+    string title
+    string organization
+    date achieved_on
+    string verification_status
+    string verification_source
+    datetime created_at
+  }
+
+  ATHLETE_CONNECTION {
+    string id PK
+    string requester_id FK
+    string addressee_id FK
+    string status
+    datetime created_at
+    datetime responded_at
+  }
+
+  ATHLETE ||--o{ ATHLETE_ACHIEVEMENT : "earns"
+  ATHLETE ||--o{ ATHLETE_CONNECTION : "initiates_or_receives"
+
+  %% === Medical & OCR ===
+  MEDICAL_DOCUMENT {
+    string id PK
+    string athlete_id FK
+    string document_type
+    string object_path
+    string mime_type
+    string sha256
+    string status
+    json verified_data
+    bytes ocr_raw_output 
+    json ocr_parsed_data 
+    string verified_by_user_account_id FK
+    datetime uploaded_at
+    datetime verified_at
+  }
+
+  OCR_JOB {
+    string id PK
+    string medical_document_id FK
+    string model_name
+    string prompt_version
+    string status
+    json confidence_map
+    boolean schema_valid
+    int retry_count
+    string request_id
+    datetime started_at
+    datetime finished_at
+  }
+
+  MEDICAL_DOCUMENT ||--o{ OCR_JOB : "processed_by"
+  MEDICAL_DOCUMENT ||--o| USER_ACCOUNT : "verified_by_user"
+  ATHLETE ||--o{ MEDICAL_DOCUMENT : "submits_doc"
+
+  %% === Compliance & Audit ===
+  PII_CONSENT_LOG {
+    string id PK
+    string athlete_id FK
+    string purpose_code
+    string consent_version
+    boolean granted
+    datetime granted_at
+    datetime revoked_at
+    string evidence_ref 
+  }
+
+  AUDIT_EVENT {
+    string id PK
+    string user_account_id FK
+    string athlete_id FK
+    string event_type
+    string target_type
+    string target_id
+    string purpose_code
+    string request_id
+    json metadata
+    datetime created_at
+  }
+
+  DATA_LIFECYCLE_REQUEST {
+    string id PK
+    string athlete_id FK
+    string requested_by FK
+    string request_type
+    string status
+    string artifact_path
+    datetime created_at
+    datetime expires_at
+    datetime completed_at
+  }
+
+  ATHLETE ||--o{ PII_CONSENT_LOG : "grants"
+  USER_ACCOUNT ||--o{ AUDIT_EVENT : "logs_event"
+  ATHLETE ||--o{ AUDIT_EVENT : "subject_of"
+  USER_ACCOUNT ||--o{ DATA_LIFECYCLE_REQUEST : "submits_request"
+  ATHLETE ||--o{ DATA_LIFECYCLE_REQUEST : "data_subject"
+  

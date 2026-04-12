@@ -1,1 +1,1 @@
-export const VALIDATORS_PACKAGE = "@packages/validators" as const;
+export const VALIDATORS_PACKAGE = '@packages/validators' as const;

@@ -8,15 +8,24 @@
     "build": "tsc --build",
     "typecheck": "tsc --noEmit",
     "dev": "tsx watch src/server.ts",
-    "lint": "echo 'no linter configured yet'",
-    "test": "echo 'no tests yet'"
+    "lint": "eslint .",
+    "test": "echo 'no tests yet'",
+    "clean": "rm -rf dist .turbo",
+    "db:generate": "prisma generate --schema=../../prisma/schema.prisma",
+    "db:validate": "prisma validate --schema=../../prisma/schema.prisma",
+    "db:format": "prisma format --schema=../../prisma/schema.prisma"
+  },
+  "prisma": {
+    "schema": "../../prisma/schema.prisma"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "fastify": "^5.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
+    "@types/node": "^22.13.0",
+    "prisma": "^6.19.3",
     "tsx": "^4.19.0",
-    "@types/node": "^22.13.0"
+    "typescript": "^5.7.0"
   }
 }

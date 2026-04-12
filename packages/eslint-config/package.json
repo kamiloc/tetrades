@@ -3,11 +3,19 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./index.js",
+  "main": "./base.js",
+  "exports": {
+    ".": "./base.js",
+    "./base": "./base.js",
+    "./api": "./api.js",
+    "./nextjs": "./nextjs.js",
+    "./react-native": "./react-native.js"
+  },
   "scripts": {
     "build": "echo 'nothing to build'",
     "typecheck": "echo 'no typecheck for eslint-config'",
-    "lint": "echo 'no linter configured yet'",
-    "test": "echo 'no tests yet'"
+    "lint": "echo 'no linter for eslint-config'",
+    "test": "echo 'no tests yet'",
+    "clean": "rm -rf .turbo"
   }
 }

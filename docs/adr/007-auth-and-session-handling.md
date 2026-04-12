@@ -4,9 +4,11 @@
 - **Date:** 2026-04-02
 
 ## Decision
+
 All auth flows go through `packages/auth` and all server authorization depends on verified JWT context.
 
 ## Rules
+
 - do not call Supabase auth directly from apps
 - trust only `ctx.userId`
 - Magic Link is primary, OTP fallback

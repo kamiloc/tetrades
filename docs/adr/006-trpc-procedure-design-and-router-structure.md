@@ -4,9 +4,11 @@
 - **Date:** 2026-04-02
 
 ## Decision
+
 Every procedure must have explicit auth level, validated input/output, explicit error handling, and router-per-domain organization.
 
 ## Rules
+
 - use `publicProcedure` or `protectedProcedure`, never bare `procedure`
 - every procedure uses imported Zod `.input()` and `.output()`
 - errors use `TRPCError`

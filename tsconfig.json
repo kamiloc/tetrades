@@ -1,0 +1,14 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/validators" },
+    { "path": "packages/shared-logic" },
+    { "path": "packages/auth" },
+    { "path": "packages/crypto" },
+    { "path": "packages/api-client" },
+    { "path": "packages/queue" },
+    { "path": "apps/api" },
+    { "path": "apps/web" },
+    { "path": "apps/mobile" }
+  ]
+}
