@@ -18,5 +18,6 @@ Safely ingest private documents without passing files through the Fastify server
 - medical PDFs go to `medical-documents/{athleteId}/{documentId}.pdf`
 - profile photos go under `profile-photos/{athleteId}/...`
 - medical document URLs are signed and short-lived
+- medical document metadata is stored encrypted (`documentTypeEnc`, `objectPathEnc`)
 - Fastify never handles multipart uploads
 - confirmation happens only after storage upload succeeds

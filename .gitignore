@@ -4,7 +4,9 @@ node_modules/
 dist/
 .next/
 .expo/
+.vscode/
 *.env
 *.env.local
 .env.*
 !.env.example
+docs/SPRINT_PLAN.md

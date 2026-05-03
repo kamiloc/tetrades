@@ -5,6 +5,9 @@ import { photoVariantEnum, processingStatusEnum } from './enums.js';
 
 // ──────────────────────────────────────────────
 // BASE SCHEMA — mirrors Prisma model 1:1
+// DB constraint: @@unique([athleteId, variant]) — exactly one row per athlete per variant.
+// The ORIGINAL variant is L1-INTERNAL (may contain EXIF) and is NEVER served publicly;
+// only the optimized variants (THUMB_150, CARD_400, FULL_1200) appear in public outputs.
 // ──────────────────────────────────────────────
 
 export const profilePhotoAssetSchema = z.object({

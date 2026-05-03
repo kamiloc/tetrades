@@ -16,9 +16,12 @@ Human-only alternate state:
 
 ## Rules
 
-- `ocrRawOutput` is immutable
-- `ocrParsedData` is not a display source of truth
-- `verifiedData` is the only display source of truth
-- only `verifyDocument` may write `verifiedData`
+- `rawOutputEnc` (on `OcrJob`) is immutable
+- `parsedDataEnc` (on `OcrJob`) is not a display source of truth
+- `verifiedDataEnc` (on `MedicalDocument`) is the only display source of truth
+- only `verifyDocument` may write `verifiedDataEnc`
+- `verifiedDataEnc` may be set only when `status = VERIFIED` (DB CHECK constraint)
+- `processOCR` must copy `athleteId` from `MedicalDocument` into `OcrJob`
+- `processOCR` must encrypt raw and parsed OCR outputs before persisting
 - OCR failures revert to `UPLOADED`
 - confidence scores are reviewer guidance only

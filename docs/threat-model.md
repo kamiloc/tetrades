@@ -6,7 +6,7 @@
 - public athlete profile data
 - private profile data
 - medical documents in Storage
-- `ocrRawOutput`, `ocrParsedData`, and `verifiedData`
+- `rawOutputEnc`, `parsedDataEnc`, and `verifiedDataEnc`
 - encryption keys / decryption paths
 - signed upload/download URLs
 - RLS policies

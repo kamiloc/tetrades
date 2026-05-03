@@ -15,7 +15,7 @@ export const athleteAchievementSchema = z.object({
   achievedOn: datetimeSchema, /// L0-PUBLIC
   verificationStatus: verificationStatusEnum, /// L0-PUBLIC
   verificationSource: z.string().min(1).max(500).nullable(), /// L0-PUBLIC
-  createdAt: datetimeSchema, /// L0-PUBLIC
+  createdAt: datetimeSchema, /// L1-INTERNAL
 });
 export type AthleteAchievement = z.infer<typeof athleteAchievementSchema>;
 

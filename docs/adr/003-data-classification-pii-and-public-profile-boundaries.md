@@ -5,7 +5,7 @@
 
 ## Decision
 
-Use four classifications: `PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, `RESTRICTED`.
+Use four classifications aligned to the schema and repo constitution: `L0-PUBLIC`, `L1-INTERNAL`, `L2-CONFIDENTIAL`, `L3-RESTRICTED`.
 
 ## Public profile rule
 
@@ -13,4 +13,4 @@ Public athlete pages may expose only public-safe data such as sport, bio, verifi
 
 ## Restricted data rule
 
-Medical records, OCR outputs, doctor/clinic details, personal identification numbers, and similar PII/sensitive data are `RESTRICTED` and must never appear on public pages or in client-side decryption paths.
+Medical records, OCR outputs, doctor/clinic details, personal identification numbers, and similar PII/sensitive data are `L2-CONFIDENTIAL` and must never appear on public pages or in client-side decryption paths. `L3-RESTRICTED` is reserved for master keys, service-role keys, and other secret material that never appears in application data models.

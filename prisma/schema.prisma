@@ -182,7 +182,7 @@ model Athlete {
   countryCode      String        @map("country_code")
   /// L1-INTERNAL
   profileStatus    ProfileStatus @default(DRAFT) @map("profile_status")
-  /// L1-INTERNAL
+  /// L3-RESTRICTED — only the project owner may set or clear this flag via direct DB access
   isUnderLegalHold Boolean       @default(false) @map("is_under_legal_hold")
   /// L1-INTERNAL
   createdAt        DateTime      @default(now()) @map("created_at")
@@ -196,6 +196,7 @@ model Athlete {
   photos               ProfilePhotoAsset[]
   achievements         AthleteAchievement[]
   medicalDocuments     MedicalDocument[]
+  ocrJobs              OcrJob[]
   consentLogs          PiiConsentLog[]
   auditEvents          AuditEvent[]
   lifecycleRequests    DataLifecycleRequest[]
@@ -222,21 +223,25 @@ model AthletePublicProfile {
   primaryPosition      String?  @map("primary_position")
   /// L0-PUBLIC
   connectionCountCache Int      @default(0) @map("connection_count_cache")
-  /// L0-PUBLIC
+  /// L0-PUBLIC — CONSTRAINT: must reference a ProfilePhotoAsset where
+  /// asset.athleteId == this.athleteId AND asset.variant != 'ORIGINAL'.
+  /// Enforced by: application layer (tRPC procedure) + supabase/policies/athlete_public_profiles.sql
+  /// + supabase/constraints/avatar_ownership.sql (DB trigger)
   avatarAssetId        String?  @unique @map("avatar_asset_id")
   /// L0-PUBLIC
   isSearchable         Boolean  @default(true) @map("is_searchable")
-  /// L0-PUBLIC
+  /// L1-INTERNAL
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   athlete     Athlete            @relation(fields: [athleteId], references: [id], onDelete: Restrict)
   avatarAsset ProfilePhotoAsset? @relation("PublicProfileAvatar", fields: [avatarAssetId], references: [id], onDelete: Restrict)
 
+  @@index([isSearchable])
   @@map("athlete_public_profiles")
 }
 
 model AthletePrivateProfile {
-  /// L2-CONFIDENTIAL
+  /// L1-INTERNAL
   athleteId            String           @id @map("athlete_id")
   /// L2-CONFIDENTIAL
   exactDobEnc          Bytes?           @map("exact_dob_enc")
@@ -279,7 +284,7 @@ model ProfilePhotoAsset {
   athlete           Athlete               @relation(fields: [athleteId], references: [id], onDelete: Restrict)
   publicProfileLink AthletePublicProfile? @relation("PublicProfileAvatar")
 
-  @@index([athleteId, variant])
+  @@unique([athleteId, variant])
   @@map("profile_photo_assets")
 }
 
@@ -302,7 +307,7 @@ model AthleteAchievement {
   verificationStatus VerificationStatus @default(UNVERIFIED) @map("verification_status")
   /// L0-PUBLIC
   verificationSource String?            @map("verification_source")
-  /// L0-PUBLIC
+  /// L1-INTERNAL
   createdAt          DateTime           @default(now()) @map("created_at")
 
   athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Restrict)
@@ -339,31 +344,27 @@ model AthleteConnection {
 // ============================================================================
 
 model MedicalDocument {
-  /// L2-CONFIDENTIAL
+  /// L1-INTERNAL — opaque identifier; encrypted CONTENT is L2 in *_enc fields
   id                      String         @id @default(cuid())
-  /// L2-CONFIDENTIAL
+  /// L1-INTERNAL — FK to athlete; the relationship is L1, the content is L2
   athleteId               String         @map("athlete_id")
-  /// L2-CONFIDENTIAL
-  documentType            String         @map("document_type")
-  /// L2-CONFIDENTIAL
-  objectPath              String         @map("object_path")
-  /// L1-INTERNAL
+  /// L2-CONFIDENTIAL (encrypted)
+  documentTypeEnc         Bytes          @map("document_type_enc")
+  /// L2-CONFIDENTIAL (encrypted)
+  objectPathEnc           Bytes          @map("object_path_enc")
+  /// L1-INTERNAL — file format, not content
   mimeType                String         @map("mime_type")
-  /// L1-INTERNAL
+  /// L1-INTERNAL — integrity hash, not content
   sha256                  String
-  /// L2-CONFIDENTIAL
+  /// L1-INTERNAL — workflow status, not medical data itself
   status                  DocumentStatus @default(UPLOADED)
-  /// L2-CONFIDENTIAL
-  verifiedData            Json?          @map("verified_data")
-  /// L2-CONFIDENTIAL
-  ocrRawOutput            Bytes?         @map("ocr_raw_output")
-  /// L2-CONFIDENTIAL
-  ocrParsedData           Json?          @map("ocr_parsed_data")
-  /// L1-INTERNAL
+  /// L2-CONFIDENTIAL (encrypted JSON) — only populated when status = VERIFIED
+  verifiedDataEnc         Bytes?         @map("verified_data_enc")
+  /// L1-INTERNAL — FK to verifier UserAccount
   verifiedByUserAccountId String?        @map("verified_by_user_account_id")
-  /// L2-CONFIDENTIAL
+  /// L1-INTERNAL
   uploadedAt              DateTime       @default(now()) @map("uploaded_at")
-  /// L2-CONFIDENTIAL
+  /// L1-INTERNAL
   verifiedAt              DateTime?      @map("verified_at")
 
   athlete    Athlete      @relation(fields: [athleteId], references: [id], onDelete: Restrict)
@@ -371,22 +372,29 @@ model MedicalDocument {
   ocrJobs    OcrJob[]
 
   @@index([athleteId, status])
-  @@index([athleteId, documentType])
+  @@index([verifiedByUserAccountId])
   @@map("medical_documents")
 }
 
 model OcrJob {
   /// L1-INTERNAL
   id                String       @id @default(cuid())
-  /// L2-CONFIDENTIAL
+  /// L1-INTERNAL
   medicalDocumentId String       @map("medical_document_id")
+  /// L1-INTERNAL — DENORMALIZED: must equal medicalDocument.athleteId. Enforced by application
+  /// layer on insert. Enables direct RLS policy: USING (auth.uid() = athlete_id)
+  athleteId         String       @map("athlete_id")
   /// L1-INTERNAL
   modelName         String       @map("model_name")
   /// L1-INTERNAL
   promptVersion     String       @map("prompt_version")
   /// L1-INTERNAL
   status            OcrJobStatus @default(QUEUED)
-  /// L2-CONFIDENTIAL
+  /// L2-CONFIDENTIAL (encrypted JSON) — immutable once set; contains raw extracted medical values
+  rawOutputEnc      Bytes?       @map("raw_output_enc")
+  /// L2-CONFIDENTIAL (encrypted JSON) — structured medical data
+  parsedDataEnc     Bytes?       @map("parsed_data_enc")
+  /// L1-INTERNAL — numeric confidence scores per field, not medical values
   confidenceMap     Json?        @map("confidence_map")
   /// L1-INTERNAL
   schemaValid       Boolean      @default(false) @map("schema_valid")
@@ -400,8 +408,11 @@ model OcrJob {
   finishedAt        DateTime?    @map("finished_at")
 
   medicalDocument MedicalDocument @relation(fields: [medicalDocumentId], references: [id], onDelete: Cascade)
+  athlete         Athlete         @relation(fields: [athleteId], references: [id], onDelete: Restrict)
 
   @@index([medicalDocumentId, status])
+  @@index([athleteId])
+  @@index([requestId])
   @@map("ocr_jobs")
 }
 
@@ -433,32 +444,34 @@ model PiiConsentLog {
   @@map("pii_consent_log")
 }
 
+/// Every audit event MUST have an actor and a subject athlete.
+/// For system/background actions, use the SYSTEM_ACCOUNT user (seeded UserAccount with role=SYSTEM).
 model AuditEvent {
   /// L1-INTERNAL
-  id            String   @id @default(cuid())
+  id                 String   @id @default(cuid())
+  /// L1-INTERNAL — who performed the action (use SYSTEM_ACCOUNT for background jobs)
+  actorUserAccountId String   @map("actor_user_account_id")
+  /// L1-INTERNAL — subject athlete; required so RLS can scope audit visibility
+  athleteId          String   @map("athlete_id")
   /// L1-INTERNAL
-  userAccountId String?  @map("user_account_id")
+  eventType          String   @map("event_type")
   /// L1-INTERNAL
-  athleteId     String?  @map("athlete_id")
+  targetType         String   @map("target_type")
   /// L1-INTERNAL
-  eventType     String   @map("event_type")
+  targetId           String   @map("target_id")
   /// L1-INTERNAL
-  targetType    String   @map("target_type")
+  purposeCode        String   @map("purpose_code")
   /// L1-INTERNAL
-  targetId      String   @map("target_id")
+  requestId          String   @map("request_id")
   /// L1-INTERNAL
-  purposeCode   String   @map("purpose_code")
+  metadata           Json?
   /// L1-INTERNAL
-  requestId     String   @map("request_id")
-  /// L1-INTERNAL
-  metadata      Json?
-  /// L1-INTERNAL
-  createdAt     DateTime @default(now()) @map("created_at")
+  createdAt          DateTime @default(now()) @map("created_at")
 
-  userAccount UserAccount? @relation(fields: [userAccountId], references: [id], onDelete: Restrict)
-  athlete     Athlete?     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  actor   UserAccount @relation(fields: [actorUserAccountId], references: [id], onDelete: Restrict)
+  athlete Athlete     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
 
-  @@index([userAccountId, createdAt])
+  @@index([actorUserAccountId, createdAt])
   @@index([athleteId, createdAt])
   @@index([eventType, createdAt])
   @@map("audit_log")

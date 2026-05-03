@@ -4,13 +4,14 @@ import { cuidSchema, datetimeSchema } from './common.js';
 
 // ──────────────────────────────────────────────
 // BASE SCHEMA — mirrors Prisma model 1:1
+// Every audit event has a non-null actor and athlete (use SYSTEM_ACCOUNT for background jobs).
 // Never used directly in tRPC outputs.
 // ──────────────────────────────────────────────
 
 export const auditEventSchema = z.object({
   id: cuidSchema, /// L1-INTERNAL
-  userAccountId: cuidSchema.nullable(), /// L1-INTERNAL
-  athleteId: cuidSchema.nullable(), /// L1-INTERNAL
+  actorUserAccountId: cuidSchema, /// L1-INTERNAL — required (SYSTEM_ACCOUNT for system actions)
+  athleteId: cuidSchema, /// L1-INTERNAL — required so RLS can scope visibility
   eventType: z.string().min(1).max(100), /// L1-INTERNAL
   targetType: z.string().min(1).max(100), /// L1-INTERNAL
   targetId: z.string().min(1).max(255), /// L1-INTERNAL
@@ -23,7 +24,7 @@ export type AuditEvent = z.infer<typeof auditEventSchema>;
 
 // ──────────────────────────────────────────────
 // OUTPUT SCHEMAS
-// NEVER include userAccountId, metadata, or requestId
+// NEVER include actorUserAccountId, metadata, or requestId
 // ──────────────────────────────────────────────
 
 export const auditEventOwnerOutput = z.object({

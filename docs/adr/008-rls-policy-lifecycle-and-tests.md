@@ -20,3 +20,7 @@ Treat RLS as the highest-risk security layer and manage it through dedicated SQL
 ## Note
 
 Watch out for PostgreSQL OR-composition across multiple policies of the same command type.
+
+## OcrJob policy constraint
+
+`ocr_jobs` must use a direct athlete predicate: `USING (auth.uid() = athlete_id)`. Join-based RLS on `medical_documents` is forbidden for this table.

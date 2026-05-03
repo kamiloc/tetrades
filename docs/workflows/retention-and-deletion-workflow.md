@@ -19,4 +19,4 @@ Meet Habeas Data deletion/export obligations while preventing accidental orphane
 - deletion jobs must be idempotent
 - storage objects and DB rows must be reconciled
 - export jobs should generate a complete athlete ZIP bundle
-- legal-hold support should be added before production if exceptional retention is required
+- legal-hold must be enforced: deletion jobs must abort when `is_under_legal_hold = true`

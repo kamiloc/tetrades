@@ -10,7 +10,7 @@ import { onboardingStatusEnum } from './enums.js';
 // ──────────────────────────────────────────────
 
 export const athletePrivateProfileSchema = z.object({
-  athleteId: cuidSchema, /// L2-CONFIDENTIAL
+  athleteId: cuidSchema, /// L1-INTERNAL — FK; the relationship is L1, the encrypted content is L2
   exactDobEnc: z.instanceof(Uint8Array).nullable(), /// L2-CONFIDENTIAL
   contactEmailEnc: z.instanceof(Uint8Array).nullable(), /// L2-CONFIDENTIAL
   contactPhoneEnc: z.instanceof(Uint8Array).nullable(), /// L2-CONFIDENTIAL

@@ -16,7 +16,7 @@ export const athleteSchema = z.object({
   sportId: cuidSchema, /// L0-PUBLIC
   countryCode: countryCodeSchema, /// L0-PUBLIC
   profileStatus: profileStatusEnum, /// L1-INTERNAL
-  isUnderLegalHold: z.boolean(), /// L1-INTERNAL
+  isUnderLegalHold: z.boolean(), /// L3-RESTRICTED — never expose in any output schema
   createdAt: datetimeSchema, /// L1-INTERNAL
   updatedAt: datetimeSchema, /// L1-INTERNAL
 });

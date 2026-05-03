@@ -33,7 +33,7 @@
 - Public Visitor: deny
 - Athlete: allow own
 - Reviewer: deny by default
-- Support Admin: limited / policy-dependent
+- Support Admin: deny by default / break-glass only
 - API Server: allow only through protected procedures
 - Job Worker: deny unless a job explicitly requires it
 
@@ -57,7 +57,7 @@
 
 ## Break-glass rule
 
-If Support Admin access to RESTRICTED data is ever required:
+If Support Admin access to L2-CONFIDENTIAL data is ever required:
 
 1. purpose must be declared
 2. access must be time-scoped

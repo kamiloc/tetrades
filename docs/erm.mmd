@@ -106,14 +106,12 @@ erDiagram
   MEDICAL_DOCUMENT {
     string id PK
     string athlete_id FK
-    string document_type
-    string object_path
+    bytes document_type_enc
+    bytes object_path_enc
     string mime_type
     string sha256
     string status
-    json verified_data
-    bytes ocr_raw_output 
-    json ocr_parsed_data 
+    bytes verified_data_enc
     string verified_by_user_account_id FK
     datetime uploaded_at
     datetime verified_at
@@ -122,9 +120,12 @@ erDiagram
   OCR_JOB {
     string id PK
     string medical_document_id FK
+    string athlete_id FK
     string model_name
     string prompt_version
     string status
+    bytes raw_output_enc
+    bytes parsed_data_enc
     json confidence_map
     boolean schema_valid
     int retry_count
@@ -136,6 +137,7 @@ erDiagram
   MEDICAL_DOCUMENT ||--o{ OCR_JOB : "processed_by"
   MEDICAL_DOCUMENT ||--o| USER_ACCOUNT : "verified_by_user"
   ATHLETE ||--o{ MEDICAL_DOCUMENT : "submits_doc"
+  ATHLETE ||--o{ OCR_JOB : "owns_ocr_job"
 
   %% === Compliance & Audit ===
   PII_CONSENT_LOG {
@@ -151,7 +153,7 @@ erDiagram
 
   AUDIT_EVENT {
     string id PK
-    string user_account_id FK
+    string actor_user_account_id FK
     string athlete_id FK
     string event_type
     string target_type

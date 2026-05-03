@@ -7,6 +7,13 @@
 
 All repository crypto flows are isolated in `packages/crypto`, which exports exactly `encryptPII()` and `decryptPII()`.
 
+JSON payloads (for example, OCR outputs and verified data) are encrypted through internal helpers:
+
+- `encryptJSON(obj) -> Bytes`
+- `decryptJSON(bytes) -> object`
+
+These helpers are not part of the public package API; callers still use `encryptPII()` and `decryptPII()` only.
+
 ## Rules
 
 - use `node:crypto` AES-256-GCM only
