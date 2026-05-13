@@ -15,10 +15,12 @@
     "build": "tsc --build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "echo 'no tests yet'",
+    "test": "vitest run",
     "clean": "rm -rf dist .turbo"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "@types/node": "^22.13.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   }
 }
