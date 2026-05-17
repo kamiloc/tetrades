@@ -1,7 +1,7 @@
 import { createCipheriv } from 'node:crypto';
 
-import type { EncryptedPayload } from './types.js';
 import { generateDek, generateIv, parseMasterKey, payloadToBuffer } from './helpers.js';
+import type { EncryptedPayload } from './types.js';
 
 /**
  * Encrypts a plaintext string using AES-256-GCM envelope encryption.
