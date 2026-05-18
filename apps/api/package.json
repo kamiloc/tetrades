@@ -11,9 +11,9 @@
     "lint": "eslint .",
     "test": "echo 'no tests yet'",
     "clean": "rm -rf dist .turbo",
-    "db:generate": "prisma generate --schema=../../prisma/schema.prisma",
-    "db:validate": "prisma validate --schema=../../prisma/schema.prisma",
-    "db:format": "prisma format --schema=../../prisma/schema.prisma"
+    "db:generate": "prisma generate --schema=../../prisma/schema.prisma --env-file=../../.env",
+    "db:validate": "prisma validate --schema=../../prisma/schema.prisma --env-file=../../.env",
+    "db:format": "prisma format --schema=../../prisma/schema.prisma --env-file=../../.env"
   },
   "prisma": {
     "schema": "../../prisma/schema.prisma"

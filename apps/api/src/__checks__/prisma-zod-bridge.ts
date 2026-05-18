@@ -20,6 +20,16 @@
 // negatives even when assignability holds at the whole-object level.
 
 import type {
+  Athlete,
+  AthleteAchievement,
+  AuditEvent,
+  MedicalDocument,
+  OcrJob,
+  PiiConsentLog,
+  Sport,
+  UserAccount,
+} from '@packages/validators';
+import type {
   Athlete as PrismaAthlete,
   AthleteAchievement as PrismaAthleteAchievement,
   AuditEvent as PrismaAuditEvent,
@@ -30,16 +40,6 @@ import type {
   UserAccount as PrismaUserAccount,
 } from '@prisma/client';
 
-import type {
-  Athlete,
-  AthleteAchievement,
-  AuditEvent,
-  MedicalDocument,
-  OcrJob,
-  PiiConsentLog,
-  Sport,
-  UserAccount,
-} from '@packages/validators';
 
 type IsAssignable<From, To> = [From] extends [To] ? true : false;
 type Assert<T extends true> = T;
