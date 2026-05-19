@@ -131,15 +131,6 @@ CREATE POLICY "medical_documents_update_owner_or_verifier"
       WHERE a.id = medical_documents.athlete_id
         AND ua.supabase_user_id = auth.uid()::text
     )
-    OR (
-      medical_documents.verified_by_user_account_id IS NOT NULL
-      AND EXISTS (
-        SELECT 1
-        FROM public.user_accounts ua
-        WHERE ua.id = medical_documents.verified_by_user_account_id
-          AND ua.supabase_user_id = auth.uid()::text
-      )
-    )
   );
 
 -- ────────────────────────────────────────────────────────────────────────────

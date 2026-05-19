@@ -4,7 +4,8 @@
   "type": "module",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "tests/*"
   ],
   "scripts": {
     "build": "turbo build",
@@ -32,5 +33,11 @@
   "prisma": {
     "seed": "yarn db:seed"
   },
-  "packageManager": "yarn@1.22.22"
+  "packageManager": "yarn@1.22.22",
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@supabase/supabase-js": "^2.106.0",
+    "@trpc/server": "^11.17.0",
+    "superjson": "^2.2.6"
+  }
 }
