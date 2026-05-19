@@ -83,6 +83,12 @@ describe('verifyAuthToken — unauthenticated', () => {
     expect(result.userId).toBeNull();
   });
 
+  it('Bearer prefix with empty token → unauthenticated', async () => {
+    const result = await verifyAuthToken('Bearer ');
+    expect(result.authenticated).toBe(false);
+    expect(result.userId).toBeNull();
+  });
+
   it('expired token → unauthenticated', async () => {
     _setVerifierForTest(
       makeVerifier({ user: null, error: { status: 401, message: 'JWT expired' } }),

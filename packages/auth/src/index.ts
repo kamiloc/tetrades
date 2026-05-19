@@ -5,13 +5,12 @@
  *   - Magic Link is primary; OTP is the fallback. No email/password.
  *   - Apps must consume this package — never call Supabase auth directly.
  *   - All server authorization derives from `verifyAccessToken` (trust boundary).
- *
- * React hooks (useAuth, useSession, etc.) are deferred to Sprint 2 task 2.7 and
- * will live in a future `./hooks.ts` module — they are NOT exported here.
+ *   - Only `./hooks.ts` may import from `react`. All other modules are pure TS.
  */
 
 export {
   createAuthClient,
+  createSupabaseClient,
   getCurrentSession,
   sendMagicLink,
   signOut,
@@ -32,10 +31,24 @@ export {
   createTokenVerifier,
   extractBearerToken,
   verifyAccessToken,
+  verifyToken,
   type CookieMethodsServer,
   type SsrServerClientConfig,
   type TokenVerifierConfig,
   type VerifiedUser,
 } from './server.js';
+
+export {
+  AuthProvider,
+  useAuth,
+  useSession,
+  useSignIn,
+  useSignOut,
+  type AuthContextValue,
+  type AuthProviderProps,
+  type UseSessionResult,
+  type UseSignInResult,
+  type UseSignOutResult,
+} from './hooks.js';
 
 export const AUTH_PACKAGE = '@packages/auth' as const;

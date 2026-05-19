@@ -11,8 +11,9 @@
  *   - Token storage / cookies are app-specific and injected via `storage` / cookies.
  */
 
+import { createBrowserClient } from '@supabase/ssr';
 import {
-  createClient as createSupabaseClient,
+  createClient as createSupabaseJsClient,
   type Session,
   type SupabaseClient,
   type SupportedStorage,
@@ -47,7 +48,7 @@ export type { Session, SupabaseClient, SupportedStorage, User };
  * detection are configured at the Supabase project level (ADR-007).
  */
 export function createAuthClient(config: AuthClientConfig): AuthClient {
-  return createSupabaseClient(config.supabaseUrl, config.supabaseAnonKey, {
+  return createSupabaseJsClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
       flowType: 'pkce',
       autoRefreshToken: true,
@@ -57,6 +58,23 @@ export function createAuthClient(config: AuthClientConfig): AuthClient {
       storageKey: config.storageKey,
     },
   });
+}
+
+/**
+ * Simple browser/RN Supabase client factory that delegates to `@supabase/ssr`.
+ *
+ * The URL and anon key are passed in because this package is consumed by both
+ * Next.js (which exposes them via `NEXT_PUBLIC_*`) and Expo (`EXPO_PUBLIC_*`).
+ * Reading `process.env` here would couple the package to one framework.
+ *
+ * For richer configuration (PKCE flow, custom storage adapter for Expo Secure
+ * Store, custom storage key), use `createAuthClient` instead.
+ */
+export function createSupabaseClient(
+  supabaseUrl: string,
+  supabaseAnonKey: string,
+): SupabaseClient {
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
 
 export interface SendMagicLinkParams {

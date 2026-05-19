@@ -34,7 +34,7 @@ export const protectedProcedure = t.procedure.use(
       ctx: {
         ...ctx,
         userId: ctx.userId,
-        supabaseUserId: ctx.supabaseUserId as string,
+        supabaseUserId: ctx.supabaseUserId ?? ctx.userId,
       },
     });
   }),

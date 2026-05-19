@@ -102,3 +102,36 @@ export function createSsrServerClient(config: SsrServerClientConfig): SupabaseCl
 }
 
 export type { CookieMethodsServer, SupabaseClient };
+
+/**
+ * Stateless token verifier intended for one-off use (e.g., tests, scripts).
+ *
+ * In long-running services prefer `createTokenVerifier` + `verifyAccessToken`
+ * so a single Supabase client is reused across requests rather than created
+ * on every call.
+ *
+ * Returns `{ userId }` on success or `null` when the token is invalid,
+ * expired, or rejected. NEVER logs the token or error contents — the caller
+ * decides how to surface failures.
+ */
+export async function verifyToken(
+  token: string,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+): Promise<{ userId: string } | null> {
+  if (token.trim().length === 0) return null;
+  const supabase = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  });
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data.user) return null;
+    return { userId: data.user.id };
+  } catch {
+    return null;
+  }
+}
