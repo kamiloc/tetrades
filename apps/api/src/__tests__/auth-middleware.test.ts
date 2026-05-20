@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import type { Context } from '../context.js';
+import { setEnvForTests } from '../env.js';
 import { verifyAuthToken, _setVerifierForTest } from '../middleware/auth.js';
 import { router, publicProcedure, protectedProcedure } from '../trpc.js';
 
@@ -31,9 +32,8 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
   return {
     prisma: {} as Context['prisma'],
     userId: null,
-    supabaseUserId: null,
+    supabase: {} as Context['supabase'],
     requestId: 'test-request-id',
-    req: { log: { info: vi.fn(), error: vi.fn() } } as unknown as Context['req'],
     ...overrides,
   };
 }
@@ -44,8 +44,13 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
 
 beforeEach(() => {
   _setVerifierForTest(undefined);
-  process.env['SUPABASE_URL'] = 'https://test.supabase.co';
-  process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'test-service-role-key';
+  setEnvForTests({
+    SUPABASE_URL: 'https://test.supabase.co',
+    SUPABASE_ANON_KEY: 'test-anon-key',
+    DATABASE_URL: 'postgresql://postgres:test@localhost:5432/test',
+    CORS_ORIGIN: 'http://localhost:3000',
+    NODE_ENV: 'test',
+  });
 });
 
 afterEach(() => {
@@ -61,7 +66,6 @@ describe('verifyAuthToken — unauthenticated', () => {
     const result = await verifyAuthToken(undefined);
     expect(result.authenticated).toBe(false);
     expect(result.userId).toBeNull();
-    expect(result.supabaseUserId).toBeNull();
   });
 
   it('empty Authorization header → unauthenticated', async () => {
@@ -121,15 +125,14 @@ describe('verifyAuthToken — authenticated', () => {
     expect(result.authenticated).toBe(true);
     if (result.authenticated) {
       expect(result.userId).toBe(VALID_USER_ID);
-      expect(result.supabaseUserId).toBe(VALID_USER_ID);
     }
   });
 
-  it('userId and supabaseUserId are the same value', async () => {
+  it('userId matches the verified Supabase user', async () => {
     _setVerifierForTest(makeVerifier({ user: { id: VALID_USER_ID }, error: null }));
     const result = await verifyAuthToken('Bearer valid.jwt.token');
     if (result.authenticated) {
-      expect(result.userId).toBe(result.supabaseUserId);
+      expect(result.userId).toBe(VALID_USER_ID);
     }
   });
 });
@@ -159,7 +162,7 @@ describe('protectedProcedure', () => {
 
   it('protectedProcedure succeeds when userId is a non-null string', async () => {
     const caller = testRouter.createCaller(
-      makeCtx({ userId: VALID_USER_ID, supabaseUserId: VALID_USER_ID }),
+      makeCtx({ userId: VALID_USER_ID }),
     );
     const result = await caller.secret();
     expect(result).toBe(`hello ${VALID_USER_ID}`);
@@ -169,7 +172,7 @@ describe('protectedProcedure', () => {
     // This is a compile-time assertion encoded as a runtime check.
     // If the narrowing were wrong, TypeScript would not compile the router above.
     const caller = testRouter.createCaller(
-      makeCtx({ userId: VALID_USER_ID, supabaseUserId: VALID_USER_ID }),
+      makeCtx({ userId: VALID_USER_ID }),
     );
     const result = await caller.secret();
     expect(typeof result).toBe('string');

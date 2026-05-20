@@ -1,34 +1,28 @@
 import { extractBearerToken } from '@packages/auth';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { getEnv } from '../env.js';
+
 export type AuthResult =
-  | { authenticated: true; userId: string; supabaseUserId: string }
-  | { authenticated: false; userId: null; supabaseUserId: null; errorCode?: string | number };
+  | { authenticated: true; userId: string }
+  | { authenticated: false; userId: null; errorCode?: string | number };
 
 const UNAUTHENTICATED: AuthResult = {
   authenticated: false,
   userId: null,
-  supabaseUserId: null,
+  errorCode: undefined,
 };
 
-// One service-role client per process, created lazily on first use.
-// The service-role key lets auth.getUser() verify any user's JWT server-side.
-// NEVER log this key — it is L3-RESTRICTED.
+// One Supabase client per process, created lazily on first use.
+// Uses the anon key to call auth.getUser() for JWT verification.
 let _verifier: SupabaseClient | undefined;
 
 function getVerifier(): SupabaseClient {
   if (_verifier) return _verifier;
 
-  const url = process.env['SUPABASE_URL'];
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY'];
+  const env = getEnv();
 
-  if (!url || !key) {
-    throw new Error(
-      'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables',
-    );
-  }
-
-  _verifier = createClient(url, key, {
+  _verifier = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -70,7 +64,6 @@ export async function verifyAuthToken(
       return {
         authenticated: false,
         userId: null,
-        supabaseUserId: null,
         // Status code only — never the message which may reference token segments.
         errorCode: error?.status ?? 'no_user',
       };
@@ -79,13 +72,11 @@ export async function verifyAuthToken(
     return {
       authenticated: true,
       userId: data.user.id,
-      supabaseUserId: data.user.id,
     };
   } catch (err: unknown) {
     return {
       authenticated: false,
       userId: null,
-      supabaseUserId: null,
       errorCode: err instanceof Error ? err.name : 'unknown_error',
     };
   }

@@ -1,1 +1,1 @@
-{"root":["./src/context.ts","./src/server.ts","./src/trpc.ts","./src/__checks__/prisma-zod-bridge.ts","./src/__tests__/auth-middleware.test.ts","./src/lib/prisma.ts","./src/middleware/auth.ts","./src/router/index.ts"],"version":"5.9.3"}
+{"root":["./src/context.ts","./src/env.ts","./src/index.ts","./src/server.ts","./src/trpc.ts","./src/__checks__/prisma-zod-bridge.ts","./src/__tests__/auth-middleware.test.ts","./src/lib/prisma.ts","./src/middleware/auth.ts","./src/router/index.ts"],"version":"5.9.3"}
