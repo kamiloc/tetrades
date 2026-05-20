@@ -9,6 +9,14 @@
     "CORS_ORIGIN"
   ],
   "tasks": {
+    "@packages/api-client#build": {
+      "dependsOn": ["@packages/validators#build", "@app/api#build"],
+      "outputs": ["dist/**"]
+    },
+    "@packages/api-client#typecheck": {
+      "dependsOn": ["@app/api#build"],
+      "outputs": []
+    },
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
