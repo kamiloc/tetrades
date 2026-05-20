@@ -17,4 +17,5 @@ export * from './ocr-job.js';
 export * from './pii-consent-log.js';
 export * from './profile-photo-asset.js';
 export * from './sport.js';
+export * from './storage.js';
 export * from './user-account.js';

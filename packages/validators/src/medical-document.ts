@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { cuidSchema, datetimeSchema } from './common.js';
+import { cuidSchema, datetimeSchema, uuidSchema } from './common.js';
 import { documentStatusEnum } from './enums.js';
 
 // ──────────────────────────────────────────────
@@ -83,3 +83,26 @@ export const getMedicalDocumentByIdInput = z.object({
   id: cuidSchema,
 });
 export type GetMedicalDocumentByIdInput = z.infer<typeof getMedicalDocumentByIdInput>;
+
+export const uploadMedicalDocumentInput = z.object({
+  fileName: z.string(),
+  mimeType: z.string(),
+});
+export type UploadMedicalDocumentInput = z.infer<typeof uploadMedicalDocumentInput>;
+
+export const uploadMedicalDocumentOutput = z.object({
+  documentId: uuidSchema,
+  uploadUrl: z.string().url(),
+});
+export type UploadMedicalDocumentOutput = z.infer<typeof uploadMedicalDocumentOutput>;
+
+export const medicalDocumentIdInput = z.object({
+  documentId: uuidSchema,
+});
+export type MedicalDocumentIdInput = z.infer<typeof medicalDocumentIdInput>;
+
+export const rejectMedicalDocumentInput = z.object({
+  documentId: uuidSchema,
+  reason: z.string().min(1),
+});
+export type RejectMedicalDocumentInput = z.infer<typeof rejectMedicalDocumentInput>;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { cuidSchema, countryCodeSchema, datetimeSchema, slugSchema } from './common.js';
+import { cuidSchema, countryCodeSchema, datetimeSchema, slugSchema, uuidSchema } from './common.js';
 import { profileStatusEnum } from './enums.js';
 
 // ──────────────────────────────────────────────
@@ -41,6 +41,14 @@ export const updateAthleteInput = z.object({
 });
 export type UpdateAthleteInput = z.infer<typeof updateAthleteInput>;
 
+export const updateAthleteProfileInput = z.object({
+  bio: z.string().max(2000).optional(),
+  heightCm: z.number().int().min(1).optional(),
+  weightKg: z.number().min(1).optional(),
+  sport: z.string().min(1).max(100).optional(),
+});
+export type UpdateAthleteProfileInput = z.infer<typeof updateAthleteProfileInput>;
+
 // ──────────────────────────────────────────────
 // OUTPUT SCHEMAS
 // ──────────────────────────────────────────────
@@ -73,3 +81,20 @@ export const getAthleteByIdInput = z.object({
   id: cuidSchema,
 });
 export type GetAthleteByIdInput = z.infer<typeof getAthleteByIdInput>;
+
+export const getAthleteProfileInput = z.object({
+  athleteId: uuidSchema,
+});
+export type GetAthleteProfileInput = z.infer<typeof getAthleteProfileInput>;
+
+export const getAthletePublicProfileInput = z.object({
+  slug: z.string(),
+});
+export type GetAthletePublicProfileInput = z.infer<typeof getAthletePublicProfileInput>;
+
+export const searchAthletesInput = z.object({
+  query: z.string(),
+  sportId: uuidSchema.optional(),
+  page: z.number().int().min(1).optional(),
+});
+export type SearchAthletesInput = z.infer<typeof searchAthletesInput>;

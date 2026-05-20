@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { cuidSchema, datetimeSchema } from './common.js';
+import { cuidSchema, datetimeSchema, uuidSchema } from './common.js';
 import { connectionStatusEnum } from './enums.js';
 
 // ──────────────────────────────────────────────
@@ -26,6 +26,13 @@ export const sendConnectionRequestInput = z.object({
 });
 export type SendConnectionRequestInput = z.infer<typeof sendConnectionRequestInput>;
 
+export const sendAthleteConnectionRequestInput = z.object({
+  targetAthleteId: uuidSchema,
+});
+export type SendAthleteConnectionRequestInput = z.infer<
+  typeof sendAthleteConnectionRequestInput
+>;
+
 export const respondConnectionInput = z.object({
   connectionId: cuidSchema,
   status: z.enum(['ACCEPTED', 'DECLINED']),
@@ -38,3 +45,16 @@ export type RespondConnectionInput = z.infer<typeof respondConnectionInput>;
 
 export const athleteConnectionOwnerOutput = athleteConnectionSchema;
 export type AthleteConnectionOwnerOutput = z.infer<typeof athleteConnectionOwnerOutput>;
+
+export const athleteConnectionListOutput = z.array(athleteConnectionSchema);
+export type AthleteConnectionListOutput = z.infer<typeof athleteConnectionListOutput>;
+
+export const connectionIdInput = z.object({
+  connectionId: uuidSchema,
+});
+export type ConnectionIdInput = z.infer<typeof connectionIdInput>;
+
+export const listConnectionsInput = z.object({
+  athleteId: uuidSchema,
+});
+export type ListConnectionsInput = z.infer<typeof listConnectionsInput>;

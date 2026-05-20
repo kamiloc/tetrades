@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { cuidSchema, datetimeSchema } from './common.js';
+import { cuidSchema, datetimeSchema, uuidSchema } from './common.js';
 import { verificationStatusEnum } from './enums.js';
 
 // ──────────────────────────────────────────────
@@ -30,6 +30,9 @@ export const createAthleteAchievementInput = z.object({
 });
 export type CreateAthleteAchievementInput = z.infer<typeof createAthleteAchievementInput>;
 
+export const createAchievementInput = createAthleteAchievementInput;
+export type CreateAchievementInput = z.infer<typeof createAchievementInput>;
+
 export const updateAthleteAchievementInput = z.object({
   title: z.string().min(2).max(200).optional(),
   organization: z.string().min(2).max(200).optional(),
@@ -52,3 +55,16 @@ export type AthleteAchievementPublicOutput = z.infer<typeof athleteAchievementPu
 
 export const athleteAchievementOwnerOutput = athleteAchievementSchema;
 export type AthleteAchievementOwnerOutput = z.infer<typeof athleteAchievementOwnerOutput>;
+
+export const athleteAchievementListOutput = z.array(athleteAchievementSchema);
+export type AthleteAchievementListOutput = z.infer<typeof athleteAchievementListOutput>;
+
+export const listAchievementsInput = z.object({
+  athleteId: uuidSchema,
+});
+export type ListAchievementsInput = z.infer<typeof listAchievementsInput>;
+
+export const verifyAchievementInput = z.object({
+  achievementId: uuidSchema,
+});
+export type VerifyAchievementInput = z.infer<typeof verifyAchievementInput>;

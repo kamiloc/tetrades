@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const cuidSchema = z.string().cuid2();
 
+export const uuidSchema = z.string().uuid();
+
 export const datetimeSchema = z.coerce.date();
 
 export const paginationInput = z.object({

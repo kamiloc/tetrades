@@ -38,3 +38,6 @@ export const athletePublicProfileOutput = athletePublicProfileSchema.omit({
   updatedAt: true,
 });
 export type AthletePublicProfileOutput = z.infer<typeof athletePublicProfileOutput>;
+
+export const athletePublicProfileListOutput = z.array(athletePublicProfileSchema);
+export type AthletePublicProfileListOutput = z.infer<typeof athletePublicProfileListOutput>;

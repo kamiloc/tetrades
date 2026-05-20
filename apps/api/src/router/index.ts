@@ -1,7 +1,17 @@
-// Sprint 3 will merge sub-routers here (athlete, medical, achievement, connection, storage).
-// This placeholder keeps the server compilable during Sprint 2.
 import { router } from '../trpc.js';
 
-export const appRouter = router({});
+import { achievementRouter } from './achievement.js';
+import { athleteRouter } from './athlete.js';
+import { connectionRouter } from './connection.js';
+import { medicalRouter } from './medical.js';
+import { storageRouter } from './storage.js';
+
+export const appRouter = router({
+  athlete: athleteRouter,
+  medical: medicalRouter,
+  achievement: achievementRouter,
+  connection: connectionRouter,
+  storage: storageRouter,
+});
 
 export type AppRouter = typeof appRouter;
