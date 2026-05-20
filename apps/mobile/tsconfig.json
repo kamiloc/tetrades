@@ -13,6 +13,7 @@
   "references": [
     { "path": "../../packages/validators" },
     { "path": "../../packages/auth" },
+    { "path": "../../packages/api-client" },
     { "path": "../../packages/shared-logic" }
   ]
 }

@@ -11,7 +11,7 @@ interface ApiProviderProps {
   getToken: () => Promise<string | null>;
 }
 
-export function ApiProvider({ children, apiUrl, getToken }: ApiProviderProps): ReactNode {
+export function ApiProvider({ children, apiUrl, getToken }: ApiProviderProps) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
