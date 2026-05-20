@@ -6,9 +6,24 @@
     "DATABASE_URL",
     "SUPABASE_URL",
     "SUPABASE_ANON_KEY",
-    "CORS_ORIGIN"
+    "CORS_ORIGIN",
+    "NEXT_PUBLIC_API_URL",
+    "EXPO_PUBLIC_API_URL"
   ],
   "tasks": {
+    "@app/web#build": {
+      "dependsOn": ["@packages/api-client#build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": ["NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+    },
+    "@app/web#typecheck": {
+      "dependsOn": ["@packages/api-client#build"],
+      "outputs": []
+    },
+    "@app/mobile#typecheck": {
+      "dependsOn": ["@packages/api-client#build"],
+      "outputs": []
+    },
     "@packages/api-client#build": {
       "dependsOn": ["@packages/validators#build", "@app/api#build"],
       "outputs": ["dist/**"]

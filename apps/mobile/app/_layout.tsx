@@ -2,22 +2,18 @@ import '../global.css';
 
 import { ApiProvider } from '@packages/api-client';
 import { AuthProvider } from '@packages/auth';
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
 
 import { authClient } from '../lib/auth-client';
+import { getToken } from '../lib/get-token';
 
-const API_URL = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://localhost:3000/trpc';
-
-async function getToken(): Promise<string | null> {
-  const { data } = await authClient.auth.getSession();
-  return data.session?.access_token ?? null;
-}
+const API_URL = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://localhost:3001/trpc';
 
 export default function RootLayout() {
   return (
     <AuthProvider client={authClient}>
       <ApiProvider apiUrl={API_URL} getToken={getToken}>
-        <Slot />
+        <Stack screenOptions={{ headerShown: false }} />
       </ApiProvider>
     </AuthProvider>
   );

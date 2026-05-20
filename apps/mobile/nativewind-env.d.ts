@@ -4,6 +4,9 @@
 // `export {}` makes this a module file so `declare module` augments rather than replaces.
 export {};
 
+// Allow side-effect CSS imports (e.g., `import './global.css'`) used by NativeWind.
+declare module '*.css' {}
+
 declare module 'react-native' {
   interface ViewProps {
     className?: string;

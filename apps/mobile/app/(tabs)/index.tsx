@@ -1,9 +1,5 @@
-import { View, Text } from 'react-native';
+import { Redirect } from 'expo-router';
 
-export default function DashboardScreen() {
-  return (
-    <View className="flex-1 items-center justify-center bg-white">
-      <Text className="text-base font-medium text-gray-900">Athlete Passport</Text>
-    </View>
-  );
+export default function TabIndex() {
+  return <Redirect href="/(tabs)/profile" />;
 }

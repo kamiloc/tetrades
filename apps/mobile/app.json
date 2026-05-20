@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "Athlete Passport",
+    "slug": "athlete-passport",
+    "version": "1.0.0",
+    "scheme": "athletepassport",
+    "platforms": ["ios", "android"],
+    "plugins": ["expo-router", "expo-secure-store"]
+  }
+}
