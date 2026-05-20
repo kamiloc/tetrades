@@ -1,119 +1,174 @@
 import { Feather } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, Text, View } from 'react-native';
+import type { ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  colors,
-  fontSize,
-  fontWeight,
-  layout,
-  radius,
-  shadow,
-  space,
-  text as textTokens,
-} from '../../lib/tokens';
+const shadowSm: ViewStyle = Platform.select<ViewStyle>({
+  ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },
+  android: { elevation: 1 },
+  default: {},
+}) ?? {};
 
 export default function ProfileScreen() {
   return (
-    <View style={styles.root}>
+    <View className="flex-1 bg-canvas">
       {/* Fixed dark header */}
-      <View style={styles.header}>
+      <View className="bg-ink px-5 pb-3">
         <SafeAreaView edges={['top']}>
-          <View style={styles.brandRow}>
-            <View style={styles.brandLeft}>
-              <View style={styles.apMark} />
-              <Text style={styles.brandName}>THE ATHLETE PASSPORT</Text>
+          <View className="h-8 mt-1.5 flex-row items-center justify-between">
+            <View className="flex-row items-center gap-1">
+              <View className="w-[18px] h-[18px] rounded-xs bg-header-chip-bg border border-header-chip-border" />
+              <Text
+                className="text-caption font-semibold uppercase text-on-ink-muted"
+                style={{ letterSpacing: 2.4 }}
+              >
+                THE ATHLETE PASSPORT
+              </Text>
             </View>
-            <View style={styles.notifBtn}>
-              <Feather name="bell" size={16} color={colors.onInk} accessibilityLabel="Notifications" />
+            <View className="w-8 h-8 rounded-sm bg-header-chip-bg border border-header-chip-border items-center justify-center">
+              <Feather name="bell" size={16} color="#FFFFFF" accessibilityLabel="Notifications" />
             </View>
           </View>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <Text style={styles.headerSubtitle}>Your athlete identity</Text>
+          <Text
+            className="text-title1 font-bold text-on-ink mt-3"
+            style={{ letterSpacing: -0.4, lineHeight: 29.9 }}
+          >
+            Profile
+          </Text>
+          <Text
+            className="text-footnote font-regular text-on-ink-muted mt-0.5 mb-5"
+            style={{ letterSpacing: 0.1 }}
+          >
+            Your athlete identity
+          </Text>
         </SafeAreaView>
       </View>
 
       {/* Scrollable body — identity card overlaps header by 20 px */}
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Identity card */}
-        <View style={[styles.card, styles.identityCard]}>
-          <View style={styles.avatarRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarInitials}>MC</Text>
+        <View className="bg-paper rounded-xl border border-line -mt-5 pt-5 px-[18px] pb-[18px]" style={shadowSm}>
+          <View className="flex-row items-center gap-3.5">
+            <View
+              className="w-[68px] h-[68px] rounded-pill bg-blue items-center justify-center border-paper"
+              style={{ borderWidth: 3 }}
+            >
+              <Text className="text-title3 font-bold text-paper">MC</Text>
             </View>
-            <View style={styles.avatarInfo}>
-              <View style={styles.nameRow}>
-                <Text style={styles.athleteName}>Marcus Chen</Text>
-                <View style={styles.blueCheck}>
-                  <Feather name="check" size={9} color={colors.paper} accessibilityLabel="Verified" />
+            <View className="flex-1">
+              <View className="flex-row items-center gap-1">
+                <Text
+                  className="text-title3 font-bold text-text"
+                  style={{ letterSpacing: -0.2, lineHeight: 21.85 }}
+                >
+                  Marcus Chen
+                </Text>
+                <View className="w-4 h-4 rounded-pill bg-blue items-center justify-center">
+                  <Feather name="check" size={9} color="#FFFFFF" accessibilityLabel="Verified" />
                 </View>
               </View>
-              <Text style={styles.sportLine}>Midfielder · Soccer</Text>
-              <View style={styles.tagsRow}>
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>Stanford Cardinal</Text>
+              <Text className="text-small font-regular text-muted mt-1">
+                Midfielder · Soccer
+              </Text>
+              <View className="flex-row gap-2 mt-2 flex-wrap">
+                <View className="px-2 py-1 bg-canvas rounded-sm border border-line">
+                  <Text className="text-caption font-medium text-text">Stanford Cardinal</Text>
                 </View>
-                <View style={[styles.tag, styles.tagBlue]}>
-                  <Text style={[styles.tagText, styles.tagTextBlue]}>NCAA D1</Text>
+                <View className="px-2 py-1 bg-blue-tint rounded-sm border border-blue-line">
+                  <Text className="text-caption font-medium text-blue">NCAA D1</Text>
                 </View>
               </View>
             </View>
           </View>
 
-          <View style={styles.divider} />
+          <View className="h-px bg-line mt-[18px]" />
 
           {/* Stats row */}
-          <View style={styles.statsRow}>
-            <View style={styles.statCell}>
-              <Text style={styles.statValue}>6'1"</Text>
-              <Text style={styles.statLabelText}>HEIGHT</Text>
+          <View className="flex-row pt-3">
+            <View className="flex-1 items-center">
+              <Text className="text-callout font-bold text-text" style={{ letterSpacing: -0.2 }}>
+                6'1"
+              </Text>
+              <Text
+                className="text-caption font-semibold uppercase text-muted mt-0.5"
+                style={{ letterSpacing: 0.2 }}
+              >
+                HEIGHT
+              </Text>
             </View>
-            <View style={[styles.statCell, styles.statCellBorder]}>
-              <Text style={styles.statValue}>178 lb</Text>
-              <Text style={styles.statLabelText}>WEIGHT</Text>
+            <View className="flex-1 items-center border-l border-l-line pl-3.5">
+              <Text className="text-callout font-bold text-text" style={{ letterSpacing: -0.2 }}>
+                178 lb
+              </Text>
+              <Text
+                className="text-caption font-semibold uppercase text-muted mt-0.5"
+                style={{ letterSpacing: 0.2 }}
+              >
+                WEIGHT
+              </Text>
             </View>
-            <View style={[styles.statCell, styles.statCellBorder]}>
-              <Text style={[styles.statValue, styles.statValueBlue]}>247</Text>
-              <Text style={styles.statLabelText}>CONNECTIONS</Text>
+            <View className="flex-1 items-center border-l border-l-line pl-3.5">
+              <Text className="text-callout font-bold text-blue" style={{ letterSpacing: -0.2 }}>
+                247
+              </Text>
+              <Text
+                className="text-caption font-semibold uppercase text-muted mt-0.5"
+                style={{ letterSpacing: 0.2 }}
+              >
+                CONNECTIONS
+              </Text>
             </View>
           </View>
         </View>
 
         {/* About section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionEyebrow}>ABOUT</Text>
-          <View style={styles.card}>
-            <Text style={styles.bioText}>
+        <View className="mt-5">
+          <Text
+            className="text-small font-bold uppercase text-muted pb-2 px-1"
+            style={{ letterSpacing: 1.7 }}
+          >
+            ABOUT
+          </Text>
+          <View className="bg-paper rounded-xl border border-line" style={shadowSm}>
+            <Text
+              className="text-body-lg font-regular text-text px-3 pt-[14px]"
+              style={{ lineHeight: 23.25 }}
+            >
               Center mid at Stanford. PAC-12 All-Conference 2024. Two-footed playmaker focused on tempo control and final-third creation. Records verified through Athlete Passport since 2023.
             </Text>
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <Feather name="map-pin" size={13} color={colors.muted} />
-                <Text style={styles.metaText}>Palo Alto, CA</Text>
+            <View className="flex-row gap-3.5 px-3 pt-3 pb-3.5">
+              <View className="flex-row items-center gap-1">
+                <Feather name="map-pin" size={13} color="#6B7280" />
+                <Text className="text-small font-regular text-muted">Palo Alto, CA</Text>
               </View>
-              <View style={styles.metaItem}>
-                <Feather name="clock" size={13} color={colors.muted} />
-                <Text style={styles.metaText}>Joined Aug 2023</Text>
+              <View className="flex-row items-center gap-1">
+                <Feather name="clock" size={13} color="#6B7280" />
+                <Text className="text-small font-regular text-muted">Joined Aug 2023</Text>
               </View>
             </View>
           </View>
         </View>
 
         {/* Achievements section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionEyebrow}>ACHIEVEMENTS</Text>
-            <Text style={styles.seeAll}>See all</Text>
+        <View className="mt-5">
+          <View className="flex-row items-center justify-between pb-2 px-1">
+            <Text
+              className="text-small font-bold uppercase text-muted"
+              style={{ letterSpacing: 1.7 }}
+            >
+              ACHIEVEMENTS
+            </Text>
+            <Text className="text-small font-semibold text-blue">See all</Text>
           </View>
-          <View style={styles.card}>
+          <View className="bg-paper rounded-xl border border-line" style={shadowSm}>
             <AchievementRow
               icon="check"
-              iconColor={colors.blue}
-              tileBg={colors.blueTint}
+              iconColor="#1A6BFF"
+              tileBg="#E8F0FF"
               title="PAC-12 All-Conference"
               meta="2024 · Stanford Athletics"
               status="verified"
@@ -121,8 +176,8 @@ export default function ProfileScreen() {
             />
             <AchievementRow
               icon="check"
-              iconColor={colors.blue}
-              tileBg={colors.blueTint}
+              iconColor="#1A6BFF"
+              tileBg="#E8F0FF"
               title="U.S. Youth National Team — Player Pool"
               meta="2023 · U.S. Soccer"
               status="verified"
@@ -130,8 +185,8 @@ export default function ProfileScreen() {
             />
             <AchievementRow
               icon="clock"
-              iconColor={colors.pending}
-              tileBg={colors.pendingTint}
+              iconColor="#B5651D"
+              tileBg="#FFF3E0"
               title="Combine: 40-yd dash · 4.61s"
               meta="2025 · Bay Area Showcase"
               status="pending"
@@ -139,8 +194,8 @@ export default function ProfileScreen() {
             />
             <AchievementRow
               icon="check"
-              iconColor={colors.blue}
-              tileBg={colors.blueTint}
+              iconColor="#1A6BFF"
+              tileBg="#E8F0FF"
               title="Annual Physical — Cleared"
               meta="Mar 2025 · Stanford Sports Med"
               status="verified"
@@ -150,20 +205,25 @@ export default function ProfileScreen() {
         </View>
 
         {/* Passport completeness */}
-        <View style={styles.section}>
-          <View style={[styles.card, styles.passportCard]}>
-            <View style={styles.passportRow}>
-              <View style={styles.passportTile}>
-                <Feather name="shield" size={20} color={colors.blue} />
+        <View className="mt-5">
+          <View className="bg-paper rounded-xl border border-blue-line" style={shadowSm}>
+            <View className="flex-row items-center px-3 py-3.5 gap-3">
+              <View className="w-10 h-10 rounded-md bg-blue-tint items-center justify-center">
+                <Feather name="shield" size={20} color="#1A6BFF" />
               </View>
-              <View style={styles.passportInfo}>
-                <Text style={styles.passportTitle}>Passport 82% complete</Text>
-                <View style={styles.progressTrack}>
-                  <View style={styles.progressFill} />
+              <View className="flex-1">
+                <Text
+                  className="text-body font-semibold text-text"
+                  style={{ lineHeight: 17.5 }}
+                >
+                  Passport 82% complete
+                </Text>
+                <View className="h-1.5 bg-blue-line rounded-pill mt-2 overflow-hidden">
+                  <View className="w-[82%] h-1.5 bg-blue rounded-pill" />
                 </View>
               </View>
-              <View style={styles.finishBtn}>
-                <Text style={styles.finishBtnText}>Finish</Text>
+              <View className="px-3.5 py-[7px] rounded-pill border border-line bg-paper">
+                <Text className="text-small font-semibold text-text">Finish</Text>
               </View>
             </View>
           </View>
@@ -194,369 +254,44 @@ function AchievementRow({
   const isVerified = status === 'verified';
   return (
     <>
-      <View style={styles.achieveRow}>
-        <View style={[styles.achieveTile, { backgroundColor: tileBg }]}>
+      <View className="flex-row items-center px-3 py-3 gap-3">
+        <View
+          className="w-[34px] h-[34px] rounded-md items-center justify-center"
+          style={{ backgroundColor: tileBg }}
+        >
           <Feather name={icon} size={17} color={iconColor} accessibilityLabel={isVerified ? 'Verified' : 'Pending'} />
         </View>
-        <View style={styles.achieveInfo}>
-          <Text style={styles.achieveTitle} numberOfLines={2}>{title}</Text>
-          <Text style={styles.achieveMeta}>{meta}</Text>
+        <View className="flex-1">
+          <Text
+            className="text-body font-semibold text-text"
+            numberOfLines={2}
+            style={{ lineHeight: 17.5 }}
+          >
+            {title}
+          </Text>
+          <Text className="text-small font-regular text-muted mt-0.5">{meta}</Text>
         </View>
         {isVerified ? (
-          <View style={styles.chipVerified}>
-            <Text style={styles.chipVerifiedText}>VERIFIED</Text>
+          <View className="px-2 py-1 bg-blue-tint rounded-pill border border-blue-line">
+            <Text
+              className="text-caption font-semibold uppercase text-blue"
+              style={{ letterSpacing: 0.2 }}
+            >
+              VERIFIED
+            </Text>
           </View>
         ) : (
-          <View style={styles.chipPending}>
-            <Text style={styles.chipPendingText}>PENDING</Text>
+          <View className="px-2 py-1 bg-pending-tint rounded-pill">
+            <Text
+              className="text-caption font-semibold uppercase text-pending"
+              style={{ letterSpacing: 0.2 }}
+            >
+              PENDING
+            </Text>
           </View>
         )}
       </View>
-      {showDivider ? <View style={styles.achieveDivider} /> : null}
+      {showDivider ? <View className="h-px bg-line mx-3" /> : null}
     </>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.canvas,
-  },
-
-  // Header
-  header: {
-    backgroundColor: colors.ink,
-    paddingHorizontal: space.xl,
-    paddingBottom: space.md,
-  },
-  brandRow: {
-    height: 32,
-    marginTop: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  brandLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-  },
-  apMark: {
-    width: 18,
-    height: 18,
-    borderRadius: radius.xs,
-    backgroundColor: colors.headerChipBg,
-    borderWidth: 1,
-    borderColor: colors.headerChipBorder,
-  },
-  brandName: {
-    ...textTokens.headerBrand,
-    color: colors.onInkMuted,
-  },
-  notifBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
-    backgroundColor: colors.headerChipBg,
-    borderWidth: 1,
-    borderColor: colors.headerChipBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    ...textTokens.headerLargeTitle,
-    color: colors.onInk,
-    marginTop: space.md,
-  },
-  headerSubtitle: {
-    ...textTokens.headerSubtitle,
-    color: colors.onInkMuted,
-    marginTop: 2,
-    marginBottom: space.xl,
-  },
-
-  // Scroll
-  scroll: { flex: 1 },
-  content: {
-    paddingHorizontal: layout.screenPaddingX,
-    paddingBottom: space['2xl'],
-  },
-
-  // Card base
-  card: {
-    backgroundColor: colors.paper,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.line,
-    ...shadow.sm,
-  },
-
-  // Identity card
-  identityCard: {
-    marginTop: -20,
-    paddingTop: space.xl,
-    paddingHorizontal: 18,
-    paddingBottom: 18,
-  },
-  avatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  avatar: {
-    width: layout.avatarSizes.hero,
-    height: layout.avatarSizes.hero,
-    borderRadius: radius.pill,
-    backgroundColor: colors.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.paper,
-  },
-  avatarInitials: {
-    fontSize: fontSize.title3,
-    fontWeight: fontWeight.bold,
-    color: colors.paper,
-  },
-  avatarInfo: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-  },
-  athleteName: {
-    ...textTokens.cardTitle,
-    color: colors.text,
-  },
-  blueCheck: {
-    width: 16,
-    height: 16,
-    borderRadius: radius.pill,
-    backgroundColor: colors.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sportLine: {
-    ...textTokens.meta,
-    color: colors.muted,
-    marginTop: 4,
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    gap: space.sm,
-    marginTop: space.sm,
-    flexWrap: 'wrap',
-  },
-  tag: {
-    paddingHorizontal: space.sm,
-    paddingVertical: 4,
-    backgroundColor: colors.canvas,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.line,
-  },
-  tagText: {
-    fontSize: fontSize.caption,
-    fontWeight: fontWeight.medium,
-    color: colors.text,
-  },
-  tagBlue: {
-    backgroundColor: colors.blueTint,
-    borderColor: colors.blueLine,
-  },
-  tagTextBlue: {
-    color: colors.blue,
-  },
-
-  // Divider
-  divider: {
-    height: 1,
-    backgroundColor: colors.line,
-    marginTop: 18,
-  },
-
-  // Stats
-  statsRow: {
-    flexDirection: 'row',
-    paddingTop: space.md,
-  },
-  statCell: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statCellBorder: {
-    borderLeftWidth: 1,
-    borderLeftColor: colors.line,
-    paddingLeft: 14,
-  },
-  statValue: {
-    ...textTokens.statValue,
-    color: colors.text,
-  },
-  statValueBlue: {
-    color: colors.blue,
-  },
-  statLabelText: {
-    ...textTokens.statLabel,
-    color: colors.muted,
-    marginTop: 2,
-  },
-
-  // Sections
-  section: {
-    marginTop: space.xl,
-  },
-  sectionEyebrow: {
-    ...textTokens.sectionEyebrow,
-    color: colors.muted,
-    paddingBottom: space.sm,
-    paddingHorizontal: 4,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: space.sm,
-    paddingHorizontal: 4,
-  },
-  seeAll: {
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.semibold,
-    color: colors.blue,
-  },
-
-  // About card
-  bioText: {
-    ...textTokens.body,
-    color: colors.text,
-    paddingHorizontal: space.md,
-    paddingTop: 14,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    gap: 14,
-    paddingHorizontal: space.md,
-    paddingTop: space.md,
-    paddingBottom: 14,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-  },
-  metaText: {
-    ...textTokens.meta,
-    color: colors.muted,
-  },
-
-  // Achievement rows
-  achieveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
-    gap: space.md,
-  },
-  achieveTile: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  achieveInfo: {
-    flex: 1,
-  },
-  achieveTitle: {
-    ...textTokens.rowTitle,
-    color: colors.text,
-  },
-  achieveMeta: {
-    ...textTokens.meta,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  achieveDivider: {
-    height: 1,
-    backgroundColor: colors.line,
-    marginHorizontal: space.md,
-  },
-  chipVerified: {
-    paddingHorizontal: space.sm,
-    paddingVertical: 4,
-    backgroundColor: colors.blueTint,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.blueLine,
-  },
-  chipVerifiedText: {
-    ...textTokens.chip,
-    color: colors.blue,
-  },
-  chipPending: {
-    paddingHorizontal: space.sm,
-    paddingVertical: 4,
-    backgroundColor: colors.pendingTint,
-    borderRadius: radius.pill,
-  },
-  chipPendingText: {
-    ...textTokens.chip,
-    color: colors.pending,
-  },
-
-  // Passport card
-  passportCard: {
-    borderColor: colors.blueLine,
-  },
-  passportRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: space.md,
-    paddingVertical: 14,
-    gap: space.md,
-  },
-  passportTile: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: colors.blueTint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  passportInfo: {
-    flex: 1,
-  },
-  passportTitle: {
-    ...textTokens.rowTitle,
-    color: colors.text,
-  },
-  progressTrack: {
-    height: 6,
-    backgroundColor: colors.blueLine,
-    borderRadius: radius.pill,
-    marginTop: space.sm,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    width: '82%',
-    height: 6,
-    backgroundColor: colors.blue,
-    borderRadius: radius.pill,
-  },
-  finishBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.paper,
-  },
-  finishBtnText: {
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.semibold,
-    color: colors.text,
-  },
-});

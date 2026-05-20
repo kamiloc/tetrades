@@ -1,17 +1,25 @@
 import { Feather } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, Text, View } from 'react-native';
+import type { ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  colors,
-  fontSize,
-  fontWeight,
-  layout,
-  radius,
-  shadow,
-  space,
-  text as textTokens,
-} from '../../lib/tokens';
+const shadowSm: ViewStyle = Platform.select<ViewStyle>({
+  ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },
+  android: { elevation: 1 },
+  default: {},
+}) ?? {};
+
+const shadowCta: ViewStyle = Platform.select<ViewStyle>({
+  ios: { shadowColor: '#1A6BFF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12 },
+  android: { elevation: 4 },
+  default: {},
+}) ?? {};
+
+const shadowInk: ViewStyle = Platform.select<ViewStyle>({
+  ios: { shadowColor: '#0B1220', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 20 },
+  android: { elevation: 6 },
+  default: {},
+}) ?? {};
 
 const PREVIEW_DOCS = [
   'Annual Physical Examination',
@@ -22,240 +30,123 @@ const PREVIEW_DOCS = [
 
 export default function DocumentsScreen() {
   return (
-    <View style={styles.root}>
+    <View className="flex-1 bg-canvas">
       {/* Dark header */}
-      <View style={styles.header}>
+      <View className="bg-ink px-5 pb-3">
         <SafeAreaView edges={['top']}>
-          <View style={styles.brandRow}>
-            <View style={styles.brandLeft}>
-              <View style={styles.apMark} />
-              <Text style={styles.brandName}>THE ATHLETE PASSPORT</Text>
+          <View className="h-8 mt-1.5 flex-row items-center">
+            <View className="flex-row items-center gap-1">
+              <View className="w-[18px] h-[18px] rounded-xs bg-header-chip-bg border border-header-chip-border" />
+              <Text
+                className="text-caption font-semibold uppercase text-on-ink-muted"
+                style={{ letterSpacing: 2.4 }}
+              >
+                THE ATHLETE PASSPORT
+              </Text>
             </View>
           </View>
-          <Text style={styles.headerTitle}>Documents</Text>
-          <Text style={styles.headerSubtitle}>Verified medical records</Text>
+          <Text
+            className="text-title1 font-bold text-on-ink mt-3"
+            style={{ letterSpacing: -0.4, lineHeight: 29.9 }}
+          >
+            Documents
+          </Text>
+          <Text
+            className="text-footnote font-regular text-on-ink-muted mt-0.5 mb-5"
+            style={{ letterSpacing: 0.1 }}
+          >
+            Verified medical records
+          </Text>
         </SafeAreaView>
       </View>
 
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Lock hero card */}
-        <View style={[styles.card, styles.heroCard]}>
-          <View style={[styles.lockIcon, shadow.ink]}>
-            <Feather name="lock" size={26} color={colors.paper} accessibilityLabel="Locked" />
+        <View
+          className="bg-paper rounded-xl border border-blue-line items-center px-[18px] py-[22px]"
+          style={shadowSm}
+        >
+          <View
+            className="w-14 h-14 rounded-xl bg-ink items-center justify-center"
+            style={shadowInk}
+          >
+            <Feather name="lock" size={26} color="#FFFFFF" accessibilityLabel="Locked" />
           </View>
-          <Text style={styles.heroEyebrow}>SPRINT 4 · COMING SOON</Text>
-          <Text style={styles.heroTitle}>Verified medical records</Text>
-          <Text style={styles.heroBody}>
+          <Text
+            className="text-small font-bold uppercase text-blue mt-[14px]"
+            style={{ letterSpacing: 1.7 }}
+          >
+            SPRINT 4 · COMING SOON
+          </Text>
+          <Text
+            className="text-title3 font-bold text-text mt-2 text-center"
+            style={{ letterSpacing: -0.2, lineHeight: 21.85 }}
+          >
+            Verified medical records
+          </Text>
+          <Text
+            className="text-footnote font-regular text-muted mt-2 text-center max-w-[280px]"
+            style={{ lineHeight: 19.5 }}
+          >
             Securely upload physicals, ECGs, and clearance forms. Cryptographically signed by your team's medical staff.
           </Text>
-          <View style={[styles.notifyBtn, shadow.cta]}>
-            <Text style={styles.notifyBtnText}>Notify me when ready</Text>
+          <View className="mt-4 px-5 py-2.5 rounded-pill bg-blue" style={shadowCta}>
+            <Text
+              className="text-footnote font-semibold text-paper"
+              style={{ letterSpacing: 0.1 }}
+            >
+              Notify me when ready
+            </Text>
           </View>
         </View>
 
         {/* Locked preview list */}
-        <View style={styles.section}>
-          <Text style={styles.sectionEyebrow}>PREVIEW · LOCKED</Text>
-          <View style={[styles.card, styles.previewCard]}>
+        <View className="mt-5">
+          <Text
+            className="text-small font-bold uppercase text-muted pb-2 px-1"
+            style={{ letterSpacing: 1.7 }}
+          >
+            PREVIEW · LOCKED
+          </Text>
+          <View className="bg-paper rounded-xl border border-line opacity-70" style={shadowSm}>
             {PREVIEW_DOCS.map((doc, index) => (
               <View key={doc}>
-                <View style={styles.previewRow}>
-                  <View style={styles.docTile}>
-                    <Feather name="lock" size={14} color={colors.subtle} />
+                <View className="flex-row items-center px-3 py-3 gap-3">
+                  <View className="w-[38px] h-11 rounded-md bg-canvas border border-line items-center justify-center">
+                    <Feather name="lock" size={14} color="#9AA3B2" />
                   </View>
-                  <View style={styles.previewInfo}>
-                    <Text style={styles.previewTitle} numberOfLines={1}>{doc}</Text>
-                    <Text style={styles.previewMeta}>Locked until Sprint 4</Text>
+                  <View className="flex-1">
+                    <Text
+                      className="text-body font-semibold text-text"
+                      numberOfLines={1}
+                      style={{ lineHeight: 17.5 }}
+                    >
+                      {doc}
+                    </Text>
+                    <Text className="text-small font-regular text-muted mt-0.5">
+                      Locked until Sprint 4
+                    </Text>
                   </View>
-                  <Feather name="lock" size={16} color={colors.subtle} />
+                  <Feather name="lock" size={16} color="#9AA3B2" />
                 </View>
-                {index < PREVIEW_DOCS.length - 1 ? <View style={styles.rowDivider} /> : null}
+                {index < PREVIEW_DOCS.length - 1 ? <View className="h-px bg-line mx-3" /> : null}
               </View>
             ))}
           </View>
         </View>
 
         {/* Footer note */}
-        <Text style={styles.footerNote}>
+        <Text
+          className="text-caption font-regular text-subtle mt-3 px-2"
+          style={{ lineHeight: 16.5 }}
+        >
           Document uploads, signing, and sharing will arrive in Sprint 4. Today this tab is a placeholder.
         </Text>
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.canvas,
-  },
-
-  // Header
-  header: {
-    backgroundColor: colors.ink,
-    paddingHorizontal: space.xl,
-    paddingBottom: space.md,
-  },
-  brandRow: {
-    height: 32,
-    marginTop: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  brandLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-  },
-  apMark: {
-    width: 18,
-    height: 18,
-    borderRadius: radius.xs,
-    backgroundColor: colors.headerChipBg,
-    borderWidth: 1,
-    borderColor: colors.headerChipBorder,
-  },
-  brandName: {
-    ...textTokens.headerBrand,
-    color: colors.onInkMuted,
-  },
-  headerTitle: {
-    ...textTokens.headerLargeTitle,
-    color: colors.onInk,
-    marginTop: space.md,
-  },
-  headerSubtitle: {
-    ...textTokens.headerSubtitle,
-    color: colors.onInkMuted,
-    marginTop: 2,
-    marginBottom: space.xl,
-  },
-
-  // Scroll
-  scroll: { flex: 1 },
-  content: {
-    paddingHorizontal: layout.screenPaddingX,
-    paddingTop: space['2xl'],
-    paddingBottom: space['2xl'],
-  },
-
-  // Card base
-  card: {
-    backgroundColor: colors.paper,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.line,
-    ...shadow.sm,
-  },
-
-  // Hero card
-  heroCard: {
-    borderColor: colors.blueLine,
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 22,
-  },
-  lockIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.xl,
-    backgroundColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroEyebrow: {
-    ...textTokens.sectionEyebrow,
-    color: colors.blue,
-    marginTop: 14,
-  },
-  heroTitle: {
-    ...textTokens.cardTitle,
-    color: colors.text,
-    marginTop: space.sm,
-    textAlign: 'center',
-  },
-  heroBody: {
-    fontSize: fontSize.footnote,
-    fontWeight: fontWeight.regular,
-    color: colors.muted,
-    lineHeight: fontSize.footnote * 1.5,
-    textAlign: 'center',
-    marginTop: space.sm,
-    maxWidth: 280,
-  },
-  notifyBtn: {
-    marginTop: space.lg,
-    paddingHorizontal: space.xl,
-    paddingVertical: space.md - 2,
-    borderRadius: radius.pill,
-    backgroundColor: colors.blue,
-  },
-  notifyBtnText: {
-    ...textTokens.ctaPrimary,
-    color: colors.paper,
-  },
-
-  // Section
-  section: {
-    marginTop: space.xl,
-  },
-  sectionEyebrow: {
-    ...textTokens.sectionEyebrow,
-    color: colors.muted,
-    paddingBottom: space.sm,
-    paddingHorizontal: 4,
-  },
-
-  // Preview (locked) list
-  previewCard: {
-    opacity: 0.7,
-  },
-  previewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
-    gap: space.md,
-  },
-  docTile: {
-    width: 38,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.canvas,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewInfo: {
-    flex: 1,
-  },
-  previewTitle: {
-    ...textTokens.rowTitle,
-    color: colors.text,
-  },
-  previewMeta: {
-    ...textTokens.meta,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  rowDivider: {
-    height: 1,
-    backgroundColor: colors.line,
-    marginHorizontal: space.md,
-  },
-
-  // Footer
-  footerNote: {
-    fontSize: fontSize.caption,
-    fontWeight: fontWeight.regular,
-    color: colors.subtle,
-    lineHeight: fontSize.caption * 1.5,
-    marginTop: space.md,
-    paddingHorizontal: space.sm,
-  },
-});

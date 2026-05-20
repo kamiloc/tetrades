@@ -4,9 +4,6 @@ import { Tabs, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 
-
-import { colors, fontSize, fontWeight, layout, radius, space, text as textTokens } from '../../lib/tokens';
-
 function TabIcon({
   name,
   focused,
@@ -18,17 +15,23 @@ function TabIcon({
   badge?: number;
   locked?: boolean;
 }) {
-  const tint = focused ? colors.tabActive : colors.tabInactive;
+  const tint = focused ? '#1A6BFF' : '#8A93A4';
   return (
-    <View style={styles.iconWrap}>
+    <View className="w-8 h-6 items-center justify-center">
       <Feather name={name} size={24} color={tint} />
       {badge ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge}</Text>
+        <View
+          className="absolute -top-1 -right-2 min-w-4 h-4 px-1 rounded-pill bg-blue items-center justify-center border-paper"
+          style={{ borderWidth: 1.5 }}
+        >
+          <Text className="text-paper text-badge font-bold">{badge}</Text>
         </View>
       ) : null}
       {locked ? (
-        <View style={focused ? styles.lockDotFocused : styles.lockDotUnfocused}>
+        <View
+          className={`absolute -top-1 -right-2 w-3.5 h-3.5 rounded-full bg-paper items-center justify-center ${focused ? 'border-tab-active' : 'border-line'}`}
+          style={{ borderWidth: 1.5 }}
+        >
           <Feather name="lock" size={8} color={tint} />
         </View>
       ) : null}
@@ -48,7 +51,7 @@ export default function TabsLayout() {
 
   if (isLoading) {
     return (
-      <View style={styles.loading}>
+      <View className="flex-1 items-center justify-center">
         <ActivityIndicator />
       </View>
     );
@@ -63,20 +66,20 @@ export default function TabsLayout() {
       initialRouteName="profile"
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.tabActive,
-        tabBarInactiveTintColor: colors.tabInactive,
+        tabBarActiveTintColor: '#1A6BFF',
+        tabBarInactiveTintColor: '#8A93A4',
         tabBarStyle: {
-          backgroundColor: colors.tabBarBg,
-          borderTopColor: colors.tabBarBorder,
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E5E8EE',
           borderTopWidth: StyleSheet.hairlineWidth,
           height: Platform.select({
-            ios: layout.tabBarHeight + layout.homeIndicatorSafe,
-            android: layout.tabBarHeight,
+            ios: 98,
+            android: 64,
           }),
-          paddingTop: space.sm,
-          paddingBottom: Platform.select({ ios: space.xl, android: space.sm }),
+          paddingTop: 8,
+          paddingBottom: Platform.select({ ios: 20, android: 8 }),
         },
-        tabBarLabelStyle: textTokens.tabLabel,
+        tabBarLabelStyle: { fontSize: 10.5, fontWeight: '500', letterSpacing: 0.1 },
       }}
     >
       <Tabs.Screen
@@ -110,53 +113,3 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  iconWrap: { width: 32, height: 24, alignItems: 'center', justifyContent: 'center' },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    minWidth: 16,
-    height: 16,
-    paddingHorizontal: space.xs,
-    borderRadius: radius.pill,
-    backgroundColor: colors.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.paper,
-  },
-  badgeText: {
-    color: colors.paper,
-    fontSize: fontSize.badge,
-    fontWeight: fontWeight.bold,
-  },
-  lockDotFocused: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: colors.paper,
-    borderWidth: 1.5,
-    borderColor: colors.tabActive,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lockDotUnfocused: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: colors.paper,
-    borderWidth: 1.5,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

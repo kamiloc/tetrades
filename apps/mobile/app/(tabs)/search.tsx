@@ -1,17 +1,13 @@
 import { Feather } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import type { ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  colors,
-  fontSize,
-  fontWeight,
-  layout,
-  radius,
-  shadow,
-  space,
-  text as textTokens,
-} from '../../lib/tokens';
+const shadowSm: ViewStyle = Platform.select<ViewStyle>({
+  ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },
+  android: { elevation: 1 },
+  default: {},
+}) ?? {};
 
 const SPORTS = [
   'Soccer', 'Basketball', 'Football', 'Track & Field',
@@ -32,108 +28,151 @@ const SUGGESTED: Array<{ initials: string; name: string; verified: boolean; spor
 
 export default function SearchScreen() {
   return (
-    <View style={styles.root}>
+    <View className="flex-1 bg-canvas">
       {/* Dark header */}
-      <View style={styles.header}>
+      <View className="bg-ink px-5 pb-3">
         <SafeAreaView edges={['top']}>
-          <View style={styles.brandRow}>
-            <View style={styles.brandLeft}>
-              <View style={styles.apMark} />
-              <Text style={styles.brandName}>THE ATHLETE PASSPORT</Text>
+          <View className="h-8 mt-1.5 flex-row items-center">
+            <View className="flex-row items-center gap-1">
+              <View className="w-[18px] h-[18px] rounded-xs bg-header-chip-bg border border-header-chip-border" />
+              <Text
+                className="text-caption font-semibold uppercase text-on-ink-muted"
+                style={{ letterSpacing: 2.4 }}
+              >
+                THE ATHLETE PASSPORT
+              </Text>
             </View>
           </View>
-          <Text style={styles.headerTitle}>Discover</Text>
-          <Text style={styles.headerSubtitle}>Find athletes & teams</Text>
+          <Text
+            className="text-title1 font-bold text-on-ink mt-3"
+            style={{ letterSpacing: -0.4, lineHeight: 29.9 }}
+          >
+            Discover
+          </Text>
+          <Text
+            className="text-footnote font-regular text-on-ink-muted mt-0.5 mb-5"
+            style={{ letterSpacing: 0.1 }}
+          >
+            Find athletes &amp; teams
+          </Text>
         </SafeAreaView>
       </View>
 
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {/* Search field */}
-        <View style={[styles.searchField, shadow.sm]}>
-          <Feather name="search" size={18} color={colors.subtle} />
+        <View
+          className="flex-row items-center gap-2 bg-paper rounded-lg border border-line px-3.5 py-[11px]"
+          style={shadowSm}
+        >
+          <Feather name="search" size={18} color="#9AA3B2" />
           <TextInput
-            style={styles.searchInput}
+            className="flex-1 font-regular text-text"
+            style={{ fontSize: 14.5 }}
             placeholder="Search athletes by name or sport"
-            placeholderTextColor={colors.subtle}
+            placeholderTextColor="#9AA3B2"
             editable
             returnKeyType="search"
             accessibilityLabel="Search athletes"
           />
-          <View style={styles.kbdHint}>
-            <Text style={styles.kbdHintText}>⌘K</Text>
+          <View className="bg-canvas rounded-xs border border-line py-0.5 px-1.5">
+            <Text className="text-caption font-regular text-muted">⌘K</Text>
           </View>
         </View>
 
         {/* Browse by sport */}
-        <View style={styles.section}>
-          <Text style={styles.sectionEyebrow}>BROWSE BY SPORT</Text>
-          <View style={styles.sportsGrid}>
+        <View className="mt-5">
+          <Text
+            className="text-small font-bold uppercase text-muted pb-2 px-1"
+            style={{ letterSpacing: 1.7 }}
+          >
+            BROWSE BY SPORT
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
             {SPORTS.map((sport) => (
-              <View key={sport} style={styles.sportChip}>
-                <Text style={styles.sportChipText}>{sport}</Text>
+              <View key={sport} className="px-3.5 py-2 bg-paper rounded-pill border border-line" style={shadowSm}>
+                <Text className="text-footnote font-medium text-text">{sport}</Text>
               </View>
             ))}
           </View>
         </View>
 
         {/* Recent searches */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionEyebrow}>RECENT</Text>
-            <Text style={styles.clearText}>Clear</Text>
+        <View className="mt-5">
+          <View className="flex-row items-center justify-between pb-2 px-1">
+            <Text
+              className="text-small font-bold uppercase text-muted"
+              style={{ letterSpacing: 1.7 }}
+            >
+              RECENT
+            </Text>
+            <Text className="text-small font-semibold text-blue pb-2">Clear</Text>
           </View>
-          <View style={styles.card}>
+          <View className="bg-paper rounded-xl border border-line" style={shadowSm}>
             {RECENT.map(({ query, meta }, index) => (
               <View key={query}>
-                <View style={styles.recentRow}>
-                  <View style={styles.recentTile}>
-                    <Feather name="clock" size={15} color={colors.muted} />
+                <View className="flex-row items-center px-3 py-3 gap-3">
+                  <View className="w-8 h-8 rounded-md bg-canvas border border-line items-center justify-center">
+                    <Feather name="clock" size={15} color="#6B7280" />
                   </View>
-                  <View style={styles.recentInfo}>
-                    <Text style={styles.recentQuery}>{query}</Text>
-                    <Text style={styles.recentMeta}>{meta}</Text>
+                  <View className="flex-1">
+                    <Text className="text-body font-medium text-text">{query}</Text>
+                    <Text className="text-small font-regular text-muted mt-0.5">{meta}</Text>
                   </View>
-                  <Feather name="search" size={15} color={colors.subtle} />
+                  <Feather name="search" size={15} color="#9AA3B2" />
                 </View>
-                {index < RECENT.length - 1 ? <View style={styles.rowDivider} /> : null}
+                {index < RECENT.length - 1 ? <View className="h-px bg-line mx-3" /> : null}
               </View>
             ))}
           </View>
         </View>
 
         {/* Suggested for you */}
-        <View style={styles.section}>
-          <Text style={styles.sectionEyebrow}>SUGGESTED FOR YOU</Text>
-          <View style={styles.card}>
+        <View className="mt-5">
+          <Text
+            className="text-small font-bold uppercase text-muted pb-2 px-1"
+            style={{ letterSpacing: 1.7 }}
+          >
+            SUGGESTED FOR YOU
+          </Text>
+          <View className="bg-paper rounded-xl border border-line" style={shadowSm}>
             {SUGGESTED.map((athlete, index) => (
               <View key={athlete.name}>
-                <View style={styles.connectionRow}>
-                  <View style={[styles.avatar, { backgroundColor: `hsl(${athlete.hue}, 60%, 50%)` }]}>
-                    <Text style={styles.avatarInitials}>{athlete.initials}</Text>
+                <View className="flex-row items-center px-3 py-3 gap-3">
+                  <View
+                    className="w-11 h-11 rounded-pill items-center justify-center"
+                    style={{ backgroundColor: `hsl(${athlete.hue}, 60%, 50%)` }}
+                  >
+                    <Text className="text-body font-bold text-paper">{athlete.initials}</Text>
                   </View>
-                  <View style={styles.athleteInfo}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.athleteName} numberOfLines={1}>{athlete.name}</Text>
+                  <View className="flex-1">
+                    <View className="flex-row items-center gap-1">
+                      <Text
+                        className="text-body font-semibold text-text shrink"
+                        numberOfLines={1}
+                        style={{ lineHeight: 17.5 }}
+                      >
+                        {athlete.name}
+                      </Text>
                       {athlete.verified ? (
-                        <View style={styles.blueCheck}>
-                          <Feather name="check" size={9} color={colors.paper} accessibilityLabel="Verified" />
+                        <View className="w-3.5 h-3.5 rounded-pill bg-blue items-center justify-center">
+                          <Feather name="check" size={9} color="#FFFFFF" accessibilityLabel="Verified" />
                         </View>
                       ) : null}
                     </View>
-                    <Text style={styles.sportText}>{athlete.sport}</Text>
-                    <Text style={styles.orgText}>{athlete.org}</Text>
+                    <Text className="text-small font-regular text-muted mt-0.5">{athlete.sport}</Text>
+                    <Text className="text-small font-regular text-subtle">{athlete.org}</Text>
                   </View>
-                  <View style={styles.connectBtn}>
-                    <Feather name="plus" size={13} color={colors.paper} />
-                    <Text style={styles.connectBtnText}>Connect</Text>
+                  <View className="flex-row items-center gap-1 px-3 py-1.5 rounded-pill bg-blue">
+                    <Feather name="plus" size={13} color="#FFFFFF" />
+                    <Text className="text-small font-semibold text-paper">Connect</Text>
                   </View>
                 </View>
-                {index < SUGGESTED.length - 1 ? <View style={styles.rowDivider} /> : null}
+                {index < SUGGESTED.length - 1 ? <View className="h-px bg-line mx-3" /> : null}
               </View>
             ))}
           </View>
@@ -142,244 +181,3 @@ export default function SearchScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.canvas,
-  },
-
-  // Header
-  header: {
-    backgroundColor: colors.ink,
-    paddingHorizontal: space.xl,
-    paddingBottom: space.md,
-  },
-  brandRow: {
-    height: 32,
-    marginTop: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  brandLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-  },
-  apMark: {
-    width: 18,
-    height: 18,
-    borderRadius: radius.xs,
-    backgroundColor: colors.headerChipBg,
-    borderWidth: 1,
-    borderColor: colors.headerChipBorder,
-  },
-  brandName: {
-    ...textTokens.headerBrand,
-    color: colors.onInkMuted,
-  },
-  headerTitle: {
-    ...textTokens.headerLargeTitle,
-    color: colors.onInk,
-    marginTop: space.md,
-  },
-  headerSubtitle: {
-    ...textTokens.headerSubtitle,
-    color: colors.onInkMuted,
-    marginTop: 2,
-    marginBottom: space.xl,
-  },
-
-  // Scroll
-  scroll: { flex: 1 },
-  content: {
-    paddingHorizontal: layout.screenPaddingX,
-    paddingTop: space.lg,
-    paddingBottom: space['2xl'],
-  },
-
-  // Search field
-  searchField: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    backgroundColor: colors.paper,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.line,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: fontSize.bodyLg - 0.5,
-    fontWeight: fontWeight.regular,
-    color: colors.text,
-  },
-  kbdHint: {
-    paddingHorizontal: space.sm - 2,
-    paddingVertical: 2,
-    backgroundColor: colors.canvas,
-    borderRadius: radius.xs,
-    borderWidth: 1,
-    borderColor: colors.line,
-  },
-  kbdHintText: {
-    fontSize: fontSize.caption,
-    fontWeight: fontWeight.regular,
-    color: colors.muted,
-  },
-
-  // Section
-  section: {
-    marginTop: space.xl,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: space.sm,
-    paddingHorizontal: 4,
-  },
-  sectionEyebrow: {
-    ...textTokens.sectionEyebrow,
-    color: colors.muted,
-    paddingBottom: space.sm,
-    paddingHorizontal: 4,
-  },
-  clearText: {
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.semibold,
-    color: colors.blue,
-    paddingBottom: space.sm,
-  },
-
-  // Card base
-  card: {
-    backgroundColor: colors.paper,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.line,
-    ...shadow.sm,
-  },
-
-  // Sport chips
-  sportsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space.sm,
-  },
-  sportChip: {
-    paddingHorizontal: 14,
-    paddingVertical: space.sm,
-    backgroundColor: colors.paper,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.line,
-    ...shadow.sm,
-  },
-  sportChipText: {
-    fontSize: fontSize.footnote,
-    fontWeight: fontWeight.medium,
-    color: colors.text,
-  },
-
-  // Recent rows
-  recentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
-    gap: space.md,
-  },
-  recentTile: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.md,
-    backgroundColor: colors.canvas,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recentInfo: { flex: 1 },
-  recentQuery: {
-    fontSize: fontSize.body,
-    fontWeight: fontWeight.medium,
-    color: colors.text,
-  },
-  recentMeta: {
-    ...textTokens.meta,
-    color: colors.muted,
-    marginTop: 2,
-  },
-
-  // Connection rows (suggested)
-  connectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
-    gap: space.md,
-  },
-  avatar: {
-    width: layout.avatarSizes.lg,
-    height: layout.avatarSizes.lg,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitials: {
-    fontSize: fontSize.body,
-    fontWeight: fontWeight.bold,
-    color: colors.paper,
-  },
-  athleteInfo: { flex: 1 },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-  },
-  athleteName: {
-    ...textTokens.rowTitle,
-    color: colors.text,
-    flexShrink: 1,
-  },
-  blueCheck: {
-    width: 14,
-    height: 14,
-    borderRadius: radius.pill,
-    backgroundColor: colors.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sportText: {
-    ...textTokens.meta,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  orgText: {
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.regular,
-    color: colors.subtle,
-  },
-  connectBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm - 2,
-    borderRadius: radius.pill,
-    backgroundColor: colors.blue,
-  },
-  connectBtnText: {
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.semibold,
-    color: colors.paper,
-  },
-  rowDivider: {
-    height: 1,
-    backgroundColor: colors.line,
-    marginHorizontal: space.md,
-  },
-});
