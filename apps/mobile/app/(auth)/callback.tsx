@@ -2,16 +2,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect } from 'react'
 import { ActivityIndicator, View } from 'react-native'
 
-import { supabase } from '../../lib/supabase'
-
-// Mirror of Supabase's EmailOtpType — values the auth server sends in magic link callbacks
-type MagicLinkOtpType =
-  | 'signup'
-  | 'invite'
-  | 'magiclink'
-  | 'recovery'
-  | 'email_change'
-  | 'email'
+import { verifyMagicLinkCallback } from '../../lib/auth-actions'
+import { authClient } from '../../lib/auth-client'
 
 export default function CallbackScreen() {
   const router = useRouter()
@@ -36,13 +28,11 @@ export default function CallbackScreen() {
       return
     }
 
-    void supabase.auth
-      .verifyOtp({
-        token_hash: tokenHash,
-        type: otpType as MagicLinkOtpType,
-      })
-      .then(({ error }) => {
-        if (error) throw error
+    void verifyMagicLinkCallback(authClient, {
+      tokenHash,
+      type: otpType,
+    })
+      .then(() => {
         router.replace('/(tabs)/profile')
       })
       .catch(() => {

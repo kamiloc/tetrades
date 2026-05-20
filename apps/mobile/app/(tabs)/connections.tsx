@@ -1,7 +1,9 @@
-import { Feather } from '@expo/vector-icons';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import type { ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { Feather } from '../../lib/icons';
+import { colors } from '../../lib/theme';
 
 const shadowSm: ViewStyle = Platform.select<ViewStyle>({
   ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },
@@ -51,8 +53,7 @@ export default function ConnectionsScreen() {
       </View>
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
+        contentContainerClassName="px-4 pt-4 pb-6"
         showsVerticalScrollIndicator={false}
       >
         {/* Pending requests */}
@@ -124,7 +125,7 @@ export default function ConnectionsScreen() {
                       </Text>
                       {athlete.verified ? (
                         <View className="w-3.5 h-3.5 rounded-pill bg-blue items-center justify-center">
-                          <Feather name="check" size={9} color="#FFFFFF" accessibilityLabel="Verified" />
+                          <Feather name="check" size={9} color={colors.paper} accessibilityLabel="Verified" />
                         </View>
                       ) : null}
                     </View>

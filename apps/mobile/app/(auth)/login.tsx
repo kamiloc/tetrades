@@ -1,4 +1,3 @@
-import { useSignIn } from '@packages/auth'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
@@ -11,26 +10,11 @@ import {
   View,
 } from 'react-native'
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+import { sendLoginMagicLink } from '../../lib/auth-actions'
+import { getSpanishError } from '../../lib/auth-errors'
+import { colors } from '../../lib/theme'
 
-function getSpanishError(message: string): string {
-  if (message.includes('Invalid login credentials'))
-    return 'Correo no registrado en el sistema'
-  if (message.includes('Email not confirmed'))
-    return 'Correo no confirmado. Revisa tu bandeja'
-  if (message.includes('Too many requests'))
-    return 'Demasiados intentos. Espera un momento'
-  if (message.includes('User not found'))
-    return 'No encontramos una cuenta con ese correo'
-  if (message.includes('Email rate limit exceeded'))
-    return 'Límite de envíos alcanzado. Intenta más tarde'
-  if (
-    message.includes('Token has expired') ||
-    message.includes('token is invalid')
-  )
-    return 'El código expiró. Solicita uno nuevo'
-  return 'Ocurrió un error. Por favor intenta de nuevo'
-}
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const ERROR_PARAM_MAP: Readonly<Record<string, string>> = {
   link_expired: 'El enlace expiró. Solicita uno nuevo.',
@@ -44,8 +28,6 @@ export default function LoginScreen() {
     ? (rawParams.error[0] ?? undefined)
     : rawParams.error
 
-  const { signInWithMagicLink } = useSignIn()
-
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,7 +40,7 @@ export default function LoginScreen() {
     )
   }, [errorParam])
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     const trimmed = email.trim()
     if (!EMAIL_REGEX.test(trimmed)) {
       setError('Ingresa un correo electrónico válido')
@@ -66,15 +48,18 @@ export default function LoginScreen() {
     }
     setError(null)
     setIsLoading(true)
-    const { error: signInError } = await signInWithMagicLink(
-      trimmed,
-      'athletepassport://auth/callback',
-    )
-    setIsLoading(false)
-    if (signInError !== null) {
-      setError(getSpanishError(signInError))
+    try {
+      await sendLoginMagicLink({
+        email: trimmed,
+        emailRedirectTo: 'athletepassport://auth/callback',
+      })
+    } catch (error: unknown) {
+      setIsLoading(false)
+      const message = error instanceof Error ? error.message : ''
+      setError(getSpanishError(message))
       return
     }
+    setIsLoading(false)
     router.push(
       `/(auth)/verify?email=${encodeURIComponent(trimmed)}` as `/${string}`,
     )
@@ -110,7 +95,7 @@ export default function LoginScreen() {
           autoComplete="email"
           autoCorrect={false}
           placeholder="tu@correo.com"
-          placeholderTextColor="#9AA3B2"
+          placeholderTextColor={colors.subtle}
           value={email}
           onChangeText={setEmail}
           onSubmitEditing={handleSubmit}
@@ -132,7 +117,7 @@ export default function LoginScreen() {
           accessibilityLabel="Continuar"
         >
           {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.paper} />
           ) : (
             <Text className="text-body-lg font-semibold text-on-ink">
               Continuar

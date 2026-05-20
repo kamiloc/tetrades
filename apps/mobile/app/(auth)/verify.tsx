@@ -9,24 +9,9 @@ import {
   View,
 } from 'react-native'
 
-function getSpanishError(message: string): string {
-  if (message.includes('Invalid login credentials'))
-    return 'Correo no registrado en el sistema'
-  if (message.includes('Email not confirmed'))
-    return 'Correo no confirmado. Revisa tu bandeja'
-  if (message.includes('Too many requests'))
-    return 'Demasiados intentos. Espera un momento'
-  if (message.includes('User not found'))
-    return 'No encontramos una cuenta con ese correo'
-  if (message.includes('Email rate limit exceeded'))
-    return 'Límite de envíos alcanzado. Intenta más tarde'
-  if (
-    message.includes('Token has expired') ||
-    message.includes('token is invalid')
-  )
-    return 'El código expiró. Solicita uno nuevo'
-  return 'Ocurrió un error. Por favor intenta de nuevo'
-}
+import { sendLoginMagicLink } from '../../lib/auth-actions'
+import { getSpanishError } from '../../lib/auth-errors'
+import { colors } from '../../lib/theme'
 
 export default function VerifyScreen() {
   const router = useRouter()
@@ -35,7 +20,7 @@ export default function VerifyScreen() {
     ? (rawParams.email[0] ?? undefined)
     : rawParams.email
 
-  const { verifyOtp, signInWithOtp } = useSignIn()
+  const { verifyOtp } = useSignIn()
 
   const [code, setCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -66,7 +51,7 @@ export default function VerifyScreen() {
     return () => clearInterval(id)
   }, [cooldownKey])
 
-  const handleVerify = async () => {
+  const handleVerify = async (): Promise<void> => {
     if (code.length < 6 || !email) return
     setError(null)
     setIsLoading(true)
@@ -80,16 +65,22 @@ export default function VerifyScreen() {
     router.replace('/(tabs)/profile')
   }
 
-  const handleResend = async () => {
+  const handleResend = async (): Promise<void> => {
     if (!email || cooldown > 0 || isLoading) return
     setError(null)
     setIsLoading(true)
-    const { error: resendError } = await signInWithOtp(email)
-    setIsLoading(false)
-    if (resendError !== null) {
-      setError(getSpanishError(resendError))
+    try {
+      await sendLoginMagicLink({
+        email,
+        emailRedirectTo: 'athletepassport://auth/callback',
+      })
+    } catch (error: unknown) {
+      setIsLoading(false)
+      const message = error instanceof Error ? error.message : ''
+      setError(getSpanishError(message))
       return
     }
+    setIsLoading(false)
     setCooldownKey(k => k + 1)
   }
 
@@ -133,7 +124,7 @@ export default function VerifyScreen() {
         keyboardType="numeric"
         autoFocus
         placeholder="000000"
-        placeholderTextColor="#9AA3B2"
+        placeholderTextColor={colors.subtle}
         value={code}
         onChangeText={setCode}
         onSubmitEditing={handleVerify}
@@ -155,7 +146,7 @@ export default function VerifyScreen() {
         accessibilityLabel="Verificar código"
       >
         {isLoading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color={colors.paper} />
         ) : (
           <Text className="text-body-lg font-semibold text-on-ink">
             Verificar código

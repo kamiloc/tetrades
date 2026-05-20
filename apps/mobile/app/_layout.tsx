@@ -5,9 +5,10 @@ import { AuthProvider } from '@packages/auth';
 import { Stack } from 'expo-router';
 
 import { authClient } from '../lib/auth-client';
+import { getRequiredEnv } from '../lib/env';
 import { getToken } from '../lib/get-token';
 
-const API_URL = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://localhost:3001/trpc';
+const API_URL = getRequiredEnv('EXPO_PUBLIC_API_URL');
 
 export default function RootLayout() {
   return (

@@ -1,7 +1,9 @@
-import { Feather } from '@expo/vector-icons';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import type { ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { Feather, type IconName } from '../../lib/icons';
+import { colors } from '../../lib/theme';
 
 const shadowSm: ViewStyle = Platform.select<ViewStyle>({
   ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },
@@ -11,7 +13,10 @@ const shadowSm: ViewStyle = Platform.select<ViewStyle>({
 
 export default function ProfileScreen() {
   return (
-    <View className="flex-1 bg-canvas">
+    <ScrollView
+      contentContainerClassName="bg-canvas pb-6"
+      showsVerticalScrollIndicator={false}
+    >
       {/* Fixed dark header */}
       <View className="bg-ink px-5 pb-3">
         <SafeAreaView edges={['top']}>
@@ -26,7 +31,7 @@ export default function ProfileScreen() {
               </Text>
             </View>
             <View className="w-8 h-8 rounded-sm bg-header-chip-bg border border-header-chip-border items-center justify-center">
-              <Feather name="bell" size={16} color="#FFFFFF" accessibilityLabel="Notifications" />
+              <Feather name="bell" size={16} color={colors.paper} accessibilityLabel="Notifications" />
             </View>
           </View>
           <Text
@@ -44,12 +49,8 @@ export default function ProfileScreen() {
         </SafeAreaView>
       </View>
 
-      {/* Scrollable body — identity card overlaps header by 20 px */}
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* Scrollable body - identity card overlaps header by 20 px */}
+      <View className="px-4">
         {/* Identity card */}
         <View className="bg-paper rounded-xl border border-line -mt-5 pt-5 px-[18px] pb-[18px]" style={shadowSm}>
           <View className="flex-row items-center gap-3.5">
@@ -68,7 +69,7 @@ export default function ProfileScreen() {
                   Marcus Chen
                 </Text>
                 <View className="w-4 h-4 rounded-pill bg-blue items-center justify-center">
-                  <Feather name="check" size={9} color="#FFFFFF" accessibilityLabel="Verified" />
+                  <Feather name="check" size={9} color={colors.paper} accessibilityLabel="Verified" />
                 </View>
               </View>
               <Text className="text-small font-regular text-muted mt-1">
@@ -142,11 +143,11 @@ export default function ProfileScreen() {
             </Text>
             <View className="flex-row gap-3.5 px-3 pt-3 pb-3.5">
               <View className="flex-row items-center gap-1">
-                <Feather name="map-pin" size={13} color="#6B7280" />
+                <Feather name="map-pin" size={13} color={colors.muted} />
                 <Text className="text-small font-regular text-muted">Palo Alto, CA</Text>
               </View>
               <View className="flex-row items-center gap-1">
-                <Feather name="clock" size={13} color="#6B7280" />
+                <Feather name="clock" size={13} color={colors.muted} />
                 <Text className="text-small font-regular text-muted">Joined Aug 2023</Text>
               </View>
             </View>
@@ -209,7 +210,7 @@ export default function ProfileScreen() {
           <View className="bg-paper rounded-xl border border-blue-line" style={shadowSm}>
             <View className="flex-row items-center px-3 py-3.5 gap-3">
               <View className="w-10 h-10 rounded-md bg-blue-tint items-center justify-center">
-                <Feather name="shield" size={20} color="#1A6BFF" />
+                <Feather name="shield" size={20} color={colors.blue} />
               </View>
               <View className="flex-1">
                 <Text
@@ -228,8 +229,8 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
-      </ScrollView>
-    </View>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -243,7 +244,7 @@ function AchievementRow({
   status,
   showDivider,
 }: {
-  icon: React.ComponentProps<typeof Feather>['name'];
+  icon: IconName;
   iconColor: string;
   tileBg: string;
   title: string;

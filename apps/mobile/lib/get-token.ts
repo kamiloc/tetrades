@@ -1,6 +1,8 @@
-import { supabase } from './supabase';
+import { getCurrentSession } from '@packages/auth';
+
+import { authClient } from './auth-client';
 
 export async function getToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
+  const session = await getCurrentSession(authClient);
+  return session?.access_token ?? null;
 }

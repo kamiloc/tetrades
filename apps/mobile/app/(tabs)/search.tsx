@@ -1,7 +1,9 @@
-import { Feather } from '@expo/vector-icons';
 import { Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import type { ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { Feather } from '../../lib/icons';
+import { colors } from '../../lib/theme';
 
 const shadowSm: ViewStyle = Platform.select<ViewStyle>({
   ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },
@@ -59,8 +61,7 @@ export default function SearchScreen() {
       </View>
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
+        contentContainerClassName="px-4 pt-4 pb-6"
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -69,12 +70,12 @@ export default function SearchScreen() {
           className="flex-row items-center gap-2 bg-paper rounded-lg border border-line px-3.5 py-[11px]"
           style={shadowSm}
         >
-          <Feather name="search" size={18} color="#9AA3B2" />
+          <Feather name="search" size={18} color={colors.subtle} />
           <TextInput
             className="flex-1 font-regular text-text"
             style={{ fontSize: 14.5 }}
             placeholder="Search athletes by name or sport"
-            placeholderTextColor="#9AA3B2"
+            placeholderTextColor={colors.subtle}
             editable
             returnKeyType="search"
             accessibilityLabel="Search athletes"
@@ -117,13 +118,13 @@ export default function SearchScreen() {
               <View key={query}>
                 <View className="flex-row items-center px-3 py-3 gap-3">
                   <View className="w-8 h-8 rounded-md bg-canvas border border-line items-center justify-center">
-                    <Feather name="clock" size={15} color="#6B7280" />
+                    <Feather name="clock" size={15} color={colors.muted} />
                   </View>
                   <View className="flex-1">
                     <Text className="text-body font-medium text-text">{query}</Text>
                     <Text className="text-small font-regular text-muted mt-0.5">{meta}</Text>
                   </View>
-                  <Feather name="search" size={15} color="#9AA3B2" />
+                  <Feather name="search" size={15} color={colors.subtle} />
                 </View>
                 {index < RECENT.length - 1 ? <View className="h-px bg-line mx-3" /> : null}
               </View>
@@ -160,7 +161,7 @@ export default function SearchScreen() {
                       </Text>
                       {athlete.verified ? (
                         <View className="w-3.5 h-3.5 rounded-pill bg-blue items-center justify-center">
-                          <Feather name="check" size={9} color="#FFFFFF" accessibilityLabel="Verified" />
+                          <Feather name="check" size={9} color={colors.paper} accessibilityLabel="Verified" />
                         </View>
                       ) : null}
                     </View>
@@ -168,7 +169,7 @@ export default function SearchScreen() {
                     <Text className="text-small font-regular text-subtle">{athlete.org}</Text>
                   </View>
                   <View className="flex-row items-center gap-1 px-3 py-1.5 rounded-pill bg-blue">
-                    <Feather name="plus" size={13} color="#FFFFFF" />
+                    <Feather name="plus" size={13} color={colors.paper} />
                     <Text className="text-small font-semibold text-paper">Connect</Text>
                   </View>
                 </View>

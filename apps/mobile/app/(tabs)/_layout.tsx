@@ -1,8 +1,10 @@
-import { Feather } from '@expo/vector-icons';
 import { useSession } from '@packages/auth';
 import { Tabs, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+
+import { Feather, type IconName } from '../../lib/icons';
+import { colors } from '../../lib/theme';
 
 function TabIcon({
   name,
@@ -10,12 +12,12 @@ function TabIcon({
   badge,
   locked,
 }: {
-  name: React.ComponentProps<typeof Feather>['name'];
+  name: IconName;
   focused: boolean;
   badge?: number;
   locked?: boolean;
 }) {
-  const tint = focused ? '#1A6BFF' : '#8A93A4';
+  const tint = focused ? colors.blue : colors.tabInactive;
   return (
     <View className="w-8 h-6 items-center justify-center">
       <Feather name={name} size={24} color={tint} />
@@ -66,11 +68,11 @@ export default function TabsLayout() {
       initialRouteName="profile"
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#1A6BFF',
-        tabBarInactiveTintColor: '#8A93A4',
+        tabBarActiveTintColor: colors.blue,
+        tabBarInactiveTintColor: colors.tabInactive,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E8EE',
+          backgroundColor: colors.paper,
+          borderTopColor: colors.line,
           borderTopWidth: StyleSheet.hairlineWidth,
           height: Platform.select({
             ios: 98,

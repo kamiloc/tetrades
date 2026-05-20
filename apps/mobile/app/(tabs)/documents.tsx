@@ -1,7 +1,9 @@
-import { Feather } from '@expo/vector-icons';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import type { ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { Feather } from '../../lib/icons';
+import { colors } from '../../lib/theme';
 
 const shadowSm: ViewStyle = Platform.select<ViewStyle>({
   ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },
@@ -61,8 +63,7 @@ export default function DocumentsScreen() {
       </View>
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 24 }}
+        contentContainerClassName="px-4 pt-6 pb-6"
         showsVerticalScrollIndicator={false}
       >
         {/* Lock hero card */}
@@ -74,7 +75,7 @@ export default function DocumentsScreen() {
             className="w-14 h-14 rounded-xl bg-ink items-center justify-center"
             style={shadowInk}
           >
-            <Feather name="lock" size={26} color="#FFFFFF" accessibilityLabel="Locked" />
+            <Feather name="lock" size={26} color={colors.paper} accessibilityLabel="Locked" />
           </View>
           <Text
             className="text-small font-bold uppercase text-blue mt-[14px]"
@@ -117,7 +118,7 @@ export default function DocumentsScreen() {
               <View key={doc}>
                 <View className="flex-row items-center px-3 py-3 gap-3">
                   <View className="w-[38px] h-11 rounded-md bg-canvas border border-line items-center justify-center">
-                    <Feather name="lock" size={14} color="#9AA3B2" />
+                    <Feather name="lock" size={14} color={colors.subtle} />
                   </View>
                   <View className="flex-1">
                     <Text
@@ -131,7 +132,7 @@ export default function DocumentsScreen() {
                       Locked until Sprint 4
                     </Text>
                   </View>
-                  <Feather name="lock" size={16} color="#9AA3B2" />
+                  <Feather name="lock" size={16} color={colors.subtle} />
                 </View>
                 {index < PREVIEW_DOCS.length - 1 ? <View className="h-px bg-line mx-3" /> : null}
               </View>
