@@ -95,6 +95,6 @@ export type GetAthletePublicProfileInput = z.infer<typeof getAthletePublicProfil
 export const searchAthletesInput = z.object({
   query: z.string(),
   sportId: uuidSchema.optional(),
-  page: z.number().int().min(1).optional(),
+  cursor: cuidSchema.optional(),
 });
 export type SearchAthletesInput = z.infer<typeof searchAthletesInput>;

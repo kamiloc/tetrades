@@ -8,5 +8,5 @@ export const useUpdateProfile = () => trpc.athlete.updateProfile.useMutation();
 export const usePublicProfile = (slug: string) =>
   trpc.athlete.getPublicProfile.useQuery({ slug });
 
-export const useSearchAthletes = (query: string, sportId?: string, page?: number) =>
-  trpc.athlete.searchAthletes.useQuery({ query, sportId, page });
+export const useSearchAthletes = (query: string, sportId?: string, cursor?: string) =>
+  trpc.athlete.searchAthletes.useQuery({ query, sportId, cursor });

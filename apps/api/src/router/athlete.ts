@@ -10,6 +10,7 @@ import {
 } from '@packages/validators';
 import { TRPCError } from '@trpc/server';
 
+import { getEnv } from '../env.js';
 import { protectedProcedure, publicProcedure, router } from '../trpc.js';
 
 export const athleteRouter = router({
@@ -50,7 +51,7 @@ export const athleteRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Private profile not found' });
       }
 
-      const masterKey = process.env['MASTER_ENCRYPTION_KEY'] ?? '';
+      const masterKey = getEnv().MASTER_ENCRYPTION_KEY;
       const auditBase = {
         actorId: ctx.userId,
         purpose: 'getProfile',
@@ -94,7 +95,7 @@ export const athleteRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Athlete not found' });
       }
 
-      const masterKey = process.env['MASTER_ENCRYPTION_KEY'] ?? '';
+      const masterKey = getEnv().MASTER_ENCRYPTION_KEY;
 
       const updateData = {
         ...(input.exactDob !== undefined
@@ -184,8 +185,6 @@ export const athleteRouter = router({
     .output(athletePublicProfileListOutput)
     .query(async ({ ctx, input }) => {
       const pageSize = 20;
-      const page = input.page ?? 1;
-      const skip = (page - 1) * pageSize;
 
       const profiles = await ctx.prisma.athletePublicProfile.findMany({
         where: {
@@ -208,7 +207,9 @@ export const athleteRouter = router({
           updatedAt: true,
         },
         orderBy: { athlete: { displayName: 'asc' } },
-        skip,
+        ...(input.cursor !== undefined
+          ? { cursor: { athleteId: input.cursor }, skip: 1 }
+          : {}),
         take: pageSize,
       });
 

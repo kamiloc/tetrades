@@ -1,5 +1,9 @@
-import { extractBearerToken } from '@packages/auth';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import {
+  createTokenVerifier,
+  extractBearerToken,
+  verifyAccessToken,
+  type SupabaseClient,
+} from '@packages/auth';
 
 import { getEnv } from '../env.js';
 
@@ -13,8 +17,7 @@ const UNAUTHENTICATED: AuthResult = {
   errorCode: undefined,
 };
 
-// One Supabase client per process, created lazily on first use.
-// Uses the anon key to call auth.getUser() for JWT verification.
+// One verifier client per process, created lazily on first use.
 let _verifier: SupabaseClient | undefined;
 
 function getVerifier(): SupabaseClient {
@@ -22,12 +25,9 @@ function getVerifier(): SupabaseClient {
 
   const env = getEnv();
 
-  _verifier = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
+  _verifier = createTokenVerifier({
+    supabaseUrl: env.SUPABASE_URL,
+    supabaseAnonKey: env.SUPABASE_ANON_KEY,
   });
 
   return _verifier;
@@ -58,20 +58,11 @@ export async function verifyAuthToken(
   }
 
   try {
-    const { data, error } = await getVerifier().auth.getUser(token);
-
-    if (error !== null || !data.user) {
-      return {
-        authenticated: false,
-        userId: null,
-        // Status code only — never the message which may reference token segments.
-        errorCode: error?.status ?? 'no_user',
-      };
-    }
+    const user = await verifyAccessToken(getVerifier(), token);
 
     return {
       authenticated: true,
-      userId: data.user.id,
+      userId: user.userId,
     };
   } catch (err: unknown) {
     return {

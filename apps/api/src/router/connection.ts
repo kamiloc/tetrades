@@ -64,19 +64,20 @@ export const connectionRouter = router({
       // When an existing DECLINED/BLOCKED record is in the same direction (requesterId→addresseeId),
       // we must update it rather than create — the DB unique([requesterId, addresseeId]) constraint
       // prevents a second record with the same requester-addressee pair.
-      if (existing && existing.requesterId === requesterId) {
-        return ctx.prisma.athleteConnection.update({
-          where: { id: existing.id },
-          data: { status: 'PENDING', respondedAt: null },
-          select: {
-            id: true,
-            requesterId: true,
-            addresseeId: true,
-            status: true,
-            createdAt: true,
-            respondedAt: true,
-          },
-        });
+      if (existing) {
+        if (existing.status === 'BLOCKED') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Cannot send a connection request to this athlete',
+          });
+        }
+
+        // DECLINED in the same direction: delete the stale record and fall through to create.
+        // Updating a DECLINED record back to PENDING violates the state machine —
+        // it preserves a record that was explicitly rejected, breaking audit semantics.
+        if (existing.requesterId === requesterId) {
+          await ctx.prisma.athleteConnection.delete({ where: { id: existing.id } });
+        }
       }
 
       return ctx.prisma.athleteConnection.create({
@@ -224,14 +225,22 @@ export const connectionRouter = router({
     .input(listConnectionsInput)
     .output(athleteConnectionListOutput)
     .query(async ({ ctx, input }) => {
-      const athlete = await ctx.prisma.athlete.findUnique({
-        where: { id: input.athleteId },
-        select: { id: true },
+      const userAccount = await ctx.prisma.userAccount.findUnique({
+        where: { supabaseUserId: ctx.userId },
+        select: { athlete: { select: { id: true } } },
       });
-      if (!athlete) {
+      const callerId = userAccount?.athlete?.id;
+      if (!callerId) {
         throw new TRPCError({
           code: 'NOT_FOUND',
-          message: 'Athlete not found',
+          message: 'Athlete profile not found for current user',
+        });
+      }
+
+      if (callerId !== input.athleteId) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only view your own connections',
         });
       }
 

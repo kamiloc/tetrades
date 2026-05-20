@@ -7,6 +7,11 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().min(1),
   API_PORT: z.coerce.number().int().positive().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).optional().default('development'),
+  // L3-RESTRICTED: 64-char hex string (32 bytes) for AES-256-GCM envelope encryption.
+  MASTER_ENCRYPTION_KEY: z
+    .string()
+    .length(64, 'MASTER_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)')
+    .regex(/^[0-9a-fA-F]+$/, 'MASTER_ENCRYPTION_KEY must contain only hex characters'),
 });
 
 export type Env = z.infer<typeof envSchema>;
