@@ -7,6 +7,7 @@ export {
   useUpdateProfile,
   usePublicProfile,
   useSearchAthletes,
+  useMyAthlete,
 } from './hooks/athlete.js';
 
 export {

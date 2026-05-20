@@ -10,3 +10,7 @@ export const usePublicProfile = (slug: string) =>
 
 export const useSearchAthletes = (query: string, sportId?: string, cursor?: string) =>
   trpc.athlete.searchAthletes.useQuery({ query, sportId, cursor });
+
+// Query: resolve the current session user's athlete identity
+export const useMyAthlete = () =>
+  trpc.athlete.getMyAthlete.useQuery();

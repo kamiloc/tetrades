@@ -9,6 +9,7 @@ import {
   updateAthletePrivateProfileInput,
 } from '@packages/validators';
 import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
 
 import { getEnv } from '../env.js';
 import { protectedProcedure, publicProcedure, router } from '../trpc.js';
@@ -214,5 +215,43 @@ export const athleteRouter = router({
       });
 
       return profiles;
+    }),
+
+  getMyAthlete: protectedProcedure
+    .output(
+      z.object({
+        athleteId:   z.string(),
+        displayName: z.string().nullable(),
+        sport:       z.string().nullable(),
+      }),
+    )
+    .query(async ({ ctx }) => {
+      const userAccount = await ctx.prisma.userAccount.findUnique({
+        where: { supabaseUserId: ctx.userId },
+        select: { id: true },
+      });
+
+      if (!userAccount) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'User account not found' });
+      }
+
+      const athlete = await ctx.prisma.athlete.findUnique({
+        where: { userAccountId: userAccount.id },
+        select: {
+          id: true,
+          displayName: true,
+          sport: { select: { name: true } },
+        },
+      });
+
+      if (!athlete) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Athlete profile not found for this user' });
+      }
+
+      return {
+        athleteId:   athlete.id,
+        displayName: athlete.displayName,
+        sport:       athlete.sport.name,
+      };
     }),
 });
