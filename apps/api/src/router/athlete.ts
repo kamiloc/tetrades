@@ -254,4 +254,124 @@ export const athleteRouter = router({
         sport:       athlete.sport.name,
       };
     }),
+
+  /**
+   * Onboarding state for the routing layer. Returns whether the user has a
+   * UserAccount (created by the auth.users → user_accounts trigger) and an
+   * Athlete record (created by `bootstrap` after the user submits the
+   * onboarding form).
+   *
+   * Unlike `getMyAthlete` this NEVER throws on missing rows — the routing
+   * layer needs a deterministic decision tree without try/catch.
+   */
+  getOnboardingState: protectedProcedure
+    .output(
+      z.object({
+        hasUserAccount: z.boolean(),
+        hasAthlete:     z.boolean(),
+        athleteId:      z.string().nullable(),
+      }),
+    )
+    .query(async ({ ctx }) => {
+      const userAccount = await ctx.prisma.userAccount.findUnique({
+        where: { supabaseUserId: ctx.userId },
+        select: { id: true, athlete: { select: { id: true } } },
+      });
+
+      if (!userAccount) {
+        return { hasUserAccount: false, hasAthlete: false, athleteId: null };
+      }
+
+      return {
+        hasUserAccount: true,
+        hasAthlete:     userAccount.athlete !== null,
+        athleteId:      userAccount.athlete?.id ?? null,
+      };
+    }),
+
+  /**
+   * Onboarding mutation. Creates the Athlete row with profileStatus=DRAFT and
+   * transitions the UserAccount from PENDING → ACTIVE. Slug is generated
+   * server-side from displayName + a short random suffix to avoid collisions.
+   *
+   * Idempotent at the conflict level: if an Athlete already exists, returns
+   * its id instead of erroring. The displayName/sport/country submitted on a
+   * second call are ignored — use `updateProfile` to change them later.
+   */
+  bootstrap: protectedProcedure
+    .input(
+      z.object({
+        displayName: z.string().trim().min(2).max(100),
+        sportId:     z.string().min(1),
+        countryCode: z.string().length(2).toUpperCase(),
+      }),
+    )
+    .output(z.object({ athleteId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Upsert UserAccount as a defensive fallback when the auth.users →
+      // user_accounts Postgres trigger has not been applied yet. With the
+      // trigger in place this is a no-op (the row already exists).
+      const userAccount = await ctx.prisma.userAccount.upsert({
+        where:  { supabaseUserId: ctx.userId },
+        create: {
+          supabaseUserId: ctx.userId,
+          role:           'ATHLETE',
+          status:         'PENDING',
+        },
+        update: {},
+        select: { id: true, athlete: { select: { id: true } } },
+      });
+
+      if (userAccount.athlete) {
+        return { athleteId: userAccount.athlete.id };
+      }
+
+      const sport = await ctx.prisma.sport.findUnique({
+        where: { id: input.sportId },
+        select: { id: true, isActive: true },
+      });
+      if (!sport || !sport.isActive) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Sport not available' });
+      }
+
+      const slug = generateSlug(input.displayName);
+
+      const created = await ctx.prisma.$transaction(async (tx) => {
+        const athlete = await tx.athlete.create({
+          data: {
+            userAccountId: userAccount.id,
+            slug,
+            displayName:   input.displayName,
+            sportId:       input.sportId,
+            countryCode:   input.countryCode,
+            profileStatus: 'DRAFT',
+          },
+          select: { id: true },
+        });
+
+        await tx.userAccount.update({
+          where: { id: userAccount.id },
+          data:  { status: 'ACTIVE' },
+        });
+
+        return athlete;
+      });
+
+      return { athleteId: created.id };
+    }),
 });
+
+// Slug: lowercase, accent-stripped displayName + 6-char random suffix.
+// The suffix avoids hitting the unique constraint without a retry loop.
+function generateSlug(displayName: string): string {
+  const base = displayName
+    .toLowerCase()
+    .normalize('NFD')
+    // Strip combining diacritical marks (U+0300–U+036F) — accents on Latin chars.
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'athlete';
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `${base}-${suffix}`;
+}

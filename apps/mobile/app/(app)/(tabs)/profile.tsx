@@ -68,6 +68,7 @@ export default function ProfileScreen() {
     { label: 'Deporte', done: !!sport },
     { label: 'Documentos', done: false },
   ];
+  
   const pct = Math.round(
     (completionItems.filter(i => i.done).length / completionItems.length) * 100,
   );

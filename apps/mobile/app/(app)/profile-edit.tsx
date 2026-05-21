@@ -1,5 +1,5 @@
 import { trpc, useMyAthlete, useQueryClient, useUpdateProfile } from '@packages/api-client';
-import { useNavigation, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -22,7 +22,6 @@ function getSpanishError(message: string): string {
 
 export default function ProfileEditScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
   const queryClient = useQueryClient();
 
   const myAthleteQuery = useMyAthlete();
@@ -105,25 +104,10 @@ export default function ProfileEditScreen() {
     }
   }
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (!isDirty) return;
-      e.preventDefault();
-      Alert.alert(
-        'Cambios sin guardar',
-        '¿Deseas descartar los cambios?',
-        [
-          { text: 'Seguir editando', style: 'cancel' },
-          {
-            text: 'Descartar',
-            style: 'destructive',
-            onPress: () => { navigation.dispatch(e.data.action); },
-          },
-        ],
-      );
-    });
-    return unsubscribe;
-  }, [navigation, isDirty]);
+  // Unsaved-changes prompt deferred — `useNavigation()`'s `beforeRemove` listener
+  // interacted badly with expo-router 55 transitions ("Couldn't find a navigation
+  // context"). Reintroduce once we move to a custom back handler that doesn't
+  // need the react-navigation `navigation` prop.
 
   if (myAthleteQuery.isLoading || profileQuery.isLoading) {
     return (

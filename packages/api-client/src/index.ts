@@ -8,7 +8,11 @@ export {
   usePublicProfile,
   useSearchAthletes,
   useMyAthlete,
+  useOnboardingState,
+  useBootstrapAthlete,
 } from './hooks/athlete';
+
+export { useSports } from './hooks/sport';
 
 export {
   useAddAchievement,

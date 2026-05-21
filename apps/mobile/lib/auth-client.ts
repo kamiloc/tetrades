@@ -1,38 +1,53 @@
 // Must come BEFORE any supabase-js import — installs crypto.subtle.digest
-// so PKCE uses S256 instead of falling back to plain.
+// and crypto.getRandomValues so PKCE uses S256.
 import './crypto-polyfill';
 
 import { createAuthClient, type AuthClient, type SupportedStorage } from '@packages/auth';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getRequiredEnv } from './env';
 
-// expo-secure-store only accepts keys matching /^[A-Za-z0-9._-]+$/.
-// Supabase-js occasionally passes keys with other characters (and empty
-// strings during cleanup paths), which throws. Map any unsafe character to
-// '_' so the same input key always produces the same storage key.
-const SAFE_KEY = /^[A-Za-z0-9._-]+$/;
-const sanitizeKey = (key: string): string | null => {
-  if (!key) return null;
-  if (SAFE_KEY.test(key)) return key;
-  return key.replace(/[^A-Za-z0-9._-]/g, '_');
-};
+// Use AsyncStorage (not expo-secure-store) for the Supabase session blob.
+// iOS Keychain has a 2 KB per-value limit; Supabase sessions (JWT + refresh
+// token + user metadata) routinely exceed that, which causes setItem to
+// throw silently and the session never persists across cold starts.
+//
+// The stored blob contains a short-lived access token and a rotating refresh
+// token. No L2-CONFIDENTIAL data is held on-device. Device-level security
+// (PIN / biometrics) is the primary protection layer for this storage.
+//
+// On Android, AsyncStorage is backed by SQLite and rejects NULL values
+// ("the bind value at index 1 is null"). supabase-js occasionally calls
+// setItem with undefined during cleanup — coerce those into removeItem.
+// All three methods harden against null/undefined keys, which would otherwise
+// reach AsyncStorage's SQLite binding on Android and throw
+// "the bind value at index 1 is null". Silent no-op (instead of reject) so a
+// stray bad call from supabase-js doesn't cascade into an auth failure.
+function isValidKey(key: unknown): key is string {
+  if (typeof key !== 'string' || key.length === 0) {
+    if (__DEV__) {
+      console.warn('[auth-storage] ignoring invalid key:', key);
+    }
+    return false;
+  }
+  return true;
+}
 
-const secureStoreAdapter: SupportedStorage = {
+const asyncStorageAdapter: SupportedStorage = {
   getItem: (key: string) => {
-    const safe = sanitizeKey(key);
-    if (!safe) return Promise.resolve(null);
-    return SecureStore.getItemAsync(safe);
+    if (!isValidKey(key)) return Promise.resolve(null);
+    return AsyncStorage.getItem(key);
   },
   setItem: (key: string, value: string) => {
-    const safe = sanitizeKey(key);
-    if (!safe) return Promise.resolve();
-    return SecureStore.setItemAsync(safe, value);
+    if (!isValidKey(key)) return Promise.resolve();
+    if (value === null || value === undefined) {
+      return AsyncStorage.removeItem(key);
+    }
+    return AsyncStorage.setItem(key, value);
   },
   removeItem: (key: string) => {
-    const safe = sanitizeKey(key);
-    if (!safe) return Promise.resolve();
-    return SecureStore.deleteItemAsync(safe);
+    if (!isValidKey(key)) return Promise.resolve();
+    return AsyncStorage.removeItem(key);
   },
 };
 
@@ -42,6 +57,6 @@ const supabaseAnonKey = getRequiredEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 export const authClient: AuthClient = createAuthClient({
   supabaseUrl,
   supabaseAnonKey,
-  storage: secureStoreAdapter,
+  storage: asyncStorageAdapter,
   detectSessionInUrl: false,
 });
