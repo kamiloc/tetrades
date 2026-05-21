@@ -1,6 +1,6 @@
-export { trpc } from './client.js';
-export type { AppRouter } from './client.js';
-export { ApiProvider } from './provider.js';
+export { trpc } from './client';
+export type { AppRouter } from './client';
+export { ApiProvider } from './provider';
 
 export {
   useAthleteProfile,
@@ -8,19 +8,19 @@ export {
   usePublicProfile,
   useSearchAthletes,
   useMyAthlete,
-} from './hooks/athlete.js';
+} from './hooks/athlete';
 
 export {
   useAddAchievement,
   useListAchievements,
   useVerifyAchievement,
-} from './hooks/achievement.js';
+} from './hooks/achievement';
 
 export {
   useSendConnectionRequest,
   useAcceptConnectionRequest,
   useRejectConnectionRequest,
   useConnections,
-} from './hooks/connection.js';
+} from './hooks/connection';
 
 export { useQueryClient } from '@tanstack/react-query';
