@@ -1,3 +1,7 @@
+// Must come BEFORE any supabase-js import — installs crypto.subtle.digest
+// so PKCE uses S256 instead of falling back to plain.
+import './crypto-polyfill';
+
 import { createAuthClient, type AuthClient, type SupportedStorage } from '@packages/auth';
 import * as SecureStore from 'expo-secure-store';
 

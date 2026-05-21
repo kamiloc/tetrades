@@ -2,8 +2,8 @@ import { Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import type { ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Feather } from '../../lib/icons';
-import { colors } from '../../lib/theme';
+import { Feather } from '../../../lib/icons';
+import { colors } from '../../../lib/theme';
 
 const shadowSm: ViewStyle = Platform.select<ViewStyle>({
   ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },

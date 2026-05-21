@@ -1,10 +1,8 @@
-import { useSession } from '@packages/auth';
-import { Tabs, useRouter } from 'expo-router';
-import { useEffect } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { Tabs } from 'expo-router';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
-import { Feather, type IconName } from '../../lib/icons';
-import { colors } from '../../lib/theme';
+import { Feather, type IconName } from '../../../lib/icons';
+import { colors } from '../../../lib/theme';
 
 function TabIcon({
   name,
@@ -42,27 +40,6 @@ function TabIcon({
 }
 
 export default function TabsLayout() {
-  const { isLoading, isAuthenticated } = useSession();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/(auth)/login');
-    }
-  }, [isLoading, isAuthenticated, router]);
-
-  if (isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator />
-      </View>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
     <Tabs
       initialRouteName="profile"

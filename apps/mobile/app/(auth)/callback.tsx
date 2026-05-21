@@ -22,9 +22,7 @@ export default function CallbackScreen() {
 
   useEffect(() => {
     if (!tokenHash || !otpType) {
-      router.replace(
-        '/(auth)/login?error=link_invalid' as `/${string}`,
-      )
+      router.replace('/login?error=link_invalid')
       return
     }
 
@@ -33,12 +31,10 @@ export default function CallbackScreen() {
       type: otpType,
     })
       .then(() => {
-        router.replace('/(tabs)/profile')
+        router.replace('/profile')
       })
       .catch(() => {
-        router.replace(
-          '/(auth)/login?error=link_expired' as `/${string}`,
-        )
+        router.replace('/login?error=link_expired')
       })
   }, [router, tokenHash, otpType])
 

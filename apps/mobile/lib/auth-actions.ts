@@ -26,7 +26,7 @@ export async function sendLoginMagicLink({
   await sendMagicLink(authClient, {
     email,
     emailRedirectTo,
-    shouldCreateUser: false,
+    shouldCreateUser: true,
   });
 }
 

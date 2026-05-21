@@ -51,18 +51,18 @@ export default function LoginScreen() {
     try {
       await sendLoginMagicLink({
         email: trimmed,
-        emailRedirectTo: 'athletepassport://auth/callback',
+        emailRedirectTo: 'athletepassport://verify',
       })
     } catch (error: unknown) {
+      console.warn({ error })
+
       setIsLoading(false)
       const message = error instanceof Error ? error.message : ''
       setError(getSpanishError(message))
       return
     }
     setIsLoading(false)
-    router.push(
-      `/(auth)/verify?email=${encodeURIComponent(trimmed)}` as `/${string}`,
-    )
+    router.push(`/verify?email=${encodeURIComponent(trimmed)}`)
   }
 
   const isEmpty = email.trim() === ''

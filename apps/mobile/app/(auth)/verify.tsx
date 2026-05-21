@@ -32,7 +32,7 @@ export default function VerifyScreen() {
   // Redirect immediately if email is missing
   useEffect(() => {
     if (!email) {
-      router.replace('/(auth)/login')
+      router.replace('/login')
     }
   }, [email, router])
 
@@ -62,7 +62,7 @@ export default function VerifyScreen() {
       setCode('')
       return
     }
-    router.replace('/(tabs)/profile')
+    router.replace('/profile')
   }
 
   const handleResend = async (): Promise<void> => {
@@ -120,7 +120,7 @@ export default function VerifyScreen() {
       {/* OTP input */}
       <TextInput
         className="bg-paper border border-line rounded-lg px-4 py-4 text-title2 font-bold text-text text-center mb-4 tracking-widest"
-        maxLength={6}
+        maxLength={8}
         keyboardType="numeric"
         autoFocus
         placeholder="000000"
