@@ -3,10 +3,33 @@ import * as SecureStore from 'expo-secure-store';
 
 import { getRequiredEnv } from './env';
 
+// expo-secure-store only accepts keys matching /^[A-Za-z0-9._-]+$/.
+// Supabase-js occasionally passes keys with other characters (and empty
+// strings during cleanup paths), which throws. Map any unsafe character to
+// '_' so the same input key always produces the same storage key.
+const SAFE_KEY = /^[A-Za-z0-9._-]+$/;
+const sanitizeKey = (key: string): string | null => {
+  if (!key) return null;
+  if (SAFE_KEY.test(key)) return key;
+  return key.replace(/[^A-Za-z0-9._-]/g, '_');
+};
+
 const secureStoreAdapter: SupportedStorage = {
-  getItem: (key: string) => SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+  getItem: (key: string) => {
+    const safe = sanitizeKey(key);
+    if (!safe) return Promise.resolve(null);
+    return SecureStore.getItemAsync(safe);
+  },
+  setItem: (key: string, value: string) => {
+    const safe = sanitizeKey(key);
+    if (!safe) return Promise.resolve();
+    return SecureStore.setItemAsync(safe, value);
+  },
+  removeItem: (key: string) => {
+    const safe = sanitizeKey(key);
+    if (!safe) return Promise.resolve();
+    return SecureStore.deleteItemAsync(safe);
+  },
 };
 
 const supabaseUrl = getRequiredEnv('EXPO_PUBLIC_SUPABASE_URL');

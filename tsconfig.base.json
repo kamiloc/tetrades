@@ -16,7 +16,6 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@packages/api-client": ["packages/api-client/src/index.ts"],
       "@apps/web/*": ["apps/web/*"],
       "@apps/mobile/*": ["apps/mobile/*"]
     }
