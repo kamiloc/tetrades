@@ -14,7 +14,25 @@ export default function RootLayout() {
   return (
     <AuthProvider client={authClient}>
       <ApiProvider apiUrl={API_URL} getToken={getToken}>
-        <Stack screenOptions={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen
+            name="profile-edit"
+            options={{
+              presentation: 'modal',
+              headerShown: true,
+              title: 'Editar perfil',
+              headerTitleAlign: 'center',
+            }}
+          />
+          <Stack.Screen
+            name="achievements"
+            options={{
+              headerShown: true,
+              title: 'Mis Logros',
+              headerTitleAlign: 'center',
+            }}
+          />
+        </Stack>
       </ApiProvider>
     </AuthProvider>
   );

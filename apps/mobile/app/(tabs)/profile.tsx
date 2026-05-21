@@ -1,298 +1,312 @@
-import { Platform, ScrollView, Text, View } from 'react-native';
-import type { ViewStyle } from 'react-native';
+import { trpc, useMyAthlete } from '@packages/api-client';
+import { useRouter } from 'expo-router';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Feather, type IconName } from '../../lib/icons';
-import { colors } from '../../lib/theme';
-
-const shadowSm: ViewStyle = Platform.select<ViewStyle>({
-  ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },
-  android: { elevation: 1 },
-  default: {},
-}) ?? {};
+function getInitials(name: string | null): string {
+  if (!name) return '?';
+  const words = name.trim().split(/\s+/);
+  const first = words[0]?.[0] ?? '';
+  const second = words.length > 1 ? (words[1]?.[0] ?? '') : '';
+  const result = (first + second).toUpperCase();
+  return result.length > 0 ? result : '?';
+}
 
 export default function ProfileScreen() {
+  const router = useRouter();
+
+  // STEP A: Resolve athlete identity
+  const myAthleteQuery = useMyAthlete();
+  const athleteId = myAthleteQuery.data?.athleteId;
+
+  // STEP B: Fetch full profile (enabled only when athleteId is known)
+  const profileQuery = trpc.athlete.getProfile.useQuery(
+    { athleteId: athleteId ?? '' },
+    { enabled: !!athleteId },
+  );
+
+  // STEP C: Fetch achievements (enabled only when athleteId is known)
+  const achievementsQuery = trpc.achievement.listAchievements.useQuery(
+    { athleteId: athleteId ?? '' },
+    { enabled: !!athleteId },
+  );
+
+  // STEP D: Fetch connections (enabled only when athleteId is known)
+  const connectionsQuery = trpc.connection.listConnections.useQuery(
+    { athleteId: athleteId ?? '' },
+    { enabled: !!athleteId },
+  );
+
+  const isIdentityLoading = myAthleteQuery.isLoading;
+  const profile = profileQuery.data ?? null;
+  const achievements = achievementsQuery.data ?? [];
+  const connections = connectionsQuery.data ?? [];
+  const displayName = myAthleteQuery.data?.displayName ?? null;
+  const sport = myAthleteQuery.data?.sport ?? null;
+
+  // Full-screen error — identity is the critical path; without it nothing else loads
+  if (myAthleteQuery.isError) {
+    return (
+      <View className="flex-1 items-center justify-center bg-canvas px-4">
+        <Text className="text-text text-body text-center">
+          No pudimos cargar tu perfil. Intenta de nuevo.
+        </Text>
+        <Pressable
+          onPress={() => { void myAthleteQuery.refetch(); }}
+          className="mt-4 bg-blue px-6 py-3 rounded-lg"
+        >
+          <Text className="text-paper font-semibold text-body">Reintentar</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // Profile completion derived from available data
+  const completionItems = [
+    { label: 'Foto de perfil', done: false },
+    { label: 'Biografía', done: profile?.onboardingStatus === 'COMPLETE' },
+    { label: 'Deporte', done: !!sport },
+    { label: 'Documentos', done: false },
+  ];
+  const pct = Math.round(
+    (completionItems.filter(i => i.done).length / completionItems.length) * 100,
+  );
+
   return (
     <ScrollView
-      contentContainerClassName="bg-canvas pb-6"
       showsVerticalScrollIndicator={false}
+      contentContainerClassName="pb-8"
     >
-      {/* Fixed dark header */}
-      <View className="bg-ink px-5 pb-3">
+      {/* ── SECTION 1 — HEADER CARD ─────────────────────────────────── */}
+      <View className="bg-ink rounded-b-2xl">
         <SafeAreaView edges={['top']}>
-          <View className="h-8 mt-1.5 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-1">
-              <View className="w-[18px] h-[18px] rounded-xs bg-header-chip-bg border border-header-chip-border" />
-              <Text
-                className="text-caption font-semibold uppercase text-on-ink-muted"
-                style={{ letterSpacing: 2.4 }}
+          <View className="px-5 pt-4 pb-6">
+            {/* Edit button — top right */}
+            <View className="flex-row justify-end mb-3">
+              <Pressable
+                onPress={() => { router.push('/profile-edit'); }}
               >
-                THE ATHLETE PASSPORT
-              </Text>
+                <Text className="text-blue text-body font-medium">Editar</Text>
+              </Pressable>
             </View>
-            <View className="w-8 h-8 rounded-sm bg-header-chip-bg border border-header-chip-border items-center justify-center">
-              <Feather name="bell" size={16} color={colors.paper} accessibilityLabel="Notifications" />
-            </View>
+
+            {/* Avatar + identity — skeleton while identity resolves */}
+            {isIdentityLoading ? (
+              <View className="items-center">
+                <View className="h-24 w-24 rounded-pill bg-header-chip-bg animate-pulse" />
+                <View className="h-5 w-40 rounded-xs bg-header-chip-bg animate-pulse mt-3" />
+                <View className="h-4 w-24 rounded-pill bg-header-chip-bg animate-pulse mt-2" />
+              </View>
+            ) : (
+              <View className="items-center">
+                {/* Avatar circle with initials */}
+                <View className="bg-blue rounded-pill w-20 h-20 items-center justify-center">
+                  <Text className="text-paper font-bold text-title2">
+                    {getInitials(displayName)}
+                  </Text>
+                </View>
+                {/* Display name */}
+                <Text className="text-title3 font-bold text-on-ink mt-3">
+                  {displayName ?? 'Tu perfil'}
+                </Text>
+                {/* Sport badge — only when sport is known */}
+                {sport !== null ? (
+                  <View className="bg-header-chip-bg border border-header-chip-border rounded-pill px-3 py-1 mt-2 self-start">
+                    <Text className="text-on-ink text-small font-medium">{sport}</Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
           </View>
-          <Text
-            className="text-title1 font-bold text-on-ink mt-3"
-            style={{ letterSpacing: -0.4, lineHeight: 29.9 }}
-          >
-            Profile
-          </Text>
-          <Text
-            className="text-footnote font-regular text-on-ink-muted mt-0.5 mb-5"
-            style={{ letterSpacing: 0.1 }}
-          >
-            Your athlete identity
-          </Text>
         </SafeAreaView>
       </View>
 
-      {/* Scrollable body - identity card overlaps header by 20 px */}
-      <View className="px-4">
-        {/* Identity card */}
-        <View className="bg-paper rounded-xl border border-line -mt-5 pt-5 px-[18px] pb-[18px]" style={shadowSm}>
-          <View className="flex-row items-center gap-3.5">
-            <View
-              className="w-[68px] h-[68px] rounded-pill bg-blue items-center justify-center border-paper"
-              style={{ borderWidth: 3 }}
-            >
-              <Text className="text-title3 font-bold text-paper">MC</Text>
-            </View>
-            <View className="flex-1">
-              <View className="flex-row items-center gap-1">
-                <Text
-                  className="text-title3 font-bold text-text"
-                  style={{ letterSpacing: -0.2, lineHeight: 21.85 }}
-                >
-                  Marcus Chen
-                </Text>
-                <View className="w-4 h-4 rounded-pill bg-blue items-center justify-center">
-                  <Feather name="check" size={9} color={colors.paper} accessibilityLabel="Verified" />
-                </View>
-              </View>
-              <Text className="text-small font-regular text-muted mt-1">
-                Midfielder · Soccer
-              </Text>
-              <View className="flex-row gap-2 mt-2 flex-wrap">
-                <View className="px-2 py-1 bg-canvas rounded-sm border border-line">
-                  <Text className="text-caption font-medium text-text">Stanford Cardinal</Text>
-                </View>
-                <View className="px-2 py-1 bg-blue-tint rounded-sm border border-blue-line">
-                  <Text className="text-caption font-medium text-blue">NCAA D1</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          <View className="h-px bg-line mt-[18px]" />
-
-          {/* Stats row */}
-          <View className="flex-row pt-3">
-            <View className="flex-1 items-center">
-              <Text className="text-callout font-bold text-text" style={{ letterSpacing: -0.2 }}>
-                6'1"
-              </Text>
-              <Text
-                className="text-caption font-semibold uppercase text-muted mt-0.5"
-                style={{ letterSpacing: 0.2 }}
-              >
-                HEIGHT
-              </Text>
-            </View>
-            <View className="flex-1 items-center border-l border-l-line pl-3.5">
-              <Text className="text-callout font-bold text-text" style={{ letterSpacing: -0.2 }}>
-                178 lb
-              </Text>
-              <Text
-                className="text-caption font-semibold uppercase text-muted mt-0.5"
-                style={{ letterSpacing: 0.2 }}
-              >
-                WEIGHT
-              </Text>
-            </View>
-            <View className="flex-1 items-center border-l border-l-line pl-3.5">
-              <Text className="text-callout font-bold text-blue" style={{ letterSpacing: -0.2 }}>
-                247
-              </Text>
-              <Text
-                className="text-caption font-semibold uppercase text-muted mt-0.5"
-                style={{ letterSpacing: 0.2 }}
-              >
-                CONNECTIONS
-              </Text>
-            </View>
-          </View>
+      {/* ── SECTION 2 — STATS ROW ───────────────────────────────────── */}
+      <View className="flex-row bg-paper mx-4 mt-4 rounded-xl">
+        {/* Altura */}
+        <View className="flex-1 items-center py-4 border-r border-line">
+          {profileQuery.isLoading ? (
+            <View className="h-7 w-16 rounded-sm bg-canvas animate-pulse" />
+          ) : (
+            <Text className="text-callout font-bold text-text">—</Text>
+          )}
+          <Text className="text-caption text-muted mt-1">Altura</Text>
         </View>
-
-        {/* About section */}
-        <View className="mt-5">
-          <Text
-            className="text-small font-bold uppercase text-muted pb-2 px-1"
-            style={{ letterSpacing: 1.7 }}
-          >
-            ABOUT
-          </Text>
-          <View className="bg-paper rounded-xl border border-line" style={shadowSm}>
-            <Text
-              className="text-body-lg font-regular text-text px-3 pt-[14px]"
-              style={{ lineHeight: 23.25 }}
-            >
-              Center mid at Stanford. PAC-12 All-Conference 2024. Two-footed playmaker focused on tempo control and final-third creation. Records verified through Athlete Passport since 2023.
+        {/* Peso */}
+        <View className="flex-1 items-center py-4 border-r border-line">
+          {profileQuery.isLoading ? (
+            <View className="h-7 w-16 rounded-sm bg-canvas animate-pulse" />
+          ) : (
+            <Text className="text-callout font-bold text-text">—</Text>
+          )}
+          <Text className="text-caption text-muted mt-1">Peso</Text>
+        </View>
+        {/* Conexiones */}
+        <View className="flex-1 items-center py-4">
+          {connectionsQuery.isLoading ? (
+            <View className="h-7 w-16 rounded-sm bg-canvas animate-pulse" />
+          ) : (
+            <Text className="text-callout font-bold text-text">
+              {String(connections.length)}
             </Text>
-            <View className="flex-row gap-3.5 px-3 pt-3 pb-3.5">
-              <View className="flex-row items-center gap-1">
-                <Feather name="map-pin" size={13} color={colors.muted} />
-                <Text className="text-small font-regular text-muted">Palo Alto, CA</Text>
-              </View>
-              <View className="flex-row items-center gap-1">
-                <Feather name="clock" size={13} color={colors.muted} />
-                <Text className="text-small font-regular text-muted">Joined Aug 2023</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Achievements section */}
-        <View className="mt-5">
-          <View className="flex-row items-center justify-between pb-2 px-1">
-            <Text
-              className="text-small font-bold uppercase text-muted"
-              style={{ letterSpacing: 1.7 }}
-            >
-              ACHIEVEMENTS
-            </Text>
-            <Text className="text-small font-semibold text-blue">See all</Text>
-          </View>
-          <View className="bg-paper rounded-xl border border-line" style={shadowSm}>
-            <AchievementRow
-              icon="check"
-              iconColor="#1A6BFF"
-              tileBg="#E8F0FF"
-              title="PAC-12 All-Conference"
-              meta="2024 · Stanford Athletics"
-              status="verified"
-              showDivider
-            />
-            <AchievementRow
-              icon="check"
-              iconColor="#1A6BFF"
-              tileBg="#E8F0FF"
-              title="U.S. Youth National Team — Player Pool"
-              meta="2023 · U.S. Soccer"
-              status="verified"
-              showDivider
-            />
-            <AchievementRow
-              icon="clock"
-              iconColor="#B5651D"
-              tileBg="#FFF3E0"
-              title="Combine: 40-yd dash · 4.61s"
-              meta="2025 · Bay Area Showcase"
-              status="pending"
-              showDivider
-            />
-            <AchievementRow
-              icon="check"
-              iconColor="#1A6BFF"
-              tileBg="#E8F0FF"
-              title="Annual Physical — Cleared"
-              meta="Mar 2025 · Stanford Sports Med"
-              status="verified"
-              showDivider={false}
-            />
-          </View>
-        </View>
-
-        {/* Passport completeness */}
-        <View className="mt-5">
-          <View className="bg-paper rounded-xl border border-blue-line" style={shadowSm}>
-            <View className="flex-row items-center px-3 py-3.5 gap-3">
-              <View className="w-10 h-10 rounded-md bg-blue-tint items-center justify-center">
-                <Feather name="shield" size={20} color={colors.blue} />
-              </View>
-              <View className="flex-1">
-                <Text
-                  className="text-body font-semibold text-text"
-                  style={{ lineHeight: 17.5 }}
-                >
-                  Passport 82% complete
-                </Text>
-                <View className="h-1.5 bg-blue-line rounded-pill mt-2 overflow-hidden">
-                  <View className="w-[82%] h-1.5 bg-blue rounded-pill" />
-                </View>
-              </View>
-              <View className="px-3.5 py-[7px] rounded-pill border border-line bg-paper">
-                <Text className="text-small font-semibold text-text">Finish</Text>
-              </View>
-            </View>
-          </View>
+          )}
+          <Text className="text-caption text-muted mt-1">Conexiones</Text>
         </View>
       </View>
-    </ScrollView>
-  );
-}
 
-// ── Inline sub-component (no state, no hooks) ─────────────────────
-function AchievementRow({
-  icon,
-  iconColor,
-  tileBg,
-  title,
-  meta,
-  status,
-  showDivider,
-}: {
-  icon: IconName;
-  iconColor: string;
-  tileBg: string;
-  title: string;
-  meta: string;
-  status: 'verified' | 'pending';
-  showDivider: boolean;
-}) {
-  const isVerified = status === 'verified';
-  return (
-    <>
-      <View className="flex-row items-center px-3 py-3 gap-3">
-        <View
-          className="w-[34px] h-[34px] rounded-md items-center justify-center"
-          style={{ backgroundColor: tileBg }}
-        >
-          <Feather name={icon} size={17} color={iconColor} accessibilityLabel={isVerified ? 'Verified' : 'Pending'} />
-        </View>
-        <View className="flex-1">
-          <Text
-            className="text-body font-semibold text-text"
-            numberOfLines={2}
-            style={{ lineHeight: 17.5 }}
+      {/* ── SECTION 3 — PROFILE COMPLETION CARD ─────────────────────── */}
+      <View className="bg-paper rounded-xl mx-4 mt-4 p-4">
+        {profileQuery.isLoading ? (
+          <>
+            <View className="h-5 w-48 rounded-xs bg-canvas animate-pulse" />
+            <View className="h-2 rounded-pill bg-canvas animate-pulse mt-3 mb-4" />
+            {[0, 1, 2, 3].map(n => (
+              <View key={n} className="h-4 w-full rounded-xs bg-canvas animate-pulse mt-2" />
+            ))}
+          </>
+        ) : (
+          <>
+            {/* Header row */}
+            <View className="flex-row items-center justify-between">
+              <Text className="text-body font-semibold text-text">Completa tu perfil</Text>
+              <Text className="text-blue font-bold text-body">{pct}%</Text>
+            </View>
+            {/* Progress bar — width is the only permitted inline style here */}
+            <View className="h-2 bg-line rounded-pill mt-3 mb-4">
+              <View
+                className="h-2 bg-blue rounded-pill"
+                style={{ width: `${pct}%` }}
+              />
+            </View>
+            {/* Completion item rows */}
+            {completionItems.map(item => (
+              <View key={item.label} className="flex-row items-center py-1">
+                {item.done ? (
+                  <Text className="text-blue font-bold w-5">✓</Text>
+                ) : (
+                  <Text className="text-muted w-5">○</Text>
+                )}
+                <Text className={item.done ? 'text-text text-body' : 'text-muted text-body'}>
+                  {item.label}
+                </Text>
+              </View>
+            ))}
+          </>
+        )}
+      </View>
+
+      {/* ── SECTION 4 — ACHIEVEMENTS PREVIEW ────────────────────────── */}
+      <View className="mx-4 mt-4">
+        {/* Section header */}
+        <View className="flex-row items-center justify-between mb-3">
+          <Text className="text-body font-semibold text-text">Logros</Text>
+          <Pressable
+            onPress={() => router.push('/achievements')}
           >
-            {title}
-          </Text>
-          <Text className="text-small font-regular text-muted mt-0.5">{meta}</Text>
+            <Text className="text-blue text-body">Ver todos</Text>
+          </Pressable>
         </View>
-        {isVerified ? (
-          <View className="px-2 py-1 bg-blue-tint rounded-pill border border-blue-line">
-            <Text
-              className="text-caption font-semibold uppercase text-blue"
-              style={{ letterSpacing: 0.2 }}
-            >
-              VERIFIED
+
+        {achievementsQuery.isLoading ? (
+          <>
+            <View className="bg-paper rounded-xl p-4 mb-3 h-16 animate-pulse" />
+            <View className="bg-paper rounded-xl p-4 mb-3 h-16 animate-pulse" />
+          </>
+        ) : achievements.length === 0 ? (
+          <View className="items-center py-6">
+            <Text className="text-muted text-body text-center">
+              Aún no tienes logros registrados
             </Text>
           </View>
         ) : (
-          <View className="px-2 py-1 bg-pending-tint rounded-pill">
-            <Text
-              className="text-caption font-semibold uppercase text-pending"
-              style={{ letterSpacing: 0.2 }}
-            >
-              PENDING
-            </Text>
-          </View>
+          achievements.slice(0, 3).map(item => (
+            <View key={item.id} className="bg-paper rounded-xl p-4 mb-3">
+              {/* Row 1: title + badge */}
+              <View className="flex-row items-center justify-between">
+                <Text
+                  className="text-body font-semibold text-text flex-1 mr-2"
+                  numberOfLines={2}
+                >
+                  {item.title}
+                </Text>
+                {item.verificationStatus === 'VERIFIED' ? (
+                  <View className="bg-blue-tint rounded-pill px-2 py-0.5">
+                    <Text className="text-blue text-caption font-medium">Verificado</Text>
+                  </View>
+                ) : item.verificationStatus === 'REJECTED' ? (
+                  <View className="bg-red-100 rounded-pill px-2 py-0.5">
+                    <Text className="text-red-600 text-caption font-medium">Rechazado</Text>
+                  </View>
+                ) : (
+                  <View className="bg-pending-tint rounded-pill px-2 py-0.5">
+                    <Text className="text-pending text-caption font-medium">Pendiente</Text>
+                  </View>
+                )}
+              </View>
+              {/* Row 2: organization */}
+              <Text className="text-muted text-caption mt-1">{item.organization}</Text>
+              {/* Row 3: date */}
+              <Text className="text-muted text-caption mt-0.5">
+                {item.achievedOn.toLocaleDateString('es-CO')}
+              </Text>
+            </View>
+          ))
         )}
       </View>
-      {showDivider ? <View className="h-px bg-line mx-3" /> : null}
-    </>
+
+      {/* ── SECTION 5 — CONNECTIONS PREVIEW ─────────────────────────── */}
+      <View className="mx-4 mt-4">
+        {/* Section header */}
+        <View className="flex-row items-center justify-between mb-3">
+          <Text className="text-body font-semibold text-text">Conexiones</Text>
+          <Pressable
+            onPress={() => {
+              // TODO(5.9): router.push('/(tabs)/connections')
+            }}
+          >
+            <Text className="text-blue text-body">Ver todas</Text>
+          </Pressable>
+        </View>
+
+        {connectionsQuery.isLoading ? (
+          <View className="flex-row gap-3">
+            {[0, 1, 2].map(n => (
+              <View key={n} className="items-center">
+                <View className="w-12 h-12 rounded-pill bg-canvas animate-pulse" />
+                <View className="h-3 w-12 rounded-xs bg-canvas animate-pulse mt-1" />
+              </View>
+            ))}
+          </View>
+        ) : connections.length === 0 ? (
+          <View className="items-center py-4">
+            <Text className="text-muted text-body text-center">
+              Aún no tienes conexiones
+            </Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="gap-3 px-1"
+          >
+            {connections.slice(0, 5).map(conn => (
+              <View key={conn.id} className="items-center">
+                <View className="w-12 h-12 rounded-pill bg-blue-tint items-center justify-center">
+                  <Text className="text-blue text-body font-medium">?</Text>
+                </View>
+                {/* maxWidth inline style — the only permitted second inline style */}
+                <Text
+                  className="text-caption text-muted text-center mt-1"
+                  numberOfLines={1}
+                  style={{ maxWidth: 60 }}
+                >
+                  Conexión
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+    </ScrollView>
   );
 }
