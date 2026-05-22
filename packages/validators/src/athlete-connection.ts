@@ -55,6 +55,6 @@ export const connectionIdInput = z.object({
 export type ConnectionIdInput = z.infer<typeof connectionIdInput>;
 
 export const listConnectionsInput = z.object({
-  athleteId: uuidSchema,
+  athleteId: cuidSchema,
 });
 export type ListConnectionsInput = z.infer<typeof listConnectionsInput>;

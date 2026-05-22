@@ -60,7 +60,7 @@ export const athleteAchievementListOutput = z.array(athleteAchievementSchema);
 export type AthleteAchievementListOutput = z.infer<typeof athleteAchievementListOutput>;
 
 export const listAchievementsInput = z.object({
-  athleteId: uuidSchema,
+  athleteId: cuidSchema,
 });
 export type ListAchievementsInput = z.infer<typeof listAchievementsInput>;
 

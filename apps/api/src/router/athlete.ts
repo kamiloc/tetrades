@@ -323,7 +323,26 @@ export const athleteRouter = router({
       });
 
       if (userAccount.athlete) {
-        return { athleteId: userAccount.athlete.id };
+        // Self-heal: an earlier version of bootstrap created Athlete without
+        // its 1:1 private/public profile rows, so getProfile throws NOT_FOUND
+        // for those users. Upsert both rows here so existing athletes recover
+        // on their next call. Idempotent.
+        const athleteId = userAccount.athlete.id;
+        await ctx.prisma.$transaction([
+          ctx.prisma.athletePrivateProfile.upsert({
+            where:  { athleteId },
+            create: { athleteId, encryptionKeyVersion: ENCRYPTION_KEY_VERSION },
+            update: {},
+            select: { athleteId: true },
+          }),
+          ctx.prisma.athletePublicProfile.upsert({
+            where:  { athleteId },
+            create: { athleteId },
+            update: {},
+            select: { athleteId: true },
+          }),
+        ]);
+        return { athleteId };
       }
 
       const sport = await ctx.prisma.sport.findUnique({
@@ -349,6 +368,22 @@ export const athleteRouter = router({
           select: { id: true },
         });
 
+        // Private/public profile rows are 1:1 with Athlete and required by
+        // getProfile / getPublicProfile / updateProfile. Creating them here
+        // (instead of lazily) means every downstream query has a row to read.
+        await tx.athletePrivateProfile.create({
+          data: {
+            athleteId:            athlete.id,
+            encryptionKeyVersion: ENCRYPTION_KEY_VERSION,
+          },
+          select: { athleteId: true },
+        });
+
+        await tx.athletePublicProfile.create({
+          data: { athleteId: athlete.id },
+          select: { athleteId: true },
+        });
+
         await tx.userAccount.update({
           where: { id: userAccount.id },
           data:  { status: 'ACTIVE' },
@@ -360,6 +395,11 @@ export const athleteRouter = router({
       return { athleteId: created.id };
     }),
 });
+
+// Tracks which master key was used to encrypt L2 fields on a given row.
+// Bumped only when we rotate the master key; existing rows keep their old
+// version so decryption can still find the right key.
+const ENCRYPTION_KEY_VERSION = 'v1';
 
 // Slug: lowercase, accent-stripped displayName + 6-char random suffix.
 // The suffix avoids hitting the unique constraint without a retry loop.

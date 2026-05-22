@@ -1,28 +1,25 @@
-import { useSession } from '@packages/auth';
-import { Redirect, Stack } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { Stack } from 'expo-router';
 
-// The layout now ONLY gates on auth — onboarding routing happens at the
-// screen level (profile redirects to /onboarding if myAthleteQuery returns
-// NOT_FOUND). This keeps the Stack stable across query refetches; previously
-// `useOnboardingState` in the layout caused `Stack.Protected` guards to flip
-// when shared query state changed, tearing down the navigator while children
-// were mid-render and producing "Couldn't find a navigation context".
+// This layout intentionally has ZERO conditional returns. It always renders
+// the Stack with the same screen declarations on every render — the
+// navigation tree is therefore stable from first mount, never tearing down
+// child screens mid-render.
+//
+// Auth gating happens at the entry points:
+//   - app/index.tsx redirects unauthenticated users to /login
+//   - the (auth) group is unprotected and accessible to anyone
+//   - tRPC procedures throw UNAUTHORIZED if hit without a valid token, so
+//     even a deep-link into an (app) route is safe at the data layer
+//
+// Onboarding gating (no Athlete row) happens at the screen level — see
+// the useEffect in (tabs)/profile.tsx that redirects to /onboarding when
+// myAthleteQuery returns NOT_FOUND.
+//
+// Previous versions of this file conditionally returned <View>, <Redirect>,
+// or <Stack.Protected>, which produced intermittent
+// "Couldn't find a navigation context" errors as the navigation tree
+// rebuilt itself mid-render.
 export default function AppLayout() {
-  const { isLoading, isAuthenticated } = useSession();
-
-  if (isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-canvas">
-        <ActivityIndicator />
-      </View>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Redirect href="/login" />;
-  }
-
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />

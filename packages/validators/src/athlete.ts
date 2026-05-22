@@ -83,7 +83,7 @@ export const getAthleteByIdInput = z.object({
 export type GetAthleteByIdInput = z.infer<typeof getAthleteByIdInput>;
 
 export const getAthleteProfileInput = z.object({
-  athleteId: uuidSchema,
+  athleteId: cuidSchema,
 });
 export type GetAthleteProfileInput = z.infer<typeof getAthleteProfileInput>;
 

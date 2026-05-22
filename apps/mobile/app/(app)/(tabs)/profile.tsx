@@ -1,5 +1,5 @@
 import { trpc, useMyAthlete } from '@packages/api-client';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,36 +15,48 @@ function getInitials(name: string | null): string {
 export default function ProfileScreen() {
   const router = useRouter();
 
-  // STEP A: Resolve athlete identity
+  // All hooks first — Rules of Hooks forbid conditional returns above this block.
   const myAthleteQuery = useMyAthlete();
   const athleteId = myAthleteQuery.data?.athleteId;
 
-  // STEP B: Fetch full profile (enabled only when athleteId is known)
   const profileQuery = trpc.athlete.getProfile.useQuery(
     { athleteId: athleteId ?? '' },
     { enabled: !!athleteId },
   );
-
-  // STEP C: Fetch achievements (enabled only when athleteId is known)
   const achievementsQuery = trpc.achievement.listAchievements.useQuery(
     { athleteId: athleteId ?? '' },
     { enabled: !!athleteId },
   );
-
-  // STEP D: Fetch connections (enabled only when athleteId is known)
   const connectionsQuery = trpc.connection.listConnections.useQuery(
     { athleteId: athleteId ?? '' },
     { enabled: !!athleteId },
   );
 
-  const isIdentityLoading = myAthleteQuery.isLoading;
-  const profile = profileQuery.data ?? null;
-  const achievements = achievementsQuery.data ?? [];
-  const connections = connectionsQuery.data ?? [];
-  const displayName = myAthleteQuery.data?.displayName ?? null;
-  const sport = myAthleteQuery.data?.sport ?? null;
+  console.log({ errors: {
+    myAthlete: myAthleteQuery.error,
+    profile: profileQuery.error,
+    achievements: achievementsQuery.error,
+    connections: connectionsQuery.error,
+  }, loading: {
+    myAthlete: myAthleteQuery.isLoading,
+    profile: profileQuery.isLoading,
+    achievements: achievementsQuery.isLoading,
+    connections: connectionsQuery.isLoading,
+  }});
 
-  // Full-screen error — identity is the critical path; without it nothing else loads
+  // Identity gate. If the user is authenticated but has no Athlete row,
+  // getMyAthlete throws NOT_FOUND — route to onboarding declaratively with
+  // <Redirect> rather than a `useEffect` + `router.replace()`. The imperative
+  // form fires after commit and can race react-query state transitions,
+  // tearing down the (tabs) subtree while the screen is still rendering and
+  // producing "Couldn't find a navigation context" from any descendant that
+  // touches navigation in the same frame.
+  const errorCode = (myAthleteQuery.error?.data as { code?: string } | undefined)?.code;
+  if (errorCode === 'NOT_FOUND') {
+    return <Redirect href="/onboarding" />;
+  }
+
+  // Full-screen error — identity is the critical path; without it nothing else loads.
   if (myAthleteQuery.isError) {
     return (
       <View className="flex-1 items-center justify-center bg-canvas px-4">
@@ -61,12 +73,19 @@ export default function ProfileScreen() {
     );
   }
 
+  const profile = profileQuery.data ?? null;
+  const achievements = achievementsQuery.data ?? [];
+  const connections = connectionsQuery.data ?? [];
+  const displayName = myAthleteQuery.data?.displayName ?? null;
+  const sport = myAthleteQuery.data?.sport ?? null;
+
   // Profile completion derived from available data
   const completionItems = [
     { label: 'Foto de perfil', done: false },
     { label: 'Biografía', done: profile?.onboardingStatus === 'COMPLETE' },
     { label: 'Deporte', done: !!sport },
     { label: 'Documentos', done: false },
+    { label: 'Logros', done: achievements.length > 0 },
   ];
   
   const pct = Math.round(
@@ -92,7 +111,7 @@ export default function ProfileScreen() {
             </View>
 
             {/* Avatar + identity — skeleton while identity resolves */}
-            {isIdentityLoading ? (
+            {myAthleteQuery.isLoading ? (
               <View className="items-center">
                 <View className="h-24 w-24 rounded-pill bg-header-chip-bg animate-pulse" />
                 <View className="h-5 w-40 rounded-xs bg-header-chip-bg animate-pulse mt-3" />
