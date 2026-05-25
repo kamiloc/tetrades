@@ -1,7 +1,32 @@
 import { trpc, useMyAthlete } from '@packages/api-client';
-import { Redirect, useRouter } from 'expo-router';
+import { type ErrorBoundaryProps, Redirect, router } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Catches render-phase errors (including "Couldn't find a navigation context")
+// and surfaces the full stack so we can pinpoint the throwing component.
+// Remove once the root cause is resolved.
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <View className="flex-1 bg-canvas items-center justify-center px-4">
+      <Text className="text-body font-bold text-red-600 mb-2">Error capturado</Text>
+      <Text className="text-caption text-text mb-1">{error.message}</Text>
+      <Text
+        className="text-caption text-muted mb-6"
+        selectable
+        numberOfLines={20}
+      >
+        {error.stack}
+      </Text>
+      <Pressable
+        onPress={retry}
+        className="bg-blue px-6 py-3 rounded-lg"
+      >
+        <Text className="text-paper font-semibold text-body">Reintentar</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 function getInitials(name: string | null): string {
   if (!name) return '?';
@@ -13,8 +38,6 @@ function getInitials(name: string | null): string {
 }
 
 export default function ProfileScreen() {
-  const router = useRouter();
-
   // All hooks first — Rules of Hooks forbid conditional returns above this block.
   const myAthleteQuery = useMyAthlete();
   const athleteId = myAthleteQuery.data?.athleteId;
@@ -32,32 +55,11 @@ export default function ProfileScreen() {
     { enabled: !!athleteId },
   );
 
-  console.log({ errors: {
-    myAthlete: myAthleteQuery.error,
-    profile: profileQuery.error,
-    achievements: achievementsQuery.error,
-    connections: connectionsQuery.error,
-  }, loading: {
-    myAthlete: myAthleteQuery.isLoading,
-    profile: profileQuery.isLoading,
-    achievements: achievementsQuery.isLoading,
-    connections: connectionsQuery.isLoading,
-  }});
-
-  // Identity gate. If the user is authenticated but has no Athlete row,
-  // getMyAthlete throws NOT_FOUND — route to onboarding declaratively with
-  // <Redirect> rather than a `useEffect` + `router.replace()`. The imperative
-  // form fires after commit and can race react-query state transitions,
-  // tearing down the (tabs) subtree while the screen is still rendering and
-  // producing "Couldn't find a navigation context" from any descendant that
-  // touches navigation in the same frame.
-  const errorCode = (myAthleteQuery.error?.data as { code?: string } | undefined)?.code;
-  if (errorCode === 'NOT_FOUND') {
-    return <Redirect href="/onboarding" />;
-  }
-
   // Full-screen error — identity is the critical path; without it nothing else loads.
-  if (myAthleteQuery.isError) {
+  // NOT_FOUND is not shown here: (app)/_layout.tsx detects !hasAthlete via
+  // useOnboardingState and redirects to /onboarding above the Tabs navigator,
+  // avoiding "Couldn't find a navigation context" errors in sibling tab screens.
+  if (myAthleteQuery.isError || profileQuery.isError || achievementsQuery.isError || connectionsQuery.isError) {
     return (
       <View className="flex-1 items-center justify-center bg-canvas px-4">
         <Text className="text-text text-body text-center">
@@ -74,6 +76,11 @@ export default function ProfileScreen() {
   }
 
   const profile = profileQuery.data ?? null;
+
+  if (myAthleteQuery.data?.athleteId && profile === null) {
+    return <Redirect href="/onboarding" />
+  }
+
   const achievements = achievementsQuery.data ?? [];
   const connections = connectionsQuery.data ?? [];
   const displayName = myAthleteQuery.data?.displayName ?? null;
