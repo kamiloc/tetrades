@@ -222,6 +222,10 @@ model AthletePublicProfile {
   /// L0-PUBLIC
   primaryPosition      String?  @map("primary_position")
   /// L0-PUBLIC
+  heightCm             Int?     @map("height_cm")
+  /// L0-PUBLIC
+  weightKg             Float?   @map("weight_kg")
+  /// L0-PUBLIC
   connectionCountCache Int      @default(0) @map("connection_count_cache")
   /// L0-PUBLIC — CONSTRAINT: must reference a ProfilePhotoAsset where
   /// asset.athleteId == this.athleteId AND asset.variant != 'ORIGINAL'.

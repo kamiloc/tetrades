@@ -24,3 +24,9 @@ export const useOnboardingState = () =>
 // Mutation: create the Athlete row from the onboarding form.
 export const useBootstrapAthlete = () =>
   trpc.athlete.bootstrap.useMutation();
+
+export const useMyPublicProfile = () =>
+  trpc.athlete.getMyPublicProfile.useQuery();
+
+export const useUpdatePublicProfile = () =>
+  trpc.athlete.updatePublicProfile.useMutation();

@@ -10,6 +10,8 @@ export {
   useMyAthlete,
   useOnboardingState,
   useBootstrapAthlete,
+  useMyPublicProfile,
+  useUpdatePublicProfile,
 } from './hooks/athlete';
 
 export { useSports } from './hooks/sport';

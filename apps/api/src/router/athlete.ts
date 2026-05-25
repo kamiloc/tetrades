@@ -7,6 +7,7 @@ import {
   getAthletePublicProfileInput,
   searchAthletesInput,
   updateAthletePrivateProfileInput,
+  updateAthletePublicProfileInput,
 } from '@packages/validators';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
@@ -167,6 +168,8 @@ export const athleteRouter = router({
           publicBio: true,
           city: true,
           primaryPosition: true,
+          heightCm: true,
+          weightKg: true,
           connectionCountCache: true,
           avatarAssetId: true,
           isSearchable: true,
@@ -202,6 +205,8 @@ export const athleteRouter = router({
           publicBio: true,
           city: true,
           primaryPosition: true,
+          heightCm: true,
+          weightKg: true,
           connectionCountCache: true,
           avatarAssetId: true,
           isSearchable: true,
@@ -215,6 +220,83 @@ export const athleteRouter = router({
       });
 
       return profiles;
+    }),
+
+  getMyPublicProfile: protectedProcedure
+    .output(athletePublicProfileSchema)
+    .query(async ({ ctx }) => {
+      const userAccount = await ctx.prisma.userAccount.findUnique({
+        where: { supabaseUserId: ctx.userId },
+        select: { athlete: { select: { id: true } } },
+      });
+
+      const athleteId = userAccount?.athlete?.id;
+      if (!athleteId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Athlete not found' });
+      }
+
+      const publicProfile = await ctx.prisma.athletePublicProfile.findUnique({
+        where: { athleteId },
+        select: {
+          athleteId: true,
+          publicBio: true,
+          city: true,
+          primaryPosition: true,
+          heightCm: true,
+          weightKg: true,
+          connectionCountCache: true,
+          avatarAssetId: true,
+          isSearchable: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!publicProfile) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Public profile not found' });
+      }
+
+      return publicProfile;
+    }),
+
+  updatePublicProfile: protectedProcedure
+    .input(updateAthletePublicProfileInput)
+    .output(athletePublicProfileSchema)
+    .mutation(async ({ ctx, input }) => {
+      const userAccount = await ctx.prisma.userAccount.findUnique({
+        where: { supabaseUserId: ctx.userId },
+        select: { athlete: { select: { id: true } } },
+      });
+
+      const athleteId = userAccount?.athlete?.id;
+      if (!athleteId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Athlete not found' });
+      }
+
+      const publicProfile = await ctx.prisma.athletePublicProfile.update({
+        where: { athleteId },
+        data: {
+          ...(input.publicBio !== undefined ? { publicBio: input.publicBio } : {}),
+          ...(input.city !== undefined ? { city: input.city } : {}),
+          ...(input.primaryPosition !== undefined ? { primaryPosition: input.primaryPosition } : {}),
+          ...(input.heightCm !== undefined ? { heightCm: input.heightCm } : {}),
+          ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}),
+          ...(input.isSearchable !== undefined ? { isSearchable: input.isSearchable } : {}),
+        },
+        select: {
+          athleteId: true,
+          publicBio: true,
+          city: true,
+          primaryPosition: true,
+          heightCm: true,
+          weightKg: true,
+          connectionCountCache: true,
+          avatarAssetId: true,
+          isSearchable: true,
+          updatedAt: true,
+        },
+      });
+
+      return publicProfile;
     }),
 
   getMyAthlete: protectedProcedure

@@ -11,6 +11,8 @@ export const athletePublicProfileSchema = z.object({
   publicBio: z.string().max(2000).nullable(), /// L0-PUBLIC
   city: z.string().min(1).max(100).nullable(), /// L0-PUBLIC
   primaryPosition: z.string().min(1).max(100).nullable(), /// L0-PUBLIC
+  heightCm: z.number().int().min(100).max(250).nullable(), /// L0-PUBLIC
+  weightKg: z.number().min(30).max(300).nullable(), /// L0-PUBLIC
   connectionCountCache: z.number().int().min(0), /// L0-PUBLIC
   avatarAssetId: cuidSchema.nullable(), /// L0-PUBLIC — must reference a same-athlete, non-ORIGINAL ProfilePhotoAsset
   isSearchable: z.boolean(), /// L0-PUBLIC
@@ -26,6 +28,8 @@ export const updateAthletePublicProfileInput = z.object({
   publicBio: z.string().max(2000).optional(),
   city: z.string().min(1).max(100).optional(),
   primaryPosition: z.string().min(1).max(100).optional(),
+  heightCm: z.number().int().min(100).max(250).optional(),
+  weightKg: z.number().min(30).max(300).optional(),
   isSearchable: z.boolean().optional(),
 });
 export type UpdateAthletePublicProfileInput = z.infer<typeof updateAthletePublicProfileInput>;

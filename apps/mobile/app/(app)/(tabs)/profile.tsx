@@ -1,4 +1,4 @@
-import { trpc, useMyAthlete } from '@packages/api-client';
+import { trpc, useMyAthlete, useMyPublicProfile } from '@packages/api-client';
 import { type ErrorBoundaryProps, Redirect, router } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,6 +41,7 @@ export default function ProfileScreen() {
   // All hooks first — Rules of Hooks forbid conditional returns above this block.
   const myAthleteQuery = useMyAthlete();
   const athleteId = myAthleteQuery.data?.athleteId;
+  const publicProfileQuery = useMyPublicProfile();
 
   const profileQuery = trpc.athlete.getProfile.useQuery(
     { athleteId: athleteId ?? '' },
@@ -152,19 +153,27 @@ export default function ProfileScreen() {
       <View className="flex-row bg-paper mx-4 mt-4 rounded-xl">
         {/* Altura */}
         <View className="flex-1 items-center py-4 border-r border-line">
-          {profileQuery.isLoading ? (
+          {publicProfileQuery.isLoading ? (
             <View className="h-7 w-16 rounded-sm bg-canvas animate-pulse" />
           ) : (
-            <Text className="text-callout font-bold text-text">—</Text>
+            <Text className="text-callout font-bold text-text">
+              {publicProfileQuery.data?.heightCm !== null && publicProfileQuery.data?.heightCm !== undefined
+                ? `${String(publicProfileQuery.data.heightCm)} cm`
+                : '—'}
+            </Text>
           )}
           <Text className="text-caption text-muted mt-1">Altura</Text>
         </View>
         {/* Peso */}
         <View className="flex-1 items-center py-4 border-r border-line">
-          {profileQuery.isLoading ? (
+          {publicProfileQuery.isLoading ? (
             <View className="h-7 w-16 rounded-sm bg-canvas animate-pulse" />
           ) : (
-            <Text className="text-callout font-bold text-text">—</Text>
+            <Text className="text-callout font-bold text-text">
+              {publicProfileQuery.data?.weightKg !== null && publicProfileQuery.data?.weightKg !== undefined
+                ? `${String(publicProfileQuery.data.weightKg)} kg`
+                : '—'}
+            </Text>
           )}
           <Text className="text-caption text-muted mt-1">Peso</Text>
         </View>
