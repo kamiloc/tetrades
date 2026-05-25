@@ -1,5 +1,5 @@
 import { trpc, useMyAthlete, useMyPublicProfile } from '@packages/api-client';
-import { type ErrorBoundaryProps, Redirect, router } from 'expo-router';
+import { type ErrorBoundaryProps, router } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -57,9 +57,8 @@ export default function ProfileScreen() {
   );
 
   // Full-screen error — identity is the critical path; without it nothing else loads.
-  // NOT_FOUND is not shown here: (app)/_layout.tsx detects !hasAthlete via
-  // useOnboardingState and redirects to /onboarding above the Tabs navigator,
-  // avoiding "Couldn't find a navigation context" errors in sibling tab screens.
+  // The !hasAthlete case never reaches this screen: (app)/_layout.tsx gates on
+  // useOnboardingState and redirects to /onboarding above the Tabs navigator.
   if (myAthleteQuery.isError || profileQuery.isError || achievementsQuery.isError || connectionsQuery.isError) {
     return (
       <View className="flex-1 items-center justify-center bg-canvas px-4">
@@ -77,11 +76,6 @@ export default function ProfileScreen() {
   }
 
   const profile = profileQuery.data ?? null;
-
-  if (myAthleteQuery.data?.athleteId && profile === null) {
-    return <Redirect href="/onboarding" />
-  }
-
   const achievements = achievementsQuery.data ?? [];
   const connections = connectionsQuery.data ?? [];
   const displayName = myAthleteQuery.data?.displayName ?? null;
@@ -330,7 +324,6 @@ export default function ProfileScreen() {
                 <View className="w-12 h-12 rounded-pill bg-blue-tint items-center justify-center">
                   <Text className="text-blue text-body font-medium">?</Text>
                 </View>
-                {/* maxWidth inline style — the only permitted second inline style */}
                 <Text
                   className="text-caption text-muted text-center mt-1"
                   numberOfLines={1}

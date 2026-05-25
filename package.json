@@ -15,6 +15,7 @@
     "test:rls": "turbo test:rls",
     "dev": "turbo dev",
     "clean": "turbo clean && rm -rf node_modules/.cache",
+    "remove-modules": "find . -name 'node_modules' -type d -prune -exec rm -rf {} +",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:seed": "turbo run build --filter=@packages/crypto && tsx prisma/seed.ts"

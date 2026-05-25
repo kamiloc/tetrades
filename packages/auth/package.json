@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "clean": "rm -rf dist .turbo"
+    "clean": "rm -rf dist .turbo tsconfig.tsbuildinfo"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.0",
