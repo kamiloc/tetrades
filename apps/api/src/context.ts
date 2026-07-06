@@ -27,7 +27,10 @@ export async function createContext({ req }: CreateFastifyContextOptions): Promi
   const requestId =
     (req.headers['x-request-id'] as string | undefined) ?? randomUUID();
 
-  const authResult = await verifyAuthToken(req.headers['authorization']);
+  // The rate-limit onRequest hook (middleware/rateLimit.ts) verifies the JWT
+  // before routing; reuse its result to avoid a second Supabase call.
+  const authResult =
+    req.authResult ?? (await verifyAuthToken(req.headers['authorization']));
 
   if (authResult.authenticated) {
     req.log.info({ requestId, msg: 'auth verified' });

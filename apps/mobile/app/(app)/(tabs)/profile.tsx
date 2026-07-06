@@ -1,5 +1,7 @@
 import { trpc, useMyAthlete, useMyPublicProfile } from '@packages/api-client';
+import FullScreenSpinner from 'apps/mobile/components/spinner';
 import { type ErrorBoundaryProps, router } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -40,8 +42,8 @@ function getInitials(name: string | null): string {
 export default function ProfileScreen() {
   // All hooks first — Rules of Hooks forbid conditional returns above this block.
   const myAthleteQuery = useMyAthlete();
-  const athleteId = myAthleteQuery.data?.athleteId;
   const publicProfileQuery = useMyPublicProfile();
+  const athleteId = useMemo(() => myAthleteQuery.data?.athleteId ?? null, [myAthleteQuery.data]);
 
   const profileQuery = trpc.athlete.getProfile.useQuery(
     { athleteId: athleteId ?? '' },
@@ -55,6 +57,10 @@ export default function ProfileScreen() {
     { athleteId: athleteId ?? '' },
     { enabled: !!athleteId },
   );
+
+  if (myAthleteQuery.isLoading) {
+    return <FullScreenSpinner />;
+  }
 
   // Full-screen error — identity is the critical path; without it nothing else loads.
   // The !hasAthlete case never reaches this screen: (app)/_layout.tsx gates on

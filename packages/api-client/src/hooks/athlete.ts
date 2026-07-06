@@ -30,3 +30,4 @@ export const useMyPublicProfile = () =>
 
 export const useUpdatePublicProfile = () =>
   trpc.athlete.updatePublicProfile.useMutation();
+ 

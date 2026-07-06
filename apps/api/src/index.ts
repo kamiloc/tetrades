@@ -1,12 +1,13 @@
 import cors from '@fastify/cors';
+import { initCryptoAudit } from '@packages/crypto';
 import { fastifyTRPCPlugin, type FastifyTRPCPluginOptions } from '@trpc/server/adapters/fastify';
 import Fastify from 'fastify';
 
-import { initCryptoAudit } from '@packages/crypto';
 
 import { createContext } from './context.js';
 import { getEnv } from './env.js';
 import { prisma } from './lib/prisma.js';
+import { registerRateLimiting } from './middleware/rateLimit.js';
 import { appRouter, type AppRouter } from './router/index.js';
 
 const env = getEnv();
@@ -40,6 +41,10 @@ const start = async () => {
   await server.register(cors, {
     origin: env.CORS_ORIGIN,
   });
+
+  // Rate limiting must be registered before the tRPC plugin so the limiter
+  // (and its once-per-request auth verification) runs ahead of procedures.
+  await registerRateLimiting(server);
 
   await server.register(fastifyTRPCPlugin, {
     prefix: '/trpc',

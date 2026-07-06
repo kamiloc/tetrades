@@ -60,7 +60,11 @@ export async function verifyAccessToken(
   }
   const { data, error } = await verifier.auth.getUser(accessToken);
   if (error || !data.user) {
-    throw new Error(error?.message ?? 'Invalid or expired access token');
+    // Carry the Supabase HTTP status so callers can log a numeric code
+    // without ever touching the token or the raw error message.
+    throw Object.assign(new Error(error?.message ?? 'Invalid or expired access token'), {
+      status: error?.status,
+    });
   }
   return {
     userId: data.user.id,

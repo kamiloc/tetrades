@@ -1,8 +1,8 @@
 import { createDecipheriv } from 'node:crypto';
 
-import type { AuditContext } from './types.js';
 import { emitDecryptionAudit } from './audit.js';
 import { bufferToPayload, parseMasterKey } from './helpers.js';
+import type { AuditContext } from './types.js';
 
 /**
  * Decrypts a ciphertext Buffer back to a plaintext string.

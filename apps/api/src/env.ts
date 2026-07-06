@@ -12,6 +12,11 @@ const envSchema = z.object({
     .string()
     .length(64, 'MASTER_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)')
     .regex(/^[0-9a-fA-F]+$/, 'MASTER_ENCRYPTION_KEY must contain only hex characters'),
+  // Rate limit tiers in requests per minute (Sprint 3 task 3.7 defaults).
+  RATE_LIMIT_PUBLIC: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_AUTHED: z.coerce.number().int().positive().default(200),
+  RATE_LIMIT_ADMIN: z.coerce.number().int().positive().default(2000),
+  RATE_LIMIT_SENSITIVE: z.coerce.number().int().positive().default(5),
 });
 
 export type Env = z.infer<typeof envSchema>;

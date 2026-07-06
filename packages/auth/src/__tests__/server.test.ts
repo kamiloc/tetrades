@@ -51,7 +51,7 @@ interface MockUser {
 
 interface MockGetUserResult {
   data: { user: MockUser | null };
-  error: { message: string } | null;
+  error: { message: string; status?: number } | null;
 }
 
 function buildMockVerifier(result: MockGetUserResult): {
@@ -93,6 +93,17 @@ describe('verifyAccessToken', () => {
     });
 
     await expect(verifyAccessToken(client, 'expired.jwt')).rejects.toThrow('jwt expired');
+  });
+
+  it('propagates the Supabase HTTP status on the thrown error', async () => {
+    const { client } = buildMockVerifier({
+      data: { user: null },
+      error: { message: 'jwt expired', status: 401 },
+    });
+
+    await expect(verifyAccessToken(client, 'expired.jwt')).rejects.toMatchObject({
+      status: 401,
+    });
   });
 
   it('throws when the user is missing without an explicit error', async () => {

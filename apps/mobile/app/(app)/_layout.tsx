@@ -1,15 +1,8 @@
 import { useOnboardingState } from '@packages/api-client';
 import { useSession } from '@packages/auth';
+import FullScreenSpinner from 'apps/mobile/components/spinner';
 import { Redirect, Stack, useSegments } from 'expo-router';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-
-function FullScreenSpinner() {
-  return (
-    <View className="flex-1 items-center justify-center bg-canvas">
-      <ActivityIndicator />
-    </View>
-  );
-}
+import { Pressable, Text, View } from 'react-native';
 
 export default function AppLayout() {
   const { isLoading: sessionLoading, isAuthenticated } = useSession();
