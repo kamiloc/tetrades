@@ -27,6 +27,19 @@ import { createCachedRoleResolver, type RoleResolver } from '../lib/userRole.js'
 
 import { verifyAuthToken } from './auth.js';
 
+declare module 'fastify' {
+  interface FastifyRequest {
+    /**
+     * Tier decision computed once per request by decisionFor() below; read
+     * by the request-summary log line (middleware/logging.ts). Unlike
+     * `authResult`, this augmentation may live here: nothing in the Next.js
+     * TS program (which includes context.ts via the AppRouter type import)
+     * references it.
+     */
+    rateLimitDecision?: RateLimitDecision;
+  }
+}
+
 /** Counters reset every minute; only the per-tier maximums are configurable. */
 const RATE_LIMIT_WINDOW_MS = 60_000;
 
@@ -218,15 +231,21 @@ export async function registerRateLimiting(
     }
   });
 
+  // Computed lazily on first use (after the onRequest hook resolved
+  // authResult) and cached on the request for the keyGenerator/max callbacks
+  // and the request-summary log line.
   const decisionFor = (req: FastifyRequest): RateLimitDecision => {
+    if (req.rateLimitDecision) return req.rateLimitDecision;
     const auth = req.authResult;
-    return resolveRateLimit({
+    const decision = resolveRateLimit({
       url: req.url,
       userId: auth?.userId ?? null,
       role: auth?.authenticated === true ? (auth.role ?? null) : null,
       ip: req.ip,
       limits,
     });
+    req.rateLimitDecision = decision;
+    return decision;
   };
 
   await server.register(rateLimit, {
@@ -234,22 +253,35 @@ export async function registerRateLimiting(
     timeWindow: RATE_LIMIT_WINDOW_MS,
     keyGenerator: (req) => decisionFor(req).key,
     max: (req) => decisionFor(req).max,
-    errorResponseBuilder: (req, context) =>
-      new RateLimitExceededError(
+    errorResponseBuilder: (req, context) => {
+      req.log.warn({
+        event: 'rate_limit_exceeded',
+        tier: decisionFor(req).tier,
+        ip: req.ip,
+        userId: req.authResult?.userId ?? null,
+      });
+      return new RateLimitExceededError(
         context.statusCode,
         buildRateLimitErrorBody(req.url, context.after),
-      ),
+      );
+    },
     ...createRateLimitStore(),
   });
 
   // Unwrap rate-limit errors into the tRPC envelope; everything else keeps
   // Fastify's default error behavior. tRPC procedure errors never reach this
   // handler — the tRPC plugin shapes those itself.
-  server.setErrorHandler((err: FastifyError | RateLimitExceededError, _req, reply) => {
+  server.setErrorHandler((err: FastifyError | RateLimitExceededError, req, reply) => {
     if (err instanceof RateLimitExceededError) {
       void reply.status(err.statusCode).send(err.body);
       return;
     }
+    // Fastify's default error log is bypassed by a custom handler, so emit
+    // it here — name/message only, never headers or request bodies.
+    req.log.error(
+      { error: { name: err.name, message: err.message }, statusCode: err.statusCode ?? 500 },
+      'unhandled error',
+    );
     void reply.status(err.statusCode ?? 500).send(err);
   });
 }
