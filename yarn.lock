@@ -2580,6 +2580,11 @@
   resolved "https://registry.yarnpkg.com/@trpc/client/-/client-11.17.0.tgz#420308eb120269cd466507637416acfc29066cc1"
   integrity sha512-KpJBFrbKTDeVCFv/3ckL1XBBH5Yssn8hethI/rUy7GIpTj+VzjtPjykDqJpzobuVOz+d26cXCSu1t4I6MYI5Zg==
 
+"@trpc/client@^11.17.0":
+  version "11.18.0"
+  resolved "https://registry.yarnpkg.com/@trpc/client/-/client-11.18.0.tgz#8fc48fe709f5d41ca15343ac06e56b1fda3e484a"
+  integrity sha512-wOqeg3Fvl25V1ZisQhUD3K8G60ZJDlSGJNSyeXrLH24xAo5w6GSR2Kzb1cSNY9Y+IQ2YZvYGZstBU+V/ulo/ow==
+
 "@trpc/react-query@^11":
   version "11.17.0"
   resolved "https://registry.yarnpkg.com/@trpc/react-query/-/react-query-11.17.0.tgz#38816fa6cc92a2b36b5ddd3c10991892b5948420"

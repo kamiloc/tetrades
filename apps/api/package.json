@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@packages/eslint-config": "*",
+    "@trpc/client": "^11.17.0",
     "@types/node": "^22.13.0",
     "pino-pretty": "^13.0.0",
     "prisma": "^6.19.3",
