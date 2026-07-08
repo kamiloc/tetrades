@@ -27,13 +27,17 @@
     "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.106.0",
     "@trpc/server": "^11.17.0",
+    "bullmq": "^5.79.3",
     "fastify": "^5.2.0",
+    "ioredis": "5.10.1",
     "superjson": "^2.2.6",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@packages/eslint-config": "*",
+    "@trpc/client": "^11.17.0",
     "@types/node": "^22.13.0",
+    "pino-pretty": "^13.0.0",
     "prisma": "^6.19.3",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",

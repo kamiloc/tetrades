@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { cuidSchema, countryCodeSchema, datetimeSchema, slugSchema, uuidSchema } from './common.js';
+import { cuidSchema, countryCodeSchema, datetimeSchema, slugSchema } from './common.js';
 import { profileStatusEnum } from './enums.js';
 
 // ──────────────────────────────────────────────
@@ -94,7 +94,7 @@ export type GetAthletePublicProfileInput = z.infer<typeof getAthletePublicProfil
 
 export const searchAthletesInput = z.object({
   query: z.string(),
-  sportId: uuidSchema.optional(),
+  sportId: cuidSchema.optional(),
   cursor: cuidSchema.optional(),
 });
 export type SearchAthletesInput = z.infer<typeof searchAthletesInput>;

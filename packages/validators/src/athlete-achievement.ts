@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { cuidSchema, datetimeSchema, uuidSchema } from './common.js';
+import { cuidSchema, datetimeSchema } from './common.js';
 import { verificationStatusEnum } from './enums.js';
 
 // ──────────────────────────────────────────────
@@ -65,6 +65,6 @@ export const listAchievementsInput = z.object({
 export type ListAchievementsInput = z.infer<typeof listAchievementsInput>;
 
 export const verifyAchievementInput = z.object({
-  achievementId: uuidSchema,
+  achievementId: cuidSchema,
 });
 export type VerifyAchievementInput = z.infer<typeof verifyAchievementInput>;

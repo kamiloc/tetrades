@@ -12,7 +12,27 @@ const t = initTRPC.context<Context>().create({
 });
 
 export const router = t.router;
-export const publicProcedure = t.procedure;
+
+/**
+ * Procedure entry/exit logging at `debug` — invisible in production, where
+ * the logger level is `info` (middleware/logging.ts). Logs the procedure
+ * path and outcome only; never input or output values, which can contain
+ * L2 data on medical/private-profile procedures.
+ */
+const procedureLogging = t.middleware(async ({ ctx, path, type, next }) => {
+  ctx.log.debug({ procedure: path, type }, 'procedure start');
+  const startedAt = Date.now();
+
+  const result = await next();
+
+  ctx.log.debug(
+    { procedure: path, type, durationMs: Date.now() - startedAt, ok: result.ok },
+    'procedure end',
+  );
+  return result;
+});
+
+export const publicProcedure = t.procedure.use(procedureLogging);
 
 /**
  * Protected procedure — requires a valid Supabase JWT.
@@ -21,7 +41,7 @@ export const publicProcedure = t.procedure;
  * After this middleware passes, ctx.userId is narrowed from `string | null`
  * to `string`, so procedures built on protectedProcedure never null-check it.
  */
-export const protectedProcedure = t.procedure.use(
+export const protectedProcedure = publicProcedure.use(
   t.middleware(async ({ ctx, next }) => {
     if (!ctx.userId) {
       throw new TRPCError({

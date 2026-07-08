@@ -19,6 +19,7 @@
 import rateLimit, { type RateLimitPluginOptions } from '@fastify/rate-limit';
 import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
 import type { FastifyError, FastifyInstance, FastifyRequest } from 'fastify';
+import type { Redis } from 'ioredis';
 import superjson from 'superjson';
 import type { SuperJSONResult } from 'superjson';
 
@@ -26,6 +27,20 @@ import { getEnv } from '../env.js';
 import { createCachedRoleResolver, type RoleResolver } from '../lib/userRole.js';
 
 import { verifyAuthToken } from './auth.js';
+
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    /**
+     * Tier decision computed once per request by decisionFor() below; read
+     * by the request-summary log line (middleware/logging.ts). Unlike
+     * `authResult`, this augmentation may live here: nothing in the Next.js
+     * TS program (which includes context.ts via the AppRouter type import)
+     * references it.
+     */
+    rateLimitDecision?: RateLimitDecision;
+  }
+}
 
 /** Counters reset every minute; only the per-tier maximums are configurable. */
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -161,15 +176,20 @@ export class RateLimitExceededError extends Error {
 export type RateLimitStoreOptions = Pick<RateLimitPluginOptions, 'redis' | 'store'>;
 
 /**
- * Storage for rate-limit counters, isolated so Sprint 4 can move to Redis
- * (shared with BullMQ) by returning `{ redis: <ioredis client> }` here —
- * a single config change with no impact on tier logic.
+ * Storage for rate-limit counters (the Sprint 3 swap point, connected in
+ * Sprint 4 task 4.1). With a Redis connection the plugin's Redis store is
+ * used — counters survive restarts and are shared across instances — with
+ * zero impact on tier logic. Without one (unit tests, dev without
+ * UPSTASH_REDIS_URL) the in-memory store remains, which is correct for a
+ * single process.
  *
- * Sprint 3 intentionally returns no overrides: the plugin's in-memory store
- * is correct for a single long-running container.
+ * The connection is the same ioredis client BullMQ uses (queue/redis.ts);
+ * it is created with `maxRetriesPerRequest: null`, so while Redis is briefly
+ * unreachable, counter INCRs wait for the reconnect instead of failing
+ * requests into 500s.
  */
-export function createRateLimitStore(): RateLimitStoreOptions {
-  return {};
+export function createRateLimitStore(redis?: Redis): RateLimitStoreOptions {
+  return redis === undefined ? {} : { redis };
 }
 
 export interface RegisterRateLimitingOptions {
@@ -178,6 +198,11 @@ export interface RegisterRateLimitingOptions {
    * the TTL-cached Prisma lookup in lib/userRole.ts. Injectable for tests.
    */
   roleResolver?: RoleResolver;
+  /**
+   * Shared ioredis connection for Redis-backed counters (task 4.1). Omitted
+   * in unit tests and when UPSTASH_REDIS_URL is not configured.
+   */
+  redis?: Redis;
 }
 
 /**
@@ -218,15 +243,21 @@ export async function registerRateLimiting(
     }
   });
 
+  // Computed lazily on first use (after the onRequest hook resolved
+  // authResult) and cached on the request for the keyGenerator/max callbacks
+  // and the request-summary log line.
   const decisionFor = (req: FastifyRequest): RateLimitDecision => {
+    if (req.rateLimitDecision) return req.rateLimitDecision;
     const auth = req.authResult;
-    return resolveRateLimit({
+    const decision = resolveRateLimit({
       url: req.url,
       userId: auth?.userId ?? null,
       role: auth?.authenticated === true ? (auth.role ?? null) : null,
       ip: req.ip,
       limits,
     });
+    req.rateLimitDecision = decision;
+    return decision;
   };
 
   await server.register(rateLimit, {
@@ -234,22 +265,35 @@ export async function registerRateLimiting(
     timeWindow: RATE_LIMIT_WINDOW_MS,
     keyGenerator: (req) => decisionFor(req).key,
     max: (req) => decisionFor(req).max,
-    errorResponseBuilder: (req, context) =>
-      new RateLimitExceededError(
+    errorResponseBuilder: (req, context) => {
+      req.log.warn({
+        event: 'rate_limit_exceeded',
+        tier: decisionFor(req).tier,
+        ip: req.ip,
+        userId: req.authResult?.userId ?? null,
+      });
+      return new RateLimitExceededError(
         context.statusCode,
         buildRateLimitErrorBody(req.url, context.after),
-      ),
-    ...createRateLimitStore(),
+      );
+    },
+    ...createRateLimitStore(options.redis),
   });
 
   // Unwrap rate-limit errors into the tRPC envelope; everything else keeps
   // Fastify's default error behavior. tRPC procedure errors never reach this
   // handler — the tRPC plugin shapes those itself.
-  server.setErrorHandler((err: FastifyError | RateLimitExceededError, _req, reply) => {
+  server.setErrorHandler((err: FastifyError | RateLimitExceededError, req, reply) => {
     if (err instanceof RateLimitExceededError) {
       void reply.status(err.statusCode).send(err.body);
       return;
     }
+    // Fastify's default error log is bypassed by a custom handler, so emit
+    // it here — name/message only, never headers or request bodies.
+    req.log.error(
+      { error: { name: err.name, message: err.message }, statusCode: err.statusCode ?? 500 },
+      'unhandled error',
+    );
     void reply.status(err.statusCode ?? 500).send(err);
   });
 }

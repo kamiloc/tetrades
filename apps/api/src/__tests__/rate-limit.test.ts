@@ -459,8 +459,9 @@ describe('createContext reuse of req.authResult', () => {
     const { createContext } = await import('../context.js');
 
     const req = {
+      id: '9b2e8d3a-4f1c-4a6b-8f0d-1c2e3a4b5c6d',
       headers: { authorization: 'Bearer would-fail-if-reverified' },
-      log: { info: vi.fn() },
+      log: { info: vi.fn(), debug: vi.fn() },
       authResult: { authenticated: true, userId: 'pre-verified-user' } as AuthResult,
     };
 
@@ -470,5 +471,6 @@ describe('createContext reuse of req.authResult', () => {
     } as unknown as Parameters<typeof createContext>[0]);
 
     expect(ctx.userId).toBe('pre-verified-user');
+    expect(ctx.requestId).toBe('9b2e8d3a-4f1c-4a6b-8f0d-1c2e3a4b5c6d');
   });
 });

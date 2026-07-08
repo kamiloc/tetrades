@@ -1,58 +1,40 @@
-import cors from '@fastify/cors';
-import { initCryptoAudit } from '@packages/crypto';
-import { fastifyTRPCPlugin, type FastifyTRPCPluginOptions } from '@trpc/server/adapters/fastify';
-import Fastify from 'fastify';
-
-
-import { createContext } from './context.js';
+import { buildServer } from './app.js';
 import { getEnv } from './env.js';
-import { prisma } from './lib/prisma.js';
-import { registerRateLimiting } from './middleware/rateLimit.js';
-import { appRouter, type AppRouter } from './router/index.js';
-
-const env = getEnv();
-const server = Fastify({ logger: true });
-
-// Register the audit emitter before any request handling begins.
-// decryptPII() will throw if this is not called first.
-initCryptoAudit(async (event) => {
-  const actor = await prisma.userAccount.findUnique({
-    where: { supabaseUserId: event.actorId },
-    select: { id: true, athlete: { select: { id: true } } },
-  });
-
-  if (!actor?.athlete) return;
-
-  await prisma.auditEvent.create({
-    data: {
-      actorUserAccountId: actor.id,
-      athleteId: actor.athlete.id,
-      eventType: event.action,
-      targetType: event.target.table,
-      targetId: event.target.recordId,
-      purposeCode: event.purpose,
-      requestId: event.requestId,
-      metadata: { field: event.target.field },
-    },
-  });
-});
 
 const start = async () => {
-  await server.register(cors, {
-    origin: env.CORS_ORIGIN,
+  const env = getEnv();
+  const server = await buildServer();
+
+  // Graceful shutdown (task 4.1): server.close() stops the HTTP listener,
+  // waits for in-flight requests, then runs the onClose hooks — including
+  // the queue shutdown sequence, which drains active BullMQ jobs before the
+  // Redis connection is closed. `once` so a second signal force-kills.
+  const shutdown = (signal: 'SIGTERM' | 'SIGINT'): void => {
+    server.log.info({ signal }, 'shutdown signal received, draining');
+    server.close().then(
+      () => {
+        server.log.info('shutdown complete');
+        // No process.exit() here: it would race pino's async flush and drop
+        // the shutdown log lines. With workers, Redis, and Prisma closed the
+        // event loop empties and the process exits on its own; the unref'd
+        // timer only fires if a stray handle keeps the loop alive.
+        setTimeout(() => process.exit(0), 5000).unref();
+      },
+      (err: unknown) => {
+        server.log.error(
+          { error: err instanceof Error ? { name: err.name, message: err.message } : {} },
+          'shutdown failed',
+        );
+        process.exit(1);
+      },
+    );
+  };
+  process.once('SIGTERM', () => {
+    shutdown('SIGTERM');
   });
-
-  // Rate limiting must be registered before the tRPC plugin so the limiter
-  // (and its once-per-request auth verification) runs ahead of procedures.
-  await registerRateLimiting(server);
-
-  await server.register(fastifyTRPCPlugin, {
-    prefix: '/trpc',
-    trpcOptions: {
-      router: appRouter,
-      createContext,
-    },
-  } satisfies FastifyTRPCPluginOptions<AppRouter>);
+  process.once('SIGINT', () => {
+    shutdown('SIGINT');
+  });
 
   const port = env.API_PORT ?? 3001;
   await server.listen({ port, host: '0.0.0.0' });
@@ -60,6 +42,8 @@ const start = async () => {
 };
 
 start().catch((err: unknown) => {
-  server.log.error(err);
+  // The server may have failed before its logger existed — console is the
+  // only reliable sink for a fatal boot error.
+  console.error(err);
   process.exit(1);
 });
