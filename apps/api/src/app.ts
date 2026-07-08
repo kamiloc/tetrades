@@ -16,6 +16,7 @@ import { getEnv } from './env.js';
 import { prisma } from './lib/prisma.js';
 import { buildLoggerOptions, genReqId, registerRequestLogging } from './middleware/logging.js';
 import { registerRateLimiting } from './middleware/rateLimit.js';
+import { startQueueInfrastructure } from './queue/lifecycle.js';
 import { appRouter, type AppRouter } from './router/index.js';
 import { createDecryptionAuditEmitter } from './services/audit.js';
 
@@ -49,13 +50,44 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   // decryptPII() will throw if this is not called first.
   initCryptoAudit(createDecryptionAuditEmitter({ prisma, logger: server.log }));
 
+  // Release the DB pool on close so a drained process can exit on its own.
+  // onClose hooks run LIFO: registered FIRST so it runs LAST — after the
+  // queue shutdown below, since 4.2+ job processors use Prisma while
+  // draining. Prisma reconnects lazily, so test servers sharing the
+  // singleton client are unaffected.
+  server.addHook('onClose', async () => {
+    await prisma.$disconnect();
+  });
+
   await server.register(cors, {
     origin: env.CORS_ORIGIN,
   });
 
+  // BullMQ infrastructure (task 4.1): one shared ioredis connection for the
+  // queues, the worker stubs, and the rate-limit store. server.close()
+  // triggers the graceful sequence — drain workers, close queues, close
+  // Redis last — so an in-flight job always outlives the HTTP listener.
+  // Without UPSTASH_REDIS_URL (unit/integration tests, bare dev setups) the
+  // API runs with in-memory rate limiting and no workers; getEnv() rejects
+  // that combination in production.
+  const queueInfra =
+    env.UPSTASH_REDIS_URL === undefined
+      ? null
+      : startQueueInfrastructure(env.UPSTASH_REDIS_URL, server.log);
+  if (queueInfra === null) {
+    server.log.warn(
+      { event: 'queue_infrastructure_disabled' },
+      'UPSTASH_REDIS_URL not set — in-memory rate limiting, background workers disabled',
+    );
+  } else {
+    server.addHook('onClose', async () => {
+      await queueInfra.close();
+    });
+  }
+
   // Rate limiting must be registered before the tRPC plugin so the limiter
   // (and its once-per-request auth verification) runs ahead of procedures.
-  await registerRateLimiting(server);
+  await registerRateLimiting(server, { redis: queueInfra?.connection });
   registerRequestLogging(server);
 
   await server.register(fastifyTRPCPlugin, {

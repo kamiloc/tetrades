@@ -19,6 +19,7 @@
 import rateLimit, { type RateLimitPluginOptions } from '@fastify/rate-limit';
 import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
 import type { FastifyError, FastifyInstance, FastifyRequest } from 'fastify';
+import type { Redis } from 'ioredis';
 import superjson from 'superjson';
 import type { SuperJSONResult } from 'superjson';
 
@@ -26,6 +27,7 @@ import { getEnv } from '../env.js';
 import { createCachedRoleResolver, type RoleResolver } from '../lib/userRole.js';
 
 import { verifyAuthToken } from './auth.js';
+
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -174,15 +176,20 @@ export class RateLimitExceededError extends Error {
 export type RateLimitStoreOptions = Pick<RateLimitPluginOptions, 'redis' | 'store'>;
 
 /**
- * Storage for rate-limit counters, isolated so Sprint 4 can move to Redis
- * (shared with BullMQ) by returning `{ redis: <ioredis client> }` here —
- * a single config change with no impact on tier logic.
+ * Storage for rate-limit counters (the Sprint 3 swap point, connected in
+ * Sprint 4 task 4.1). With a Redis connection the plugin's Redis store is
+ * used — counters survive restarts and are shared across instances — with
+ * zero impact on tier logic. Without one (unit tests, dev without
+ * UPSTASH_REDIS_URL) the in-memory store remains, which is correct for a
+ * single process.
  *
- * Sprint 3 intentionally returns no overrides: the plugin's in-memory store
- * is correct for a single long-running container.
+ * The connection is the same ioredis client BullMQ uses (queue/redis.ts);
+ * it is created with `maxRetriesPerRequest: null`, so while Redis is briefly
+ * unreachable, counter INCRs wait for the reconnect instead of failing
+ * requests into 500s.
  */
-export function createRateLimitStore(): RateLimitStoreOptions {
-  return {};
+export function createRateLimitStore(redis?: Redis): RateLimitStoreOptions {
+  return redis === undefined ? {} : { redis };
 }
 
 export interface RegisterRateLimitingOptions {
@@ -191,6 +198,11 @@ export interface RegisterRateLimitingOptions {
    * the TTL-cached Prisma lookup in lib/userRole.ts. Injectable for tests.
    */
   roleResolver?: RoleResolver;
+  /**
+   * Shared ioredis connection for Redis-backed counters (task 4.1). Omitted
+   * in unit tests and when UPSTASH_REDIS_URL is not configured.
+   */
+  redis?: Redis;
 }
 
 /**
@@ -265,7 +277,7 @@ export async function registerRateLimiting(
         buildRateLimitErrorBody(req.url, context.after),
       );
     },
-    ...createRateLimitStore(),
+    ...createRateLimitStore(options.redis),
   });
 
   // Unwrap rate-limit errors into the tRPC envelope; everything else keeps
