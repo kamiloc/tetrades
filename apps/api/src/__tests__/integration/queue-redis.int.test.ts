@@ -9,8 +9,9 @@
  *   4. the connection factory connects and logs at info level
  *   5. graceful shutdown drains workers before Redis closes (logged sequence)
  *   6. rate-limit counters persist across server restarts (Redis keys)
- *   plus: a job enqueued against a stub worker fails loudly with
- *   'not implemented' and its failure log carries the payload requestId.
+ *   plus: an OCR job for a nonexistent document fails loudly and its
+ *   failure log carries the payload requestId (worker-level plumbing; the
+ *   OCR pipeline itself is covered by process-ocr.int.test.ts).
  */
 import './helpers/load-env.js';
 
@@ -24,7 +25,7 @@ import { closeRedis, createRedisConnection } from '../../queue/redis.js';
 import { QUEUE_NAMES } from '../../queue/registry.js';
 import { makeRecordingLogger, type RecordedLog } from '../helpers/recording-logger.js';
 
-import { dbReady, startServer } from './helpers/setup.js';
+import { dbReady, prisma, startServer } from './helpers/setup.js';
 
 const REDIS_URL = process.env['UPSTASH_REDIS_URL'] ?? '';
 const redisReady = REDIS_URL.length > 0;
@@ -78,18 +79,20 @@ describe.skipIf(!redisReady)('redis connection factory (live)', () => {
 // Worker stubs + graceful shutdown on the real broker (criterion 5)
 // ---------------------------------------------------------------------------
 
-describe.skipIf(!redisReady)('queue infrastructure (live)', () => {
+describe.skipIf(!redisReady || !dbReady)('queue infrastructure (live)', () => {
   it(
-    'stub worker fails an enqueued job with "not implemented" (requestId in logs), ' +
+    'OCR worker fails a job for a nonexistent document (requestId in logs), ' +
       'then shutdown drains workers before closing Redis',
     async () => {
       const lines: RecordedLog[] = [];
-      const infra = startQueueInfrastructure(REDIS_URL, makeRecordingLogger(lines));
+      const infra = startQueueInfrastructure(REDIS_URL, makeRecordingLogger(lines), prisma);
       const ocrQueue = infra.registry.queues[QUEUE_NAMES.OCR_PROCESSING];
 
       const requestId = randomUUID();
       // attempts: 1 overrides the default 3 so the test does not sit through
-      // the 2s/4s retry backoff; the stub behavior per attempt is identical.
+      // the 2s/4s retry backoff; behavior per attempt is identical. The
+      // document id does not exist, so the real 4.2 processor fails before
+      // touching any state.
       await ocrQueue.add(
         'process',
         { documentId: 'doc_int_test', athleteId: 'ath_int_test', requestId },
@@ -114,7 +117,9 @@ describe.skipIf(!redisReady)('queue infrastructure (live)', () => {
       );
       expect(failed?.level).toBe('error');
       expect(failed?.obj['queue']).toBe(QUEUE_NAMES.OCR_PROCESSING);
-      expect((failed?.obj['error'] as { message: string }).message).toBe('not implemented');
+      expect((failed?.obj['error'] as { message: string }).message).toBe(
+        'medical document not found',
+      );
 
       // Leave no failed jobs behind on the shared broker.
       await ocrQueue.obliterate({ force: true });

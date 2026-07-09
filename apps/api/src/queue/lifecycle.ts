@@ -13,6 +13,7 @@
  *   3. redis    — quit the shared connection LAST; closing it while a
  *                 worker is active loses the active job
  */
+import type { PrismaClient } from '@prisma/client';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Redis } from 'ioredis';
 
@@ -57,12 +58,15 @@ export async function runShutdownSequence(
 export function startQueueInfrastructure(
   redisUrl: string,
   logger: FastifyBaseLogger,
+  // Injected (not imported from lib/prisma.js) so importing this module never
+  // triggers lib/prisma's import-time env validation in unit tests.
+  prisma: PrismaClient,
 ): QueueInfrastructure {
   const connection = createRedisConnection(redisUrl, logger);
   const registry = createQueueRegistry(connection);
 
   const workers: WorkerHandle[] = [
-    createProcessOCRWorker(connection, logger),
+    createProcessOCRWorker(connection, logger, prisma),
     createOptimizeImageWorker(connection, logger),
     createDeletePIIWorker(connection, logger),
     createSendNotificationWorker(connection, logger),

@@ -73,7 +73,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const queueInfra =
     env.UPSTASH_REDIS_URL === undefined
       ? null
-      : startQueueInfrastructure(env.UPSTASH_REDIS_URL, server.log);
+      : startQueueInfrastructure(env.UPSTASH_REDIS_URL, server.log, prisma);
   if (queueInfra === null) {
     server.log.warn(
       { event: 'queue_infrastructure_disabled' },

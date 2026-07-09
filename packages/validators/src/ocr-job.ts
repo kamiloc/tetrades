@@ -44,3 +44,28 @@ export const ocrJobOwnerOutput = z.object({
   finishedAt: datetimeSchema.nullable(),
 });
 export type OcrJobOwnerOutput = z.infer<typeof ocrJobOwnerOutput>;
+
+// ──────────────────────────────────────────────
+// OCR EXTRACTION CONTRACT (Sprint 4, task 4.2)
+// The shape Claude Vision must return and the processOCR worker validates
+// before encrypting into parsedDataEnc. The CONTENT is L2-CONFIDENTIAL —
+// this schema only ever sees plaintext inside the worker, between decrypt
+// and encrypt; it is never part of a tRPC output.
+// .strict() enforces the "no extra keys" rule of the extraction prompt.
+// ──────────────────────────────────────────────
+
+export const ocrExtractedValue = z
+  .object({
+    value: z.union([z.string().max(500), z.number(), z.boolean()]), /// L2-CONFIDENTIAL (plaintext in worker only)
+    unit: z.string().max(50).nullable(), /// L2-CONFIDENTIAL (plaintext in worker only)
+    confidence: z.number().min(0).max(1), /// L1-INTERNAL — reviewer guidance, never proof (ADR-009)
+  })
+  .strict();
+export type OcrExtractedValue = z.infer<typeof ocrExtractedValue>;
+
+export const ocrExtractionResult = z
+  .object({
+    fields: z.record(z.string().min(1).max(100), ocrExtractedValue),
+  })
+  .strict();
+export type OcrExtractionResult = z.infer<typeof ocrExtractionResult>;
