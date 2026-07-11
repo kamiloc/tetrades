@@ -183,7 +183,7 @@ export type RateLimitStoreOptions = Pick<RateLimitPluginOptions, 'redis' | 'stor
  * UPSTASH_REDIS_URL) the in-memory store remains, which is correct for a
  * single process.
  *
- * The connection is the same ioredis client BullMQ uses (queue/redis.ts);
+ * The connection is the same ioredis client BullMQ uses (@packages/queue);
  * it is created with `maxRetriesPerRequest: null`, so while Redis is briefly
  * unreachable, counter INCRs wait for the reconnect instead of failing
  * requests into 500s.

@@ -8,20 +8,26 @@
  * (workers drain before Redis closes). Live-broker behavior is covered by
  * src/__tests__/integration/queue-redis.int.test.ts.
  */
-import type { Redis } from 'ioredis';
-import { describe, it, expect } from 'vitest';
-
-import { createRateLimitStore } from '../middleware/rateLimit.js';
-import { runShutdownSequence } from '../queue/lifecycle.js';
-import { closeRedis, createRedisConnection, reconnectBackoffMs } from '../queue/redis.js';
-import { DEFAULT_JOB_OPTIONS, QUEUE_NAMES } from '../queue/registry.js';
+import {
+  closeRedis,
+  createRedisConnection,
+  DEFAULT_JOB_OPTIONS,
+  QUEUE_NAMES,
+  reconnectBackoffMs,
+} from '@packages/queue';
 import type {
   ImageOptimizationJobData,
   NotificationJobData,
   OcrProcessingJobData,
   PiiDeletionJobData,
   QueueName,
-} from '../queue/registry.js';
+} from '@packages/queue';
+import type { Redis } from 'ioredis';
+import { describe, it, expect } from 'vitest';
+
+
+import { createRateLimitStore } from '../middleware/rateLimit.js';
+import { runShutdownSequence } from '../queue/lifecycle.js';
 
 import { makeRecordingLogger, type RecordedLog } from './helpers/recording-logger.js';
 

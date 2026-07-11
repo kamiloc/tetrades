@@ -16,10 +16,10 @@ import { randomUUID } from 'node:crypto';
 
 import { decryptPII, encryptPII, initCryptoAudit } from '@packages/crypto';
 import type { DecryptionAuditEvent } from '@packages/crypto';
+import { QUEUE_NAMES } from '@packages/queue';
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 
 import { createOCRProcessor, OCR_MODEL_NAME, OCR_PROMPT_VERSION } from '../../jobs/processOCR.js';
-import { QUEUE_NAMES } from '../../queue/registry.js';
 import { makeRecordingLogger, type RecordedLog } from '../helpers/recording-logger.js';
 
 import {

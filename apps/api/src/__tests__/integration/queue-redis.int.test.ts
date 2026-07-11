@@ -17,12 +17,12 @@ import './helpers/load-env.js';
 
 import { randomUUID } from 'node:crypto';
 
+import { closeRedis, createRedisConnection, QUEUE_NAMES } from '@packages/queue';
 import { Redis } from 'ioredis';
 import { describe, it, expect, afterAll } from 'vitest';
 
+
 import { startQueueInfrastructure } from '../../queue/lifecycle.js';
-import { closeRedis, createRedisConnection } from '../../queue/redis.js';
-import { QUEUE_NAMES } from '../../queue/registry.js';
 import { makeRecordingLogger, type RecordedLog } from '../helpers/recording-logger.js';
 
 import { dbReady, prisma, startServer } from './helpers/setup.js';

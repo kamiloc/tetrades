@@ -1,10 +1,15 @@
 /**
  * Queue infrastructure lifecycle (Sprint 4, task 4.1).
  *
+ * App-side wiring on top of @packages/queue: this module stays in apps/api
+ * because it assembles the app's workers (src/jobs/*) and injects Prisma —
+ * packages never import from apps. The reusable pieces (connection factory,
+ * queue registry, worker scaffold, job payload types) live in the package.
+ *
  * startQueueInfrastructure() is called once by buildServer() when
  * UPSTASH_REDIS_URL is configured. It creates the shared Redis connection,
- * the queue registry, and the four worker stubs, and hands back a handle
- * whose close() runs the graceful shutdown sequence.
+ * the queue registry, and the four workers, and hands back a handle whose
+ * close() runs the graceful shutdown sequence.
  *
  * Shutdown ORDER MATTERS and is fixed here (and locked by a unit test):
  *   1. workers  — Worker.close() stops fetching and waits for in-flight
@@ -13,6 +18,8 @@
  *   3. redis    — quit the shared connection LAST; closing it while a
  *                 worker is active loses the active job
  */
+import { closeRedis, createQueueRegistry, createRedisConnection } from '@packages/queue';
+import type { QueueRegistry, WorkerHandle } from '@packages/queue';
 import type { PrismaClient } from '@prisma/client';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Redis } from 'ioredis';
@@ -21,11 +28,6 @@ import { createDeletePIIWorker } from '../jobs/deletePII.js';
 import { createOptimizeImageWorker } from '../jobs/optimizeImage.js';
 import { createProcessOCRWorker } from '../jobs/processOCR.js';
 import { createSendNotificationWorker } from '../jobs/sendNotification.js';
-
-import { closeRedis, createRedisConnection } from './redis.js';
-import { createQueueRegistry } from './registry.js';
-import type { QueueRegistry } from './registry.js';
-import type { WorkerHandle } from './worker.js';
 
 export interface QueueInfrastructure {
   connection: Redis;

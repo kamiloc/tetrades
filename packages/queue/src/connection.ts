@@ -1,12 +1,11 @@
 /**
- * ioredis connection factory for BullMQ and Redis-backed rate limiting
- * (Sprint 4, task 4.1).
+ * ioredis connection factory for BullMQ and Redis-backed rate limiting.
  *
- * One connection per Fastify server instance: buildServer() creates it and
- * shares it between the @fastify/rate-limit store, every Queue in the
- * registry, and every Worker stub. BullMQ internally duplicate()s the
- * connection where it needs dedicated blocking sockets (Workers), so a
- * single factory-produced client is the correct amount of sharing.
+ * One connection per server instance: apps/api's buildServer() creates it
+ * and shares it between the @fastify/rate-limit store, every Queue in the
+ * registry, and every Worker. BullMQ internally duplicate()s the connection
+ * where it needs dedicated blocking sockets (Workers), so a single
+ * factory-produced client is the correct amount of sharing.
  *
  * Upstash notes:
  *   - TLS is mandatory; the rediss:// scheme turns it on in ioredis, so no
@@ -22,9 +21,9 @@
  * the URL carries the Upstash token (L3-RESTRICTED). Only event names,
  * error names/messages, and retry metadata are logged.
  */
-import type { FastifyBaseLogger } from 'fastify';
 import { Redis } from 'ioredis';
 
+import type { QueueLogger } from './types.js';
 
 /** Reconnection backoff: 1s, 2s, 4s, ... capped at 30s. Never gives up. */
 export function reconnectBackoffMs(retryAttempt: number): number {
@@ -47,7 +46,7 @@ export interface CreateRedisConnectionOptions {
  */
 export function createRedisConnection(
   url: string,
-  logger: FastifyBaseLogger,
+  logger: QueueLogger,
   options: CreateRedisConnectionOptions = {},
 ): Redis {
   const connection = new Redis(url, {

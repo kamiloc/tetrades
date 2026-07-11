@@ -24,6 +24,8 @@
  * the network edges.
  */
 import { decryptPII, encryptPII } from '@packages/crypto';
+import { createQueueWorker, QUEUE_NAMES } from '@packages/queue';
+import type { OcrProcessingJobData, WorkerHandle } from '@packages/queue';
 import { ocrExtractionResult } from '@packages/validators';
 import type { PrismaClient } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
@@ -31,10 +33,6 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { Redis } from 'ioredis';
 
 import { getEnv } from '../env.js';
-import { QUEUE_NAMES } from '../queue/registry.js';
-import type { OcrProcessingJobData } from '../queue/registry.js';
-import { createQueueWorker } from '../queue/worker.js';
-import type { WorkerHandle } from '../queue/worker.js';
 
 /** CLAUDE.md Medical OCR rule: this exact model, max_tokens 4096. */
 export const OCR_MODEL_NAME = 'claude-sonnet-4-20250514';

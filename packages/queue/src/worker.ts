@@ -1,19 +1,20 @@
 /**
- * Shared BullMQ worker scaffolding (Sprint 4, task 4.1).
+ * Shared BullMQ worker scaffolding.
  *
  * Every worker in apps/api/src/jobs/ is built through createQueueWorker so
  * that lifecycle logging and graceful shutdown behave identically across
- * queues. Job *data* is never logged — payloads are id-only by contract
- * (queue/registry.ts), but the logging rule is enforced here regardless:
- * only jobId, queue name, requestId, attempt counts, and error name/message
- * reach a log line.
+ * queues. Job execution logic (the processors) stays in apps/api — this
+ * package only provides the typed scaffold around it.
+ *
+ * Job *data* is never logged — payloads are id-only by contract (types.ts),
+ * but the logging rule is enforced here regardless: only jobId, queue name,
+ * requestId, attempt counts, and error name/message reach a log line.
  */
 import { Worker } from 'bullmq';
 import type { Job, Processor } from 'bullmq';
-import type { FastifyBaseLogger } from 'fastify';
 import type { Redis } from 'ioredis';
 
-import type { QueueJobData, QueueName } from './registry.js';
+import type { QueueJobData, QueueLogger, QueueName } from './types.js';
 
 export interface WorkerHandle {
   /** Queue this worker consumes — exposed for logging and tests. */
@@ -31,7 +32,7 @@ export interface CreateQueueWorkerOptions<Name extends QueueName> {
   queueName: Name;
   connection: Redis;
   concurrency: number;
-  logger: FastifyBaseLogger;
+  logger: QueueLogger;
   processor: Processor<QueueJobData[Name]>;
 }
 

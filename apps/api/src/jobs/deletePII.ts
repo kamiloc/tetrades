@@ -6,13 +6,12 @@
  * verification). Until then any enqueued job fails loudly with
  * 'not implemented' so an accidental enqueue is immediately visible.
  */
+import { createQueueWorker, QUEUE_NAMES } from '@packages/queue';
+import type { WorkerHandle } from '@packages/queue';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Redis } from 'ioredis';
 
 import { getEnv } from '../env.js';
-import { QUEUE_NAMES } from '../queue/registry.js';
-import { createQueueWorker } from '../queue/worker.js';
-import type { WorkerHandle } from '../queue/worker.js';
 
 export function createDeletePIIWorker(
   connection: Redis,
