@@ -1,7 +1,7 @@
 /**
  * React hooks for Supabase auth.
  *
- * Per CLAUDE.md / ADR-007:
+ * Per AGENTS.md / ADR-007:
  *   - This is the ONLY file in @packages/auth that may import from `react`.
  *   - NEVER import from `react-native`, `expo-*`, `next`, or `react-dom`.
  *     The hooks rely only on React core APIs so they work on both Expo and

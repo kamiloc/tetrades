@@ -7,7 +7,7 @@
 --   Contains L2-CONFIDENTIAL encrypted payloads (rawOutputEnc, parsedDataEnc)
 --   plus L1-INTERNAL metadata (status, retryCount, requestId, confidenceMap).
 --   The requestId column ties an OCR job to the originating tRPC call for
---   audit traceability (CLAUDE.md "Logging Rules").
+--   audit traceability (AGENTS.md "Logging Rules").
 --
 -- ADR-008 constraint (NON-NEGOTIABLE):
 --   ocr_jobs MUST use a direct predicate on its denormalized athlete_id

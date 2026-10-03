@@ -5,7 +5,7 @@
  * intentionally framework-free (no React, no react-native, no next imports)
  * so it can run anywhere that has `fetch`.
  *
- * Per CLAUDE.md / ADR-007:
+ * Per AGENTS.md / ADR-007:
  *   - Magic Link is primary, OTP is the fallback.
  *   - No email/password helpers are exposed.
  *   - Token storage / cookies are app-specific and injected via `storage` / cookies.

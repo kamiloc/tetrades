@@ -1,6 +1,6 @@
 // Athlete Passport — Prisma schema
 // Source of truth: docs/erm.mmd
-// Every field carries a data classification tag (L0/L1/L2/L3) per CLAUDE.md.
+// Every field carries a data classification tag (L0/L1/L2/L3) per AGENTS.md.
 // Encrypted (L2) columns use Bytes and are named with the `_enc` suffix.
 // L3 secrets (keys) never appear in this schema — they live in env only.
 

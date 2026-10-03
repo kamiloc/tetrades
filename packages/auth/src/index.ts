@@ -1,7 +1,7 @@
 /**
  * @packages/auth — platform-agnostic Supabase auth wrapper.
  *
- * Per ADR-007 and CLAUDE.md:
+ * Per ADR-007 and AGENTS.md:
  *   - Magic Link is primary; OTP is the fallback. No email/password.
  *   - Apps must consume this package — never call Supabase auth directly.
  *   - All server authorization derives from `verifyAccessToken` (trust boundary).

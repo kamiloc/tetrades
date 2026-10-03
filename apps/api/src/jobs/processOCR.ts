@@ -34,7 +34,7 @@ import type { Redis } from 'ioredis';
 
 import { getEnv } from '../env.js';
 
-/** CLAUDE.md Medical OCR rule: this exact model, max_tokens 4096. */
+/** AGENTS.md Medical OCR rule: this exact model, max_tokens 4096. */
 export const OCR_MODEL_NAME = 'claude-sonnet-4-20250514';
 
 /**
@@ -320,7 +320,7 @@ function firstTextBlock(body: unknown): string | null {
 
 /**
  * Production model edge: Claude Vision over native fetch (no SDK dependency;
- * CLAUDE.md dependency rules). Error messages carry the HTTP status only —
+ * AGENTS.md dependency rules). Error messages carry the HTTP status only —
  * never the response body, which could echo document content.
  */
 async function callClaudeVision(document: Buffer, mimeType: string): Promise<string> {

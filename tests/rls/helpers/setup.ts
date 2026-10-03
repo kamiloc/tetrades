@@ -73,7 +73,7 @@ export async function deleteTestSport(svc: SupabaseClient, sportId: string): Pro
  *
  * Uses password auth (email_confirm: true) so tests can sign in immediately
  * without magic-link flow.  Password auth is used ONLY in test infrastructure,
- * not in the application (CLAUDE.md Auth Rules).
+ * not in the application (AGENTS.md Auth Rules).
  */
 export async function createTestUser(
   svc: SupabaseClient,

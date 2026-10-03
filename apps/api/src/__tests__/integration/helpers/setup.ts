@@ -11,7 +11,7 @@
  * Two kinds of identities:
  *   - createAuthedUser: a real Supabase auth user with a valid JWT. Use for
  *     every caller of a protected procedure. Password auth is used ONLY in
- *     test infrastructure, never in the application (CLAUDE.md Auth Rules).
+ *     test infrastructure, never in the application (AGENTS.md Auth Rules).
  *   - createFixtureAthlete: DB rows only (no auth user) for athletes that
  *     never call the API themselves — search results, connection targets.
  *

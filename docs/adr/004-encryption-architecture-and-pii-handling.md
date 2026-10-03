@@ -7,7 +7,7 @@
 
 All repository crypto flows are isolated in `packages/crypto`, which exports exactly `encryptPII()` and `decryptPII()`.
 
-JSON payloads (for example, OCR outputs and verified data) are encrypted through internal helpers:
+JSON payloads (for example, structured identity PII) are encrypted through internal helpers:
 
 - `encryptJSON(obj) -> Bytes`
 - `decryptJSON(bytes) -> object`

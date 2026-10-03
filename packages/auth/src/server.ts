@@ -2,7 +2,7 @@
  * Server-side auth utilities for the Fastify API and Next.js SSR.
  *
  * - `verifyAccessToken` is the trust boundary for the API: every protected
- *   tRPC procedure derives `ctx.userId` from this verification. Per CLAUDE.md,
+ *   tRPC procedure derives `ctx.userId` from this verification. Per AGENTS.md,
  *   client-supplied user IDs are never trusted — only the verified JWT.
  * - `createSsrServerClient` wraps `@supabase/ssr` so the Next.js app can
  *   read/write the auth cookie without depending on Supabase directly.

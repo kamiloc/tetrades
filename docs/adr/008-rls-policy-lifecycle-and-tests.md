@@ -21,6 +21,8 @@ Treat RLS as the highest-risk security layer and manage it through dedicated SQL
 
 Watch out for PostgreSQL OR-composition across multiple policies of the same command type.
 
-## OcrJob policy constraint
+## Child-table policy constraint
 
-`ocr_jobs` must use a direct athlete predicate: `USING (auth.uid() = athlete_id)`. Join-based RLS on `medical_documents` is forbidden for this table.
+Tables owned by an athlete should carry a direct `athlete_id` and use a direct predicate (for example `USING (auth.uid() = athlete_id)`) rather than a join through a parent table. Join-based RLS is allowed only where a direct predicate is impossible, and then it needs an explicit comment and deny-test. (This rule originated with `ocr_jobs`, which is removed by [ADR-013](013-pivot-clubs-metrics-trainer-portal-and-visibility.md).)
+
+Trainer and club access policies (`ClubMembership`, `AthleteMetricEntry`) must check for an `ACTIVE` membership and are covered by deny-tests, including the pending-membership case.

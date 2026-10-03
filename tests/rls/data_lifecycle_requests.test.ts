@@ -4,7 +4,7 @@
  *   data_lifecycle_requests_select_own
  *   data_lifecycle_requests_insert_own
  *   (no UPDATE policy — status transitions are service_role background jobs)
- *   (no DELETE policy — 5-year retention per CLAUDE.md)
+ *   (no DELETE policy — 5-year retention per AGENTS.md)
  *
  * Tested criteria:
  *   (a) athlete can SELECT their own lifecycle requests

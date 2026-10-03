@@ -7,7 +7,7 @@
 --   All fields are L1-INTERNAL. Audit events themselves do NOT contain
 --   decrypted PII — only metadata about access (actor, target, requestId,
 --   purposeCode). The requestId column is the correlation key linking an
---   audit event back to the originating tRPC call (CLAUDE.md "Logging
+--   audit event back to the originating tRPC call (AGENTS.md "Logging
 --   Rules" + "Audit Logging for Decryption").
 --
 -- Trust model (per task 2.3 decision):
@@ -21,7 +21,7 @@
 --   - INSERT: service_role only. The API server writes audit events via the
 --     server-side Supabase client / Prisma.
 --   - UPDATE: NO POLICY EXISTS. The audit_log is append-only.
---   - DELETE: NO POLICY EXISTS. Audit retention is 5 years (CLAUDE.md
+--   - DELETE: NO POLICY EXISTS. Audit retention is 5 years (AGENTS.md
 --     "Retention & Legal Hold"); deletion is forbidden even for service_role
 --     in the application layer.
 -- ============================================
@@ -53,5 +53,5 @@ CREATE POLICY "audit_log_select_own_actor"
 
 -- INSERT: intentionally omitted. Only service_role writes audit events.
 -- UPDATE: intentionally omitted AND must remain omitted. audit_log is
---         append-only by policy (CLAUDE.md "Audit Logging for Decryption").
+--         append-only by policy (AGENTS.md "Audit Logging for Decryption").
 -- DELETE: intentionally omitted AND must remain omitted. 5-year retention.

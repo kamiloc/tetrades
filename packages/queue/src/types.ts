@@ -9,7 +9,7 @@
  *   - pii-deletion         → apps/api/src/jobs/deletePII.ts        (4.7)
  *   - notifications        → apps/api/src/jobs/sendNotification.ts (5.10)
  *
- * Payload rules (CLAUDE.md, Background Jobs):
+ * Payload rules (AGENTS.md, Background Jobs):
  *   - serializable data only — ids and enums, no Buffers or class instances
  *   - EVERY payload carries requestId for tRPC → enqueue → worker tracing
  *   - ids only, never values: payloads reference DB rows; nothing L2 (medical

@@ -1,6 +1,6 @@
 # ADR Index
 
-This directory contains accepted architecture decisions derived from the active `CLAUDE.md` ruleset.
+This directory contains accepted architecture decisions derived from the active `AGENTS.md` ruleset.
 
 ## How to use ADRs
 
@@ -18,7 +18,8 @@ This directory contains accepted architecture decisions derived from the active 
 - ADR-006 tRPC Procedure Design and Router Structure
 - ADR-007 Auth and Session Handling
 - ADR-008 RLS Policy Lifecycle and Tests
-- ADR-009 Medical OCR State Machine and Verification Flow
+- ADR-009 Medical OCR State Machine and Verification Flow — **Superseded by ADR-013**
 - ADR-010 Background Jobs, Storage, and Image Processing
 - ADR-011 Web/Mobile Runtime Decisions
 - ADR-012 Testing, Logging, and Agent Session Protocol
+- ADR-013 Pivot: Clubs, Sport Metrics, Trainer Portal, and Visibility Controls

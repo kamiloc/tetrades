@@ -5,13 +5,13 @@
 // that breaks assignability to the validators contract, `tsc --noEmit`
 // fails and the CI typecheck blocks the merge.
 //
-// Zod is the source of truth (CLAUDE.md / ADR-002). We assert the direction
+// Zod is the source of truth (AGENTS.md / ADR-002). We assert the direction
 // Prisma → Zod: the database row shape must satisfy the validator contract.
 // Extra fields on the Prisma side are tolerated (structural typing); missing
 // fields or incompatible types fail.
 //
 // Lives in @app/api because @packages/validators is contractually restricted
-// to `zod` imports only (CLAUDE.md Package Contracts).
+// to `zod` imports only (AGENTS.md Package Contracts).
 //
 // IsAssignable wraps both operands in a tuple to suppress TypeScript's
 // distributive conditional behavior — without the tuple, a `From` type that

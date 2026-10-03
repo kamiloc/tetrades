@@ -31,4 +31,4 @@ ALTER TABLE public.pii_consent_log FORCE ROW LEVEL SECURITY;
 -- UPDATE: intentionally omitted. service_role only.
 -- DELETE: intentionally omitted. service_role only — though deletion of
 --         consent records is itself disallowed by retention policy
---         (CLAUDE.md "Retention & Legal Hold": 5-year minimum).
+--         (AGENTS.md "Retention & Legal Hold": 5-year minimum).

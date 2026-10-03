@@ -1,7 +1,7 @@
 /**
  * OCR worker integration tests (Sprint 4, task 4.2).
  *
- * Real Prisma against the test database (never mocked — CLAUDE.md testing
+ * Real Prisma against the test database (never mocked — AGENTS.md testing
  * rules); the two network edges (Supabase Storage download, Claude Vision)
  * are injected fakes, so the full DB pipeline — status transitions, OcrJob
  * rows, encryption at rest, athleteId copy, revert-on-failure — runs for
