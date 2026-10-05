@@ -30,6 +30,7 @@ import { expect } from 'vitest';
 
 import { buildServer } from '../../../app.js';
 import { setEnvForTests } from '../../../env.js';
+import type { JobEnqueuer } from '../../../lib/jobs.js';
 import { prisma } from '../../../lib/prisma.js';
 import type { AppRouter } from '../../../router/index.js';
 
@@ -59,7 +60,10 @@ export interface RateLimitOverrides {
  * Non-rate-limit test groups pass high overrides so tier buckets can never
  * make unrelated tests flaky.
  */
-export async function startServer(overrides: RateLimitOverrides = {}): Promise<TestServer> {
+export async function startServer(
+  overrides: RateLimitOverrides = {},
+  options: { jobs?: JobEnqueuer } = {},
+): Promise<TestServer> {
   setEnvForTests({
     ...process.env,
     ...(overrides.public !== undefined ? { RATE_LIMIT_PUBLIC: String(overrides.public) } : {}),
@@ -72,7 +76,7 @@ export async function startServer(overrides: RateLimitOverrides = {}): Promise<T
       : {}),
   });
 
-  const server = await buildServer({ logLevel: 'silent' });
+  const server = await buildServer({ logLevel: 'silent', ...(options.jobs ? { jobs: options.jobs } : {}) });
   await server.listen({ port: 0, host: '127.0.0.1' });
 
   const address = server.server.address();
@@ -206,6 +210,10 @@ const ATHLETE_DELETE_ATTEMPTS = 5;
 const ATHLETE_DELETE_RETRY_DELAY_MS = 200;
 
 export async function cleanupAthleteRows(athleteId: string): Promise<void> {
+  await prisma.athleteMetricEntry.deleteMany({ where: { athleteId } });
+  await prisma.athleteMetricSummary.deleteMany({ where: { athleteId } });
+  await prisma.athleteVisibilitySettings.deleteMany({ where: { athleteId } });
+  await prisma.clubMembership.deleteMany({ where: { athleteId } });
   await prisma.athleteConnection.deleteMany({
     where: { OR: [{ requesterId: athleteId }, { addresseeId: athleteId }] },
   });
@@ -235,6 +243,7 @@ export async function cleanupAthleteRows(athleteId: string): Promise<void> {
 
 export async function cleanupFixtureAthlete(fixture: FixtureAthlete): Promise<void> {
   await cleanupAthleteRows(fixture.athleteId);
+  await prisma.clubTrainer.deleteMany({ where: { userAccountId: fixture.userAccountId } });
   await prisma.userAccount.deleteMany({ where: { id: fixture.userAccountId } });
 }
 
@@ -355,10 +364,88 @@ export async function cleanupAuthedUser(user: AuthedUser): Promise<void> {
   if (user.athleteId !== null) {
     await cleanupAthleteRows(user.athleteId);
   }
+  await prisma.clubTrainer.deleteMany({ where: { userAccountId: user.userAccountId } });
   await prisma.userAccount.deleteMany({ where: { supabaseUserId: user.supabaseUserId } });
   try {
     await supabaseAdmin().auth.admin.deleteUser(user.supabaseUserId);
   } catch {
     // Already deleted (invalidateAuthUser) or transient — never mask a test failure.
   }
+}
+
+// ---------------------------------------------------------------------------
+// Clubs, trainers, memberships, metrics (ADR-013) — DB rows only
+// ---------------------------------------------------------------------------
+
+export type MembershipStatus = 'PENDING_ATHLETE_CONFIRMATION' | 'ACTIVE' | 'COMPLETED' | 'REJECTED';
+
+export async function createTestClub(label = 'club'): Promise<string> {
+  const marker = randomUUID().slice(0, 8);
+  const club = await prisma.club.create({
+    data: { slug: `int-${label}-${marker}`, name: `Int Club ${label}`, countryCode: 'CO', city: 'Cali' },
+    select: { id: true },
+  });
+  return club.id;
+}
+
+/** Makes the account a trainer of the club; returns the ClubTrainer id. */
+export async function addClubTrainer(clubId: string, userAccountId: string): Promise<string> {
+  const trainer = await prisma.clubTrainer.create({
+    data: { clubId, userAccountId },
+    select: { id: true },
+  });
+  return trainer.id;
+}
+
+/**
+ * Creates a membership and walks it through legal transitions to `status`
+ * (the DB trigger only accepts PENDING_ATHLETE_CONFIRMATION on insert).
+ */
+export async function createTestMembership(args: {
+  clubId: string;
+  athleteId: string;
+  clubTrainerId: string;
+  status: MembershipStatus;
+}): Promise<string> {
+  const { id } = await prisma.clubMembership.create({
+    data: {
+      clubId: args.clubId,
+      athleteId: args.athleteId,
+      invitedByClubTrainerId: args.clubTrainerId,
+    },
+    select: { id: true },
+  });
+  const path: Record<MembershipStatus, MembershipStatus[]> = {
+    PENDING_ATHLETE_CONFIRMATION: [],
+    ACTIVE: ['ACTIVE'],
+    COMPLETED: ['ACTIVE', 'COMPLETED'],
+    REJECTED: ['REJECTED'],
+  };
+  for (const status of path[args.status]) {
+    await prisma.clubMembership.update({ where: { id }, data: { status }, select: { id: true } });
+  }
+  return id;
+}
+
+export async function createTestMetricDefinition(): Promise<string> {
+  const marker = randomUUID().slice(0, 8);
+  const definition = await prisma.metricDefinition.create({
+    data: { key: `int_metric_${marker}`, name: 'Int Salto vertical', unit: 'cm' },
+    select: { id: true },
+  });
+  return definition.id;
+}
+
+export async function deleteTestMetricDefinition(id: string): Promise<void> {
+  await prisma.athleteMetricEntry.deleteMany({ where: { metricDefinitionId: id } });
+  await prisma.athleteMetricSummary.deleteMany({ where: { metricDefinitionId: id } });
+  await prisma.metricDefinition.deleteMany({ where: { id } });
+}
+
+/** Removes a club and everything hanging off it, in FK order. */
+export async function cleanupTestClub(clubId: string): Promise<void> {
+  await prisma.athleteMetricEntry.deleteMany({ where: { clubMembership: { clubId } } });
+  await prisma.clubMembership.deleteMany({ where: { clubId } });
+  await prisma.clubTrainer.deleteMany({ where: { clubId } });
+  await prisma.club.deleteMany({ where: { id: clubId } });
 }

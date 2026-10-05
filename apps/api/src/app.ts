@@ -11,8 +11,9 @@ import { initCryptoAudit } from '@packages/crypto';
 import { fastifyTRPCPlugin, type FastifyTRPCPluginOptions } from '@trpc/server/adapters/fastify';
 import Fastify, { type FastifyInstance } from 'fastify';
 
-import { createContext } from './context.js';
+import { createContextFactory } from './context.js';
 import { getEnv } from './env.js';
+import { createRegistryEnqueuer, disabledJobEnqueuer, type JobEnqueuer } from './lib/jobs.js';
 import { prisma } from './lib/prisma.js';
 import { buildLoggerOptions, genReqId, registerRequestLogging } from './middleware/logging.js';
 import { registerRateLimiting } from './middleware/rateLimit.js';
@@ -27,6 +28,12 @@ export interface BuildServerOptions {
    * don't drown the test reporter. Never set in production code paths.
    */
   logLevel?: 'debug' | 'info' | 'warn' | 'error' | 'silent';
+  /**
+   * Replace the job port exposed to procedures as ctx.jobs. Integration
+   * tests inject a recorder to assert persist-before-enqueue ordering
+   * without running workers. Never set in production code paths.
+   */
+  jobs?: JobEnqueuer;
 }
 
 export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
@@ -94,7 +101,10 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     prefix: '/trpc',
     trpcOptions: {
       router: appRouter,
-      createContext,
+      createContext: createContextFactory(
+        options.jobs ??
+          (queueInfra === null ? disabledJobEnqueuer : createRegistryEnqueuer(queueInfra.registry)),
+      ),
     },
   } satisfies FastifyTRPCPluginOptions<AppRouter>);
 

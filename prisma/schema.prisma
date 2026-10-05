@@ -107,6 +107,31 @@ enum DataLifecycleStatus {
   @@map("data_lifecycle_status")
 }
 
+/// ADR-013 §5 — only ACTIVE grants a club's trainers access to the athlete.
+enum ClubMembershipStatus {
+  PENDING_ATHLETE_CONFIRMATION
+  ACTIVE
+  COMPLETED
+  REJECTED
+
+  @@map("club_membership_status")
+}
+
+enum VisibilityAudience {
+  PRIVATE
+  CONNECTIONS
+  PUBLIC
+
+  @@map("visibility_audience")
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+
+  @@map("device_platform")
+}
+
 // ============================================================================
 // Identity & Classification
 // ============================================================================
@@ -128,6 +153,8 @@ model UserAccount {
   athlete                Athlete?
   auditEvents            AuditEvent[]
   submittedLifecycleReqs DataLifecycleRequest[] @relation("LifecycleRequester")
+  clubTrainerRoles       ClubTrainer[]
+  deviceTokens           DeviceToken[]
 
   @@map("user_accounts")
 }
@@ -142,7 +169,8 @@ model Sport {
   /// L0-PUBLIC
   isActive Boolean @default(true) @map("is_active")
 
-  athletes Athlete[]
+  athletes          Athlete[]
+  metricDefinitions MetricDefinition[]
 
   @@map("sports")
 }
@@ -169,8 +197,8 @@ model Athlete {
   /// L1-INTERNAL
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
-  userAccount          UserAccount            @relation(fields: [userAccountId], references: [id], onDelete: Restrict)
-  sport                Sport                  @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  userAccount          UserAccount                @relation(fields: [userAccountId], references: [id], onDelete: Restrict)
+  sport                Sport                      @relation(fields: [sportId], references: [id], onDelete: Restrict)
   publicProfile        AthletePublicProfile?
   privateProfile       AthletePrivateProfile?
   photos               ProfilePhotoAsset[]
@@ -178,8 +206,12 @@ model Athlete {
   consentLogs          PiiConsentLog[]
   auditEvents          AuditEvent[]
   lifecycleRequests    DataLifecycleRequest[]
-  requestedConnections AthleteConnection[]    @relation("ConnectionRequester")
-  receivedConnections  AthleteConnection[]    @relation("ConnectionAddressee")
+  requestedConnections AthleteConnection[]        @relation("ConnectionRequester")
+  receivedConnections  AthleteConnection[]        @relation("ConnectionAddressee")
+  clubMemberships      ClubMembership[]
+  metricEntries        AthleteMetricEntry[]
+  metricSummaries      AthleteMetricSummary[]
+  visibilitySettings   AthleteVisibilitySettings?
 
   @@index([sportId, profileStatus])
   @@index([countryCode, sportId])
@@ -408,4 +440,195 @@ model DataLifecycleRequest {
   @@index([athleteId, status])
   @@index([status, createdAt])
   @@map("data_lifecycle_requests")
+}
+
+// ============================================================================
+// Clubs, Metrics & Visibility (ADR-013)
+// Clubs, trainers, and metric definitions are provisioned out-of-band.
+// ============================================================================
+
+model Club {
+  /// L0-PUBLIC
+  id          String   @id @default(cuid())
+  /// L0-PUBLIC
+  slug        String   @unique
+  /// L0-PUBLIC
+  name        String
+  /// L0-PUBLIC
+  countryCode String   @map("country_code")
+  /// L0-PUBLIC
+  city        String?
+  /// L1-INTERNAL
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  trainers    ClubTrainer[]
+  memberships ClubMembership[]
+
+  @@map("clubs")
+}
+
+/// A user is a trainer of a club only through a row here; there is no global trainer role.
+model ClubTrainer {
+  /// L1-INTERNAL
+  id            String   @id @default(cuid())
+  /// L1-INTERNAL
+  clubId        String   @map("club_id")
+  /// L1-INTERNAL
+  userAccountId String   @map("user_account_id")
+  /// L1-INTERNAL
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  club            Club                 @relation(fields: [clubId], references: [id], onDelete: Restrict)
+  userAccount     UserAccount          @relation(fields: [userAccountId], references: [id], onDelete: Restrict)
+  sentInvitations ClubMembership[]
+  reportedEntries AthleteMetricEntry[]
+
+  @@unique([clubId, userAccountId])
+  @@index([userAccountId])
+  @@map("club_trainers")
+}
+
+/// At most one PENDING_ATHLETE_CONFIRMATION/ACTIVE row per (club, athlete):
+/// enforced by a partial unique index in supabase/constraints/ (not expressible in Prisma).
+model ClubMembership {
+  /// L1-INTERNAL
+  id                     String               @id @default(cuid())
+  /// L0-PUBLIC
+  clubId                 String               @map("club_id")
+  /// L1-INTERNAL
+  athleteId              String               @map("athlete_id")
+  /// L1-INTERNAL
+  status                 ClubMembershipStatus @default(PENDING_ATHLETE_CONFIRMATION)
+  /// L1-INTERNAL
+  invitedByClubTrainerId String               @map("invited_by_club_trainer_id")
+  /// L1-INTERNAL
+  createdAt              DateTime             @default(now()) @map("created_at")
+  /// L1-INTERNAL
+  respondedAt            DateTime?            @map("responded_at")
+  /// L1-INTERNAL
+  endedAt                DateTime?            @map("ended_at")
+
+  club          Club                 @relation(fields: [clubId], references: [id], onDelete: Restrict)
+  athlete       Athlete              @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  invitedBy     ClubTrainer          @relation(fields: [invitedByClubTrainerId], references: [id], onDelete: Restrict)
+  metricEntries AthleteMetricEntry[]
+
+  @@index([clubId, athleteId, status])
+  @@index([athleteId, status])
+  @@map("club_memberships")
+}
+
+model MetricDefinition {
+  /// L0-PUBLIC
+  id       String  @id @default(cuid())
+  /// L0-PUBLIC
+  key      String  @unique
+  /// L0-PUBLIC
+  name     String
+  /// L0-PUBLIC
+  unit     String
+  /// L0-PUBLIC
+  sportId  String? @map("sport_id")
+  /// L0-PUBLIC
+  isActive Boolean @default(true) @map("is_active")
+
+  sport     Sport?                 @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  entries   AthleteMetricEntry[]
+  summaries AthleteMetricSummary[]
+
+  @@map("metric_definitions")
+}
+
+/// Append-only. A DB trigger in supabase/constraints/ rejects inserts whose
+/// membership is not ACTIVE or belongs to a different athlete.
+model AthleteMetricEntry {
+  /// L1-INTERNAL
+  id                      String   @id @default(cuid())
+  /// L1-INTERNAL
+  athleteId               String   @map("athlete_id")
+  /// L1-INTERNAL
+  metricDefinitionId      String   @map("metric_definition_id")
+  /// L1-INTERNAL — the ACTIVE membership that authorized the write
+  clubMembershipId        String   @map("club_membership_id")
+  /// L1-INTERNAL
+  reportedByClubTrainerId String   @map("reported_by_club_trainer_id")
+  /// L1-INTERNAL
+  value                   Decimal  @db.Decimal(12, 4)
+  /// L1-INTERNAL
+  measuredAt              DateTime @map("measured_at")
+  /// L1-INTERNAL
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  athlete          Athlete          @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
+  clubMembership   ClubMembership   @relation(fields: [clubMembershipId], references: [id], onDelete: Restrict)
+  reportedBy       ClubTrainer      @relation(fields: [reportedByClubTrainerId], references: [id], onDelete: Restrict)
+
+  @@index([athleteId, metricDefinitionId, measuredAt])
+  @@index([clubMembershipId])
+  @@map("athlete_metric_entries")
+}
+
+/// Derived from entries in the reportEntry transaction; never written by clients.
+model AthleteMetricSummary {
+  /// L1-INTERNAL
+  athleteId          String   @map("athlete_id")
+  /// L1-INTERNAL
+  metricDefinitionId String   @map("metric_definition_id")
+  /// L1-INTERNAL
+  latestValue        Decimal  @map("latest_value") @db.Decimal(12, 4)
+  /// L1-INTERNAL
+  latestMeasuredAt   DateTime @map("latest_measured_at")
+  /// L1-INTERNAL
+  entryCount         Int      @map("entry_count")
+  /// L1-INTERNAL
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  athlete          Athlete          @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
+
+  @@id([athleteId, metricDefinitionId])
+  @@map("athlete_metric_summaries")
+}
+
+/// Owner-only. A missing row resolves to PRIVATE for every category.
+model AthleteVisibilitySettings {
+  /// L1-INTERNAL
+  athleteId               String             @id @map("athlete_id")
+  /// L1-INTERNAL
+  clubMembershipsAudience VisibilityAudience @default(PRIVATE) @map("club_memberships_audience")
+  /// L1-INTERNAL
+  metricsAudience         VisibilityAudience @default(PRIVATE) @map("metrics_audience")
+  /// L1-INTERNAL
+  updatedAt               DateTime           @updatedAt @map("updated_at")
+
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@map("athlete_visibility_settings")
+}
+
+// ============================================================================
+// Notifications (membership-notifications spec, design D9)
+// ============================================================================
+
+/// Expo push token for one device. Resolved server-side by the notifications
+/// worker; never placed in job payloads. Deleted by deletePII.
+model DeviceToken {
+  /// L1-INTERNAL
+  id            String         @id @default(cuid())
+  /// L1-INTERNAL
+  userAccountId String         @map("user_account_id")
+  /// L1-INTERNAL
+  token         String         @unique
+  /// L1-INTERNAL
+  platform      DevicePlatform
+  /// L1-INTERNAL
+  createdAt     DateTime       @default(now()) @map("created_at")
+  /// L1-INTERNAL
+  lastSeenAt    DateTime       @default(now()) @map("last_seen_at")
+
+  userAccount UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Restrict)
+
+  @@index([userAccountId])
+  @@map("device_tokens")
 }

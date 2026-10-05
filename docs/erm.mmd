@@ -5,7 +5,6 @@ config:
 ---
 
 %% Full composite ERM. Built-capability fragments: docs/erm/<capability>.mmd
-%% Planned work (Clubs/Metrics/Visibility): docs/erm/planned-clubs-metrics-visibility.mmd
 
 erDiagram
   %% === Identity & Classification ===
@@ -106,18 +105,21 @@ erDiagram
   ATHLETE ||--o{ ATHLETE_ACHIEVEMENT : "earns"
   ATHLETE ||--o{ ATHLETE_CONNECTION : "initiates_or_receives"
 
-  %% === Clubs, Metrics & Visibility (PLANNED — ADR-013) ===
-  %% Not yet in prisma/schema.prisma. Entity-level only: PK/FK and the
-  %% state field that ADR-013 depends on. Full field lists are defined by the
-  %% openspec change that introduces them; do not infer fields from this block.
+  %% === Clubs, Metrics & Visibility (ADR-013) ===
   CLUB {
     string id PK
+    string slug UK
+    string name
+    string country_code
+    string city
+    datetime created_at
   }
 
   CLUB_TRAINER {
     string id PK
     string club_id FK
     string user_account_id FK
+    datetime created_at
   }
 
   CLUB_MEMBERSHIP {
@@ -125,38 +127,73 @@ erDiagram
     string club_id FK
     string athlete_id FK
     string status "PENDING_ATHLETE_CONFIRMATION | ACTIVE | COMPLETED | REJECTED"
+    string invited_by_club_trainer_id FK
+    datetime created_at
+    datetime responded_at
+    datetime ended_at
   }
 
   METRIC_DEFINITION {
     string id PK
+    string key UK
+    string name
+    string unit
+    string sport_id FK
+    boolean is_active
   }
 
   ATHLETE_METRIC_ENTRY {
     string id PK
     string athlete_id FK
     string metric_definition_id FK
+    string club_membership_id FK
     string reported_by_club_trainer_id FK
+    decimal value
+    datetime measured_at
+    datetime created_at
   }
 
   ATHLETE_METRIC_SUMMARY {
-    string athlete_id FK
-    string metric_definition_id FK
+    string athlete_id PK,FK
+    string metric_definition_id PK,FK
+    decimal latest_value
+    datetime latest_measured_at
+    int entry_count
+    datetime updated_at
   }
 
   ATHLETE_VISIBILITY_SETTINGS {
     string athlete_id PK,FK
+    string club_memberships_audience "PRIVATE | CONNECTIONS | PUBLIC"
+    string metrics_audience "PRIVATE | CONNECTIONS | PUBLIC"
+    datetime updated_at
   }
 
   CLUB ||--o{ CLUB_TRAINER : "staffed_by"
   USER_ACCOUNT ||--o{ CLUB_TRAINER : "acts_as_trainer"
   CLUB ||--o{ CLUB_MEMBERSHIP : "has_members"
   ATHLETE ||--o{ CLUB_MEMBERSHIP : "belongs_to"
+  CLUB_TRAINER ||--o{ CLUB_MEMBERSHIP : "invites"
+  SPORT |o--o{ METRIC_DEFINITION : "scopes"
   METRIC_DEFINITION ||--o{ ATHLETE_METRIC_ENTRY : "defines"
   ATHLETE ||--o{ ATHLETE_METRIC_ENTRY : "has_entries"
   CLUB_TRAINER ||--o{ ATHLETE_METRIC_ENTRY : "reports"
+  CLUB_MEMBERSHIP ||--o{ ATHLETE_METRIC_ENTRY : "authorizes"
   METRIC_DEFINITION ||--o{ ATHLETE_METRIC_SUMMARY : "summarized_by"
   ATHLETE ||--o{ ATHLETE_METRIC_SUMMARY : "has_summaries"
-  ATHLETE ||--|| ATHLETE_VISIBILITY_SETTINGS : "controls_visibility"
+  ATHLETE ||--o| ATHLETE_VISIBILITY_SETTINGS : "controls_visibility"
+
+  %% === Notifications ===
+  DEVICE_TOKEN {
+    string id PK
+    string user_account_id FK
+    string token UK
+    string platform "IOS | ANDROID"
+    datetime created_at
+    datetime last_seen_at
+  }
+
+  USER_ACCOUNT ||--o{ DEVICE_TOKEN : "registers_device"
 
   %% === Compliance & Audit ===
   PII_CONSENT_LOG {

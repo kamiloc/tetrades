@@ -1,7 +1,10 @@
+import { clubScopedInput } from '@packages/validators';
 import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 
 import type { Context } from './context.js';
+import { requireClubTrainer } from './services/membership.js';
+import { requireViewer } from './services/viewer.js';
 
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
@@ -58,3 +61,21 @@ export const protectedProcedure = publicProcedure.use(
     });
   }),
 );
+
+/**
+ * Trainer procedure (ADR-013, design D7) — for procedures a club trainer
+ * performs on behalf of `input.clubId`.
+ *
+ * Trainer authority comes only from a ClubTrainer row linking ctx.userId to
+ * that club, never from a client-supplied trainer id: unknown club →
+ * NOT_FOUND, caller not a trainer of it → FORBIDDEN. Procedures chain their
+ * own `.input()`, which tRPC merges with `clubScopedInput`, and receive the
+ * proven row as `ctx.clubTrainer`.
+ */
+export const trainerProcedure = protectedProcedure
+  .input(clubScopedInput)
+  .use(async ({ ctx, input, next }) => {
+    const viewer = await requireViewer(ctx.prisma, ctx.userId);
+    const clubTrainer = await requireClubTrainer(ctx.prisma, viewer, input.clubId);
+    return next({ ctx: { ...ctx, viewer, clubTrainer } });
+  });

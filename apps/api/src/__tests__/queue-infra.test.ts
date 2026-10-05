@@ -59,6 +59,7 @@ describe('queue registry', () => {
       requestId: 'req_2',
     };
     const pii: PiiDeletionJobData = {
+      dataLifecycleRequestId: 'dlr_1',
       athleteId: 'ath_1',
       requestedAt: '2026-07-07T00:00:00.000Z',
       requestId: 'req_3',

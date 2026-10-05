@@ -52,14 +52,24 @@ Next.js Server Component → tRPC `createCallerFactory` → explicit Prisma `sel
 
 Mobile upload request → `storageRouter` signed upload flow → storage confirmation → BullMQ `optimizeImage` job (EXIF stripped) → public 150/400/1200 WebP variants
 
-### Trainer-reported metric entry (planned)
+### Trainer-reported metric entry
 
-Trainer request → membership check (`ACTIVE` `ClubMembership` for the trainer's club) → entry persisted with reporting trainer → `AthleteMetricSummary` derived → visible to others only as the athlete's visibility settings allow
+`metric.reportEntry` (`trainerProcedure`: `ClubTrainer` row for the club) → transaction: `ACTIVE` `ClubMembership` check → entry persisted with reporting trainer and authorizing membership → `AthleteMetricSummary` derived → visible to others only as the athlete's visibility settings allow (`services/visibility.ts`, list and detail alike)
+
+### Club invitation
+
+`club.inviteAthlete` → `PENDING_ATHLETE_CONFIRMATION` membership persisted → BullMQ `notifications` job (`CLUB_INVITATION`, ids only) → push via Expo HTTP API → athlete accepts or rejects through `club.respondToInvitation`
+
+### Data deletion (Habeas Data)
+
+`athlete.requestDeletion` → `DataLifecycleRequest` persisted → BullMQ `pii-deletion` job → legal-hold check → cascade delete, Storage and auth-user removal → tombstone athlete and account (retained audit and consent rows) → verification → `COMPLETED` or `FAILED`
 
 ## Current state vs. target (known drift)
 
-The medical/OCR removal (`remove-medical-ocr-domain`) is applied in code, schema, policies, and tests, pending the user-run database migration and deletion of the `medical-documents` Storage bucket. The club, metric, trainer, and visibility entities (ADR-013) are not yet implemented (`add-clubs-metrics-visibility-model`):
+The medical/OCR removal (`remove-medical-ocr-domain`) is applied in code, schema, policies, and tests, pending the user-run database migration and deletion of the `medical-documents` Storage bucket. The club, metric, trainer, and visibility model (ADR-013, `add-clubs-metrics-visibility-model`) is implemented in schema, RLS, services, and the `club`, `metric`, `visibility`, and `notification` routers, and the `deletePII` and `sendNotification` workers are real. Remaining drift:
 
-- `prisma/schema.prisma` has none of the pivot entities
-- `apps/api` mounts `athlete`, `achievement`, `connection`, `storage`, and `sport` routers only
-- `deletePII` and `sendNotification` workers are stubs that throw `not implemented`
+- the trainer portal and athlete UI screens for clubs, metrics, and visibility do not exist yet
+- mobile push-token registration (`expo-notifications`) is not wired
+- no scheduled job yet purges deletion tombstones after the 5-year audit and consent retention
+- `optimizeImage` is still a stub that throws `not implemented`
+- there is no data-export endpoint

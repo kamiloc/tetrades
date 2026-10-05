@@ -1,6 +1,6 @@
 # PII Access Matrix
 
-Trainer and club rows describe the planned pivot model ([ADR-013](adr/013-pivot-clubs-metrics-trainer-portal-and-visibility.md)); they are not yet implemented.
+Trainer and club rows follow [ADR-013](adr/013-pivot-clubs-metrics-trainer-portal-and-visibility.md). They are enforced in the API services (`membership`, `metrics`, `visibility`) and, as defense in depth, in RLS (`supabase/policies/`).
 
 ## Roles
 
@@ -40,28 +40,39 @@ Trainer and club rows describe the planned pivot model ([ADR-013](adr/013-pivot-
 - API Server: allow only through protected procedures
 - Job Worker: deny unless a job explicitly requires it (for example `deletePII`)
 
-### Athlete metric entries (L1, planned)
+### Athlete metric entries (L1)
 
 | Actor / state                                         | Read                                  | Write |
 | ----------------------------------------------------- | ------------------------------------- | ----- |
 | Athlete (own)                                         | allow                                 | deny (trainer-reported only) |
 | Trainer, `ACTIVE` membership with their club          | allow                                 | allow |
 | Trainer, `PENDING_ATHLETE_CONFIRMATION` membership    | deny                                  | deny |
+| Trainer, `COMPLETED` or `REJECTED` membership         | deny (access ends with `ACTIVE`)      | deny |
 | Trainer, no membership (or another club's athlete)    | deny                                  | deny |
-| Public Visitor                                        | allow only if visibility permits      | deny |
-| API Server / Job Worker                               | through protected procedures / summary derivation | summary derivation only |
+| Other athlete with an `ACCEPTED` connection           | allow only if visibility is `CONNECTIONS` or `PUBLIC` | deny |
+| Public Visitor                                        | allow only if visibility is `PUBLIC`  | deny |
+| API Server / Job Worker                               | through procedures with the visibility filter / summary derivation | summary derivation only; `deletePII` deletes |
 
-### Club membership (L0/L1, planned)
+Summaries (`AthleteMetricSummary`) aggregate every club, so the active-club trainer exception does not apply: they follow the audience rule only.
+
+### Club membership (L0/L1)
 
 - Athlete: read own; confirm or decline invitations
 - Trainer: invite for their own club; cannot activate a membership without athlete confirmation
 - Public Visitor: only `ACTIVE` memberships the athlete's visibility allows; pending memberships are never visible
 
-### Visibility settings (L1, planned)
+### Visibility settings (L1)
 
 - Athlete: read and write own
 - Trainer / Public Visitor: deny (they see only the effect, not the settings)
 - API Server: read to apply filtering
+
+### Device tokens (L1)
+
+- Account owner: register, refresh, and remove own
+- Trainer / other users / Public Visitor: deny
+- Job Worker (`notifications`): read to deliver; delete tokens Expo reports as unregistered
+- Job Worker (`deletePII`): delete
 
 ## Break-glass rule
 

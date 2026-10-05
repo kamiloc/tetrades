@@ -18,7 +18,7 @@ The product no longer handles medical records or OCR. It now centers on club aff
 
 ### 2. New entities (names fixed, fields deferred)
 
-`Club`, `ClubTrainer`, `ClubMembership`, `MetricDefinition`, `AthleteMetricEntry`, `AthleteMetricSummary`, `AthleteVisibilitySettings`. See `docs/erm.mmd` (marked PLANNED until they exist in `schema.prisma`).
+`Club`, `ClubTrainer`, `ClubMembership`, `MetricDefinition`, `AthleteMetricEntry`, `AthleteMetricSummary`, `AthleteVisibilitySettings`. Built by openspec change `add-clubs-metrics-visibility-model`; fields and classifications are in `prisma/schema.prisma` and `docs/erm/{clubs,sport-metrics,visibility}.mmd`.
 
 ### 3. Classification vs. visibility
 
@@ -69,14 +69,15 @@ The product no longer handles medical records or OCR. It now centers on club aff
 
 - Removing medical data shrinks the L2 surface to identity PII.
 - The trainer portal adds a new third-party actor; the access matrix and threat model must cover it.
-- Until the schema and policies exist, docs mark these entities PLANNED and code must not assume them.
+- The schema, RLS policies, services, and routers exist (change `add-clubs-metrics-visibility-model`). The trainer portal and athlete UI screens are still separate work.
 
 ## Resolved items
 
 - **Trainer role model (2026-10-03):** a trainer is derived solely from `ClubTrainer` rows. No new `UserRole` value is added.
 - **Membership states (2026-10-03):** `COMPLETED` and `REJECTED` as defined in section 5.
+- **Entries after `COMPLETED` (2026-10-05):** entries are append-only and retained. The club's trainers lose access; everyone else follows the athlete's visibility settings. A hide-on-completion rule, if wanted, can be added to the visibility service without changing the model.
+- **Who ends a membership (2026-10-05):** only the athlete moves `ACTIVE → COMPLETED`. Club-initiated removal is out of scope until a later change.
 
 ## Open items
 
-- Whether previously reported metric entries are retained, hidden, or otherwise changed when a membership becomes `COMPLETED`.
-- Who may initiate `ACTIVE → COMPLETED` (athlete, club, or both).
+None.

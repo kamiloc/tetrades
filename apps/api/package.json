@@ -24,6 +24,7 @@
     "@packages/auth": "*",
     "@packages/crypto": "*",
     "@packages/queue": "*",
+    "@packages/shared-logic": "*",
     "@packages/validators": "*",
     "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.106.0",

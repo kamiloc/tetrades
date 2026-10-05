@@ -43,6 +43,8 @@ export interface ImageOptimizationJobData extends BaseJobData {
 
 /** pii-deletion — cascade-delete an athlete's data (4.7, Habeas Data). */
 export interface PiiDeletionJobData extends BaseJobData {
+  /** DataLifecycleRequest (type DELETION) the worker drives through its statuses. */
+  dataLifecycleRequestId: string;
   /** Athlete whose data is being deleted. */
   athleteId: string;
   /** ISO 8601 timestamp of the athlete's deletion request (30-day SLA). */
@@ -54,7 +56,7 @@ export interface NotificationJobData extends BaseJobData {
   /** Recipient UserAccount id — the worker resolves device tokens itself. */
   userAccountId: string;
   /** Template key; the worker owns copy so no free text sits in Redis. */
-  notificationType: 'CONNECTION_REQUEST' | 'CONNECTION_ACCEPTED';
+  notificationType: 'CONNECTION_REQUEST' | 'CONNECTION_ACCEPTED' | 'CLUB_INVITATION';
   /** Row the notification is about (e.g. connection id). */
   subjectId: string;
 }

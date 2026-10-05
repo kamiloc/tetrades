@@ -261,7 +261,7 @@ Habeas Data grants athletes the right to deletion; legal obligations may require
 - Audit log and `pii_consent_log`: retained 5 years after creation.
 - Legal hold is the `isUnderLegalHold` flag on `athletes`. When true, the `deletePII` job MUST abort and log a warning ("Deletion blocked by legal hold"), and the athlete is told the deletion is paused due to a legal obligation (without disclosing the reason unless required by law).
 - Only the project owner (Cristian) sets or clears a hold, via direct database access. Agents MUST NOT create any procedure that sets or clears a legal hold.
-- After `deletePII` completes, a verification query checks every table with a foreign key to the athlete and confirms zero rows, and confirms Storage holds zero files under `{athleteId}/`. On failure, the job transitions to `DELETION_INCOMPLETE` and alerts the project owner.
+- After `deletePII` completes, a verification query checks every table with a foreign key to the athlete and confirms zero rows, and confirms Storage holds zero files under `{athleteId}/`. On failure, the job transitions to `FAILED` and alerts the project owner.
 
 ## Habeas Data compliance checklist
 

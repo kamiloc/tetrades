@@ -19,10 +19,20 @@
 // distributes the `extends` check across union members and produces false
 // negatives even when assignability holds at the whole-object level.
 
+import type { ClubMembershipStatusValue } from '@packages/shared-logic';
 import type {
   Athlete,
   AthleteAchievement,
+  AthleteMetricEntry,
+  AthleteMetricSummary,
+  AthleteVisibilitySettings,
   AuditEvent,
+  Club,
+  ClubMembership,
+  ClubMembershipStatus,
+  ClubTrainer,
+  DeviceToken,
+  MetricDefinition,
   PiiConsentLog,
   Sport,
   UserAccount,
@@ -30,7 +40,15 @@ import type {
 import type {
   Athlete as PrismaAthlete,
   AthleteAchievement as PrismaAthleteAchievement,
+  AthleteMetricEntry as PrismaAthleteMetricEntry,
+  AthleteMetricSummary as PrismaAthleteMetricSummary,
+  AthleteVisibilitySettings as PrismaAthleteVisibilitySettings,
   AuditEvent as PrismaAuditEvent,
+  Club as PrismaClub,
+  ClubMembership as PrismaClubMembership,
+  ClubTrainer as PrismaClubTrainer,
+  DeviceToken as PrismaDeviceToken,
+  MetricDefinition as PrismaMetricDefinition,
   PiiConsentLog as PrismaPiiConsentLog,
   Sport as PrismaSport,
   UserAccount as PrismaUserAccount,
@@ -67,6 +85,33 @@ type AuditEventBridgeKeys = Exclude<keyof AuditEvent, 'metadata'>;
 type _auditEvent_ok = Assert<
   IsAssignable<Pick<PrismaAuditEvent, AuditEventBridgeKeys>, Pick<AuditEvent, AuditEventBridgeKeys>>
 >;
+
+
+// Clubs, metrics & visibility (ADR-013).
+type _club_ok = Assert<IsAssignable<PrismaClub, Club>>;
+type _clubTrainer_ok = Assert<IsAssignable<PrismaClubTrainer, ClubTrainer>>;
+type _clubMembership_ok = Assert<IsAssignable<PrismaClubMembership, ClubMembership>>;
+type _metricDefinition_ok = Assert<IsAssignable<PrismaMetricDefinition, MetricDefinition>>;
+type _visibility_ok = Assert<IsAssignable<PrismaAthleteVisibilitySettings, AthleteVisibilitySettings>>;
+// Decimal(12,4) columns generate as `Prisma.Decimal`; the Zod contract is
+// `number` and services convert at the boundary. Like the Json exclusion
+// above, only those fields are left out of the structural check.
+type EntryBridgeKeys = Exclude<keyof AthleteMetricEntry, 'value'>;
+type _metricEntry_ok = Assert<
+  IsAssignable<Pick<PrismaAthleteMetricEntry, EntryBridgeKeys>, Pick<AthleteMetricEntry, EntryBridgeKeys>>
+>;
+type SummaryBridgeKeys = Exclude<keyof AthleteMetricSummary, 'latestValue'>;
+type _metricSummary_ok = Assert<
+  IsAssignable<
+    Pick<PrismaAthleteMetricSummary, SummaryBridgeKeys>,
+    Pick<AthleteMetricSummary, SummaryBridgeKeys>
+  >
+>;
+type _deviceToken_ok = Assert<IsAssignable<PrismaDeviceToken, DeviceToken>>;
+// @packages/shared-logic cannot import Zod, so its transition-table literals
+// are checked against the Zod enum in both directions here.
+type _membershipStatus_ok = Assert<IsAssignable<ClubMembershipStatusValue, ClubMembershipStatus>>;
+type _membershipStatus_rev_ok = Assert<IsAssignable<ClubMembershipStatus, ClubMembershipStatusValue>>;
 
 // Keep TS from tree-shaking the file out of the project graph.
 export const __prismaZodBridge = true;

@@ -4,7 +4,7 @@ This project uses four mandatory classification levels. Every field in every mod
 
 > **Classification is not visibility.** Classification (L0–L3) describes how sensitive stored data is and how it must be stored, logged, and accessed. Visibility describes which audience an athlete has allowed to see a field they own (`AthleteVisibilitySettings`, [ADR-013](adr/013-pivot-clubs-metrics-trainer-portal-and-visibility.md)). An L1 field can be shown to a chosen audience, and an L0 field is not automatically shown to everyone. Neither replaces the other.
 
-Entries marked **(planned)** describe pivot entities that are not yet in `prisma/schema.prisma`. Per-field levels are assigned when each entity is defined in the schema.
+Per-field levels for every model, including the ADR-013 club, metric, visibility, and device-token models, are the `///` comments in `prisma/schema.prisma` and are mirrored in `@packages/validators`.
 
 ## 1) L0-PUBLIC
 
@@ -17,8 +17,9 @@ Examples:
 - verified achievements
 - public profile photo variants
 - connection count
-- club names and club-level public information (planned)
-- metric catalog: `MetricDefinition` (planned)
+- club names and club-level public information: `Club` (except `createdAt`, L1)
+- metric catalog: `MetricDefinition`
+- the club a membership belongs to (`ClubMembership.clubId`)
 
 ## 2) L1-INTERNAL
 
@@ -29,9 +30,11 @@ Examples:
 - queue status metadata and request ids
 - profile photo originals (EXIF may contain GPS and device info)
 - consent, audit, and data-lifecycle records
-- club membership state (planned)
-- athlete metric entries and summaries: `AthleteMetricEntry`, `AthleteMetricSummary` (planned). Not inherently sensitive; exposure is controlled by visibility rules, not by classification.
-- visibility preferences: `AthleteVisibilitySettings` (planned)
+- club membership state and timestamps: `ClubMembership` (all fields except `clubId`)
+- trainer assignments: `ClubTrainer`
+- athlete metric entries and summaries: `AthleteMetricEntry`, `AthleteMetricSummary`. Not inherently sensitive; exposure is controlled by visibility rules, not by classification.
+- visibility preferences: `AthleteVisibilitySettings`
+- push tokens: `DeviceToken` (never placed in job payloads)
 
 ## 3) L2-CONFIDENTIAL
 

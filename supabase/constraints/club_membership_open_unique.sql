@@ -1,0 +1,14 @@
+-- At most one open (PENDING_ATHLETE_CONFIRMATION or ACTIVE) membership per
+-- (club, athlete). Terminal rows (COMPLETED, REJECTED) stay as history and a
+-- re-invitation inserts a new row (design D3).
+--
+-- NOT applied from this file. Prisma tracks indexes, so an index created
+-- outside its migration history would show up as drift on the next
+-- `prisma migrate dev`. The partial unique index therefore lives in the
+-- hand-edited migration prisma/migrations/
+-- 20261005033125_club_membership_open_unique/migration.sql. This file documents it next to the other constraints;
+-- the definition below must stay identical to that migration.
+--
+--   CREATE UNIQUE INDEX club_memberships_open_unique
+--     ON club_memberships (club_id, athlete_id)
+--     WHERE status IN ('PENDING_ATHLETE_CONFIRMATION', 'ACTIVE');

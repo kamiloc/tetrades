@@ -37,6 +37,7 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
     // The procedure-logging middleware (trpc.ts) calls ctx.log.debug on
     // every invocation — a silent stub keeps these tests output-free.
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as Context['log'],
+    jobs: { enqueue: vi.fn() },
     ...overrides,
   };
 }

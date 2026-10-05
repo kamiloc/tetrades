@@ -1,0 +1,24 @@
+---
+config:
+  theme: dark
+  layout: dagre
+---
+
+%% Fragment: visibility. Canonical entities are complete; REFERENCE ONLY entities show just the fields touched by relationships.
+%% Composite: docs/erm.mmd
+%% Rules: ADR-013 and openspec change add-clubs-metrics-visibility-model.
+
+erDiagram
+  ATHLETE_VISIBILITY_SETTINGS {
+    string athlete_id PK,FK
+    string club_memberships_audience "PRIVATE | CONNECTIONS | PUBLIC"
+    string metrics_audience "PRIVATE | CONNECTIONS | PUBLIC"
+    datetime updated_at
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in athlete-profile-core.mmd
+  ATHLETE {
+    string id PK
+  }
+
+  ATHLETE ||--o| ATHLETE_VISIBILITY_SETTINGS : "controls_visibility"

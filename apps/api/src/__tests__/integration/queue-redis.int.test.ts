@@ -85,18 +85,18 @@ describe.skipIf(!redisReady || !dbReady)('queue infrastructure (live)', () => {
     async () => {
       const lines: RecordedLog[] = [];
       const infra = startQueueInfrastructure(REDIS_URL, makeRecordingLogger(lines));
-      const notificationQueue = infra.registry.queues[QUEUE_NAMES.NOTIFICATIONS];
+      // image-optimization is the remaining stub worker (it always throws
+      // 'not implemented'); notifications and pii-deletion are real now.
+      const imageQueue = infra.registry.queues[QUEUE_NAMES.IMAGE_OPTIMIZATION];
 
       const requestId = randomUUID();
       // attempts: 1 overrides the default 3 so the test does not sit through
-      // the 2s/4s retry backoff; behavior per attempt is identical. The
-      // notifications worker is a stub that always throws 'not implemented'.
-      await notificationQueue.add(
-        'notify',
+      // the 2s/4s retry backoff; behavior per attempt is identical.
+      await imageQueue.add(
+        'optimize',
         {
-          userAccountId: 'usr_int_test',
-          notificationType: 'CONNECTION_REQUEST',
-          subjectId: 'conn_int_test',
+          athleteId: 'ath_int_test',
+          originalPath: 'ath_int_test/original.jpg',
           requestId,
         },
         { attempts: 1 },
@@ -119,11 +119,11 @@ describe.skipIf(!redisReady || !dbReady)('queue infrastructure (live)', () => {
         (line) => line.obj['event'] === 'job_failed' && line.obj['requestId'] === requestId,
       );
       expect(failed?.level).toBe('error');
-      expect(failed?.obj['queue']).toBe(QUEUE_NAMES.NOTIFICATIONS);
+      expect(failed?.obj['queue']).toBe(QUEUE_NAMES.IMAGE_OPTIMIZATION);
       expect((failed?.obj['error'] as { message: string }).message).toBe('not implemented');
 
       // Leave no failed jobs behind on the shared broker.
-      await notificationQueue.obliterate({ force: true });
+      await imageQueue.obliterate({ force: true });
 
       await infra.close();
 

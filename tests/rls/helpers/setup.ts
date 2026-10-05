@@ -154,6 +154,12 @@ export async function cleanupTestUser(svc: SupabaseClient, user: TestUser): Prom
     .update({ avatar_asset_id: null })
     .eq('athlete_id', user.athleteId);
 
+  await svc.from('athlete_metric_entries').delete().eq('athlete_id', user.athleteId);
+  await svc.from('athlete_metric_summaries').delete().eq('athlete_id', user.athleteId);
+  await svc.from('athlete_visibility_settings').delete().eq('athlete_id', user.athleteId);
+  await svc.from('club_memberships').delete().eq('athlete_id', user.athleteId);
+  await svc.from('club_trainers').delete().eq('user_account_id', user.userAccountId);
+  await svc.from('device_tokens').delete().eq('user_account_id', user.userAccountId);
   await svc.from('data_lifecycle_requests').delete().eq('athlete_id', user.athleteId);
   await svc.from('pii_consent_log').delete().eq('athlete_id', user.athleteId);
   await svc.from('audit_log').delete().eq('athlete_id', user.athleteId);
@@ -168,4 +174,100 @@ export async function cleanupTestUser(svc: SupabaseClient, user: TestUser): Prom
   await svc.from('athletes').delete().eq('id', user.athleteId);
   await svc.from('user_accounts').delete().eq('id', user.userAccountId);
   await svc.auth.admin.deleteUser(user.supabaseUserId);
+}
+
+// ── Clubs, trainers, memberships, metrics (ADR-013) ─────────────────────────
+
+export type MembershipStatus = 'PENDING_ATHLETE_CONFIRMATION' | 'ACTIVE' | 'COMPLETED' | 'REJECTED';
+
+export async function createTestClub(svc: SupabaseClient, label: string): Promise<string> {
+  const id = randomUUID();
+  const { error } = await svc.from('clubs').insert({
+    id,
+    slug: `rls-club-${label}-${id.slice(0, 8)}`,
+    name: `RLS Club ${label}`,
+    country_code: 'CO',
+    city: 'Medellín',
+  });
+  if (error) throw new Error(`createTestClub(${label}): ${error.message}`);
+  return id;
+}
+
+/** Makes `user` a trainer of `clubId`; returns the club_trainers.id. */
+export async function addClubTrainer(
+  svc: SupabaseClient,
+  clubId: string,
+  user: TestUser,
+): Promise<string> {
+  const id = randomUUID();
+  const { error } = await svc
+    .from('club_trainers')
+    .insert({ id, club_id: clubId, user_account_id: user.userAccountId });
+  if (error) throw new Error(`addClubTrainer: ${error.message}`);
+  return id;
+}
+
+/**
+ * Creates a membership and walks it through legal transitions to `status`
+ * (the transition trigger only accepts PENDING_ATHLETE_CONFIRMATION on insert).
+ */
+export async function createTestMembership(
+  svc: SupabaseClient,
+  args: { clubId: string; athleteId: string; clubTrainerId: string; status: MembershipStatus },
+): Promise<string> {
+  const id = randomUUID();
+  const { error } = await svc.from('club_memberships').insert({
+    id,
+    club_id: args.clubId,
+    athlete_id: args.athleteId,
+    invited_by_club_trainer_id: args.clubTrainerId,
+    status: 'PENDING_ATHLETE_CONFIRMATION',
+  });
+  if (error) throw new Error(`createTestMembership[insert]: ${error.message}`);
+
+  const path: Record<MembershipStatus, MembershipStatus[]> = {
+    PENDING_ATHLETE_CONFIRMATION: [],
+    ACTIVE: ['ACTIVE'],
+    COMPLETED: ['ACTIVE', 'COMPLETED'],
+    REJECTED: ['REJECTED'],
+  };
+  for (const next of path[args.status]) {
+    const { error: upErr } = await svc
+      .from('club_memberships')
+      .update({ status: next })
+      .eq('id', id);
+    if (upErr) throw new Error(`createTestMembership[${next}]: ${upErr.message}`);
+  }
+  return id;
+}
+
+export async function createTestMetricDefinition(svc: SupabaseClient): Promise<string> {
+  const id = randomUUID();
+  const { error } = await svc.from('metric_definitions').insert({
+    id,
+    key: `rls_metric_${id.slice(0, 8)}`,
+    name: 'RLS Sprint 100 m',
+    unit: 's',
+    is_active: true,
+  });
+  if (error) throw new Error(`createTestMetricDefinition: ${error.message}`);
+  return id;
+}
+
+export async function deleteTestMetricDefinition(svc: SupabaseClient, id: string): Promise<void> {
+  await svc.from('athlete_metric_entries').delete().eq('metric_definition_id', id);
+  await svc.from('athlete_metric_summaries').delete().eq('metric_definition_id', id);
+  await svc.from('metric_definitions').delete().eq('id', id);
+}
+
+/** Removes a club and everything hanging off it, in FK order. */
+export async function cleanupTestClub(svc: SupabaseClient, clubId: string): Promise<void> {
+  const { data } = await svc.from('club_memberships').select('id').eq('club_id', clubId);
+  const membershipIds = (data ?? []).map((r: { id: string }) => r.id);
+  if (membershipIds.length > 0) {
+    await svc.from('athlete_metric_entries').delete().in('club_membership_id', membershipIds);
+  }
+  await svc.from('club_memberships').delete().eq('club_id', clubId);
+  await svc.from('club_trainers').delete().eq('club_id', clubId);
+  await svc.from('clubs').delete().eq('id', clubId);
 }

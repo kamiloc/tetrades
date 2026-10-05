@@ -22,13 +22,15 @@
 - deny cross-tenant access using two distinct users
 - handle NULL foreign keys correctly
 
-Pivot tables (planned, [ADR-013](adr/013-pivot-clubs-metrics-trainer-portal-and-visibility.md)) require deny-tests for:
+Pivot tables ([ADR-013](adr/013-pivot-clubs-metrics-trainer-portal-and-visibility.md)) require deny-tests for the following; they live in `tests/rls/{clubs,club_trainers,club_memberships,metric_definitions,athlete_metric_entries,athlete_metric_summaries,athlete_visibility_settings,device_tokens}.test.ts` and `tests/rls/athlete_private_profiles.trainer.test.ts`:
 
 - `Club` and `ClubMembership`: a user outside the club or membership cannot read or modify it; an athlete cannot be associated without confirming
 - `AthleteMetricEntry`: cross-tenant read and write denied, including a trainer from another club
-- a trainer cannot write a metric entry for an athlete whose membership is `PENDING_ATHLETE_CONFIRMATION`
+- a trainer cannot write a metric entry for an athlete whose membership is `PENDING_ATHLETE_CONFIRMATION`, `COMPLETED`, or `REJECTED`
 - a trainer cannot read `AthletePrivateProfile` in any membership state
 - `AthleteVisibilitySettings`: only the owning athlete can read or write
+
+The API side is covered by `apps/api/src/__tests__/integration/{membership-service,metrics-service,clubs-metrics-visibility}.int.test.ts`, including list/detail parity under every audience.
 
 ### E2E tests
 

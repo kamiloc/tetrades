@@ -5,6 +5,8 @@ import {
   athletePublicProfileSchema,
   bootstrapAthleteInput,
   bootstrapAthleteOutput,
+  createDeletionRequestInput,
+  dataLifecycleRequestOwnerOutput,
   getAthleteProfileInput,
   getAthletePublicProfileInput,
   myAthleteOutput,
@@ -16,6 +18,8 @@ import {
 import { TRPCError } from '@trpc/server';
 
 import { getEnv } from '../env.js';
+import { requestDeletion } from '../services/dataLifecycle.js';
+import { requireViewerAthlete } from '../services/viewer.js';
 import { protectedProcedure, publicProcedure, router } from '../trpc.js';
 
 export const athleteRouter = router({
@@ -460,6 +464,20 @@ export const athleteRouter = router({
       });
 
       return { athleteId: created.id };
+    }),
+
+  // Habeas Data deletion (athlete-data-lifecycle spec). Context-addressed:
+  // there is no athleteId input, so only the caller's own data can be
+  // targeted. Persists the request, then enqueues pii-deletion.
+  requestDeletion: protectedProcedure
+    .input(createDeletionRequestInput)
+    .output(dataLifecycleRequestOwnerOutput)
+    .mutation(async ({ ctx }) => {
+      const viewer = await requireViewerAthlete(ctx.prisma, ctx.userId);
+      return requestDeletion(
+        { prisma: ctx.prisma, jobs: ctx.jobs, log: ctx.log },
+        { athleteId: viewer.athleteId, userAccountId: viewer.userAccountId, requestId: ctx.requestId },
+      );
     }),
 });
 

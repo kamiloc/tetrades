@@ -8,6 +8,9 @@
 | `athlete-profile-core.mmd` | built | Athlete, Sport, AthletePublicProfile, AthletePrivateProfile, AthleteAchievement, ProfilePhotoAsset | UserAccount, AthleteConnection, PiiConsentLog, AuditEvent, DataLifecycleRequest |
 | `connections.mmd` | built | AthleteConnection | Athlete |
 | `compliance.mmd` | built | PiiConsentLog, AuditEvent, DataLifecycleRequest | Athlete, UserAccount |
-| `planned-clubs-metrics-visibility.mmd` | planned | Club, ClubTrainer, ClubMembership, MetricDefinition, AthleteMetricEntry, AthleteMetricSummary, AthleteVisibilitySettings | Athlete, UserAccount (edge endpoints only) |
+| `clubs.mmd` | built | Club, ClubTrainer, ClubMembership | Athlete, UserAccount |
+| `sport-metrics.mmd` | built | MetricDefinition, AthleteMetricEntry, AthleteMetricSummary | Athlete, Sport, ClubTrainer, ClubMembership |
+| `visibility.mmd` | built | AthleteVisibilitySettings | Athlete |
+| `notifications.mmd` | built | DeviceToken | UserAccount |
 
-The planned file is intentionally a single undivided annex: ADR-013's open items (trainer role model, membership terminal state, membership removal) leave its capability boundaries undecided.
+The clubs, metrics, and visibility fragments follow the capabilities of openspec change `add-clubs-metrics-visibility-model`; ADR-013's open items (trainer role model, membership states) were closed by that change.
