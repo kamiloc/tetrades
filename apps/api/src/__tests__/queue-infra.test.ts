@@ -18,7 +18,6 @@ import {
 import type {
   ImageOptimizationJobData,
   NotificationJobData,
-  OcrProcessingJobData,
   PiiDeletionJobData,
   QueueName,
 } from '@packages/queue';
@@ -37,12 +36,11 @@ import { makeRecordingLogger, type RecordedLog } from './helpers/recording-logge
 // ---------------------------------------------------------------------------
 
 describe('queue registry', () => {
-  it('exports the four application queue names', () => {
-    expect(QUEUE_NAMES.OCR_PROCESSING).toBe('ocr-processing');
+  it('exports the three application queue names', () => {
     expect(QUEUE_NAMES.IMAGE_OPTIMIZATION).toBe('image-optimization');
     expect(QUEUE_NAMES.PII_DELETION).toBe('pii-deletion');
     expect(QUEUE_NAMES.NOTIFICATIONS).toBe('notifications');
-    expect(Object.values(QUEUE_NAMES)).toHaveLength(4);
+    expect(Object.values(QUEUE_NAMES)).toHaveLength(3);
   });
 
   it('applies the retry/retention policy to every queue', () => {
@@ -55,11 +53,6 @@ describe('queue registry', () => {
   it('job data contracts are exported, fully typed, and all carry requestId', () => {
     // Compile-time contract check: if a payload interface loses a field or
     // its requestId, these literals stop typechecking.
-    const ocr: OcrProcessingJobData = {
-      documentId: 'doc_1',
-      athleteId: 'ath_1',
-      requestId: 'req_1',
-    };
     const image: ImageOptimizationJobData = {
       athleteId: 'ath_1',
       originalPath: 'ath_1/original.jpg',
@@ -77,7 +70,7 @@ describe('queue registry', () => {
       requestId: 'req_4',
     };
 
-    for (const payload of [ocr, image, pii, notification]) {
+    for (const payload of [image, pii, notification]) {
       expect(payload.requestId.length).toBeGreaterThan(0);
     }
   });
@@ -213,10 +206,9 @@ describe('runShutdownSequence', () => {
 
 it('QueueName is the union of registry values', () => {
   const names: QueueName[] = [
-    QUEUE_NAMES.OCR_PROCESSING,
     QUEUE_NAMES.IMAGE_OPTIMIZATION,
     QUEUE_NAMES.PII_DELETION,
     QUEUE_NAMES.NOTIFICATIONS,
   ];
-  expect(new Set(names).size).toBe(4);
+  expect(new Set(names).size).toBe(3);
 });

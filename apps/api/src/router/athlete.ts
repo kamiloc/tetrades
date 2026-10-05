@@ -3,14 +3,17 @@ import {
   athletePrivateProfileOwnerOutput,
   athletePublicProfileListOutput,
   athletePublicProfileSchema,
+  bootstrapAthleteInput,
+  bootstrapAthleteOutput,
   getAthleteProfileInput,
   getAthletePublicProfileInput,
+  myAthleteOutput,
+  onboardingStateOutput,
   searchAthletesInput,
   updateAthletePrivateProfileInput,
   updateAthletePublicProfileInput,
 } from '@packages/validators';
 import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
 
 import { getEnv } from '../env.js';
 import { protectedProcedure, publicProcedure, router } from '../trpc.js';
@@ -300,13 +303,7 @@ export const athleteRouter = router({
     }),
 
   getMyAthlete: protectedProcedure
-    .output(
-      z.object({
-        athleteId:   z.string(),
-        displayName: z.string().nullable(),
-        sport:       z.string().nullable(),
-      }),
-    )
+    .output(myAthleteOutput)
     .query(async ({ ctx }) => {
       const userAccount = await ctx.prisma.userAccount.findUnique({
         where: { supabaseUserId: ctx.userId },
@@ -347,13 +344,7 @@ export const athleteRouter = router({
    * layer needs a deterministic decision tree without try/catch.
    */
   getOnboardingState: protectedProcedure
-    .output(
-      z.object({
-        hasUserAccount: z.boolean(),
-        hasAthlete:     z.boolean(),
-        athleteId:      z.string().nullable(),
-      }),
-    )
+    .output(onboardingStateOutput)
     .query(async ({ ctx }) => {
       const userAccount = await ctx.prisma.userAccount.findUnique({
         where: { supabaseUserId: ctx.userId },
@@ -381,14 +372,8 @@ export const athleteRouter = router({
    * second call are ignored — use `updateProfile` to change them later.
    */
   bootstrap: protectedProcedure
-    .input(
-      z.object({
-        displayName: z.string().trim().min(2).max(100),
-        sportId:     z.string().min(1),
-        countryCode: z.string().length(2).toUpperCase(),
-      }),
-    )
-    .output(z.object({ athleteId: z.string() }))
+    .input(bootstrapAthleteInput)
+    .output(bootstrapAthleteOutput)
     .mutation(async ({ ctx, input }) => {
       // Upsert UserAccount as a defensive fallback when the auth.users →
       // user_accounts Postgres trigger has not been applied yet. With the

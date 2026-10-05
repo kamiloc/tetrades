@@ -1,5 +1,4 @@
-import { sportPublicOutput } from '@packages/validators';
-import { z } from 'zod';
+import { sportPublicListOutput } from '@packages/validators';
 
 import { publicProcedure, router } from '../trpc.js';
 
@@ -9,7 +8,7 @@ export const sportRouter = router({
    * Sports are L0-PUBLIC, no auth required.
    */
   list: publicProcedure
-    .output(z.array(sportPublicOutput))
+    .output(sportPublicListOutput)
     .query(async ({ ctx }) => {
       return ctx.prisma.sport.findMany({
         where:   { isActive: true },

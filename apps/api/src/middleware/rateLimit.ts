@@ -5,7 +5,7 @@
  *   - public:        unauthenticated requests, keyed by IP
  *   - authenticated: verified users, keyed by userId
  *   - admin:         admin-role users, keyed by userId (10× authenticated)
- *   - sensitive:     OCR/upload endpoints (Sprint 4), keyed by userId
+ *   - sensitive:     expensive/upload endpoints, keyed by userId
  *
  * Admin tier: per Cristian's decision (2026-07-05), the SYSTEM value of
  * `UserRole` maps to the admin tier. The role is resolved via a TTL-cached
@@ -54,9 +54,9 @@ const TRPC_PREFIX = '/trpc/';
 export const ADMIN_ROLES: ReadonlySet<string> = new Set(['SYSTEM']);
 
 /**
- * Procedures throttled at the sensitive tier. Empty in Sprint 3 — Sprint 4
- * adds the medicalRouter OCR/upload procedures here (e.g.
- * 'medical.uploadDocument') without touching any other rate limit code.
+ * Procedures throttled at the sensitive tier. Empty for now — register
+ * expensive or upload procedures here (e.g. 'storage.getUploadUrl') without
+ * touching any other rate limit code.
  */
 export const SENSITIVE_PROCEDURES: ReadonlySet<string> = new Set();
 
@@ -104,7 +104,7 @@ export interface ResolveRateLimitArgs {
 /**
  * Pick the tier, bucket key, and maximum for a request.
  * Priority: sensitive > admin > authenticated > public. Sensitive outranks
- * admin because it protects expensive downstream resources (Claude OCR),
+ * admin because it protects expensive downstream resources,
  * which no role is exempt from.
  */
 export function resolveRateLimit(args: ResolveRateLimitArgs): RateLimitDecision {

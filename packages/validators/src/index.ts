@@ -12,8 +12,6 @@ export * from './athlete-public-profile.js';
 export * from './athlete-private-profile.js';
 export * from './audit-event.js';
 export * from './data-lifecycle-request.js';
-export * from './medical-document.js';
-export * from './ocr-job.js';
 export * from './pii-consent-log.js';
 export * from './profile-photo-asset.js';
 export * from './sport.js';

@@ -32,11 +32,7 @@ const envSchema = z
     // Optional so dev/test can run without workers; required in production
     // (superRefine below), where UPSTASH_REDIS_URL starts the workers.
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
-    // L3-RESTRICTED: Anthropic API key for the OCR worker (task 4.2).
-    // Same optional-in-dev / required-in-production rule as above.
-    ANTHROPIC_API_KEY: z.string().min(1).optional(),
     // BullMQ worker concurrency per queue (Sprint 4 task 4.1 defaults).
-    WORKER_CONCURRENCY_OCR: z.coerce.number().int().positive().default(1),
     WORKER_CONCURRENCY_IMAGE: z.coerce.number().int().positive().default(2),
     WORKER_CONCURRENCY_PII: z.coerce.number().int().positive().default(1),
     WORKER_CONCURRENCY_NOTIFICATIONS: z.coerce.number().int().positive().default(5),
@@ -51,18 +47,15 @@ const envSchema = z
         message: 'UPSTASH_REDIS_URL is required when NODE_ENV=production',
       });
     }
-    // Production always runs workers (Redis is mandatory above), and the OCR
-    // worker cannot function without these — fail the boot, not the jobs.
-    if (env.NODE_ENV === 'production') {
-      for (const key of ['SUPABASE_SERVICE_ROLE_KEY', 'ANTHROPIC_API_KEY'] as const) {
-        if (env[key] === undefined) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: [key],
-            message: `${key} is required when NODE_ENV=production`,
-          });
-        }
-      }
+    // Production always runs workers (Redis is mandatory above), and the
+    // storage workers cannot function without the service-role key — fail
+    // the boot, not the jobs.
+    if (env.NODE_ENV === 'production' && env.SUPABASE_SERVICE_ROLE_KEY === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SUPABASE_SERVICE_ROLE_KEY'],
+        message: 'SUPABASE_SERVICE_ROLE_KEY is required when NODE_ENV=production',
+      });
     }
   });
 

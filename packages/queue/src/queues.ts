@@ -1,7 +1,7 @@
 /**
  * Queue instances and the shared retry/retention policy.
  *
- * The registry instantiates the four application queues on the shared
+ * The registry instantiates the three application queues on the shared
  * ioredis connection from connection.ts. apps/api's buildServer() owns the
  * returned registry and closes it during graceful shutdown, after workers
  * have drained.
@@ -14,7 +14,6 @@ import { QUEUE_NAMES } from './types.js';
 import type {
   ImageOptimizationJobData,
   NotificationJobData,
-  OcrProcessingJobData,
   PiiDeletionJobData,
   QueueJobData,
   QueueName,
@@ -38,13 +37,9 @@ export interface QueueRegistry {
   close: () => Promise<void>;
 }
 
-/** Instantiate the four application queues on the shared Redis connection. */
+/** Instantiate the three application queues on the shared Redis connection. */
 export function createQueueRegistry(connection: Redis): QueueRegistry {
   const queues: QueueRegistry['queues'] = {
-    [QUEUE_NAMES.OCR_PROCESSING]: new Queue<OcrProcessingJobData>(QUEUE_NAMES.OCR_PROCESSING, {
-      connection,
-      defaultJobOptions: DEFAULT_JOB_OPTIONS,
-    }),
     [QUEUE_NAMES.IMAGE_OPTIMIZATION]: new Queue<ImageOptimizationJobData>(
       QUEUE_NAMES.IMAGE_OPTIMIZATION,
       { connection, defaultJobOptions: DEFAULT_JOB_OPTIONS },

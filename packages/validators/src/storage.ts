@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const storageBucketSchema = z.enum(['medical-documents', 'profile-photos']);
+export const storageBucketSchema = z.enum(['profile-photos']);
 export type StorageBucket = z.infer<typeof storageBucketSchema>;
 
 export const getStorageUploadUrlInput = z.object({

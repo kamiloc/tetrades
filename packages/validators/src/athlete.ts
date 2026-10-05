@@ -98,3 +98,36 @@ export const searchAthletesInput = z.object({
   cursor: cuidSchema.optional(),
 });
 export type SearchAthletesInput = z.infer<typeof searchAthletesInput>;
+
+// ──────────────────────────────────────────────
+// READ-MODEL PROJECTIONS — not Prisma mirrors.
+// Back athlete.getMyAthlete / getOnboardingState / bootstrap, whose shapes
+// are assembled server-side from several tables and therefore have no base
+// schema to .pick()/.omit() from. No L2 field appears in any of them.
+// ──────────────────────────────────────────────
+
+export const bootstrapAthleteInput = z.object({
+  displayName: z.string().trim().min(2).max(100),
+  sportId: cuidSchema,
+  countryCode: countryCodeSchema,
+});
+export type BootstrapAthleteInput = z.infer<typeof bootstrapAthleteInput>;
+
+export const bootstrapAthleteOutput = z.object({
+  athleteId: cuidSchema, /// L0-PUBLIC
+});
+export type BootstrapAthleteOutput = z.infer<typeof bootstrapAthleteOutput>;
+
+export const myAthleteOutput = z.object({
+  athleteId: cuidSchema, /// L0-PUBLIC
+  displayName: z.string().nullable(), /// L0-PUBLIC
+  sport: z.string().nullable(), /// L0-PUBLIC
+});
+export type MyAthleteOutput = z.infer<typeof myAthleteOutput>;
+
+export const onboardingStateOutput = z.object({
+  hasUserAccount: z.boolean(), /// L1-INTERNAL
+  hasAthlete: z.boolean(), /// L1-INTERNAL
+  athleteId: cuidSchema.nullable(), /// L0-PUBLIC
+});
+export type OnboardingStateOutput = z.infer<typeof onboardingStateOutput>;

@@ -96,6 +96,7 @@ export async function createTestUser(
 
   const userAccountId = randomUUID();
   const { error: uaErr } = await svc.from('user_accounts').insert({
+    updated_at: new Date().toISOString(),
     id: userAccountId,
     supabase_user_id: supabaseUserId,
     role: 'ATHLETE',
@@ -107,6 +108,7 @@ export async function createTestUser(
 
   const athleteId = randomUUID();
   const { error: athErr } = await svc.from('athletes').insert({
+    updated_at: new Date().toISOString(),
     id: athleteId,
     user_account_id: userAccountId,
     slug: `rls-${label}-${uid}`,
@@ -160,10 +162,6 @@ export async function cleanupTestUser(svc: SupabaseClient, user: TestUser): Prom
     .delete()
     .or(`requester_id.eq.${user.athleteId},addressee_id.eq.${user.athleteId}`);
   await svc.from('athlete_achievements').delete().eq('athlete_id', user.athleteId);
-  // ocr_jobs.onDelete = Cascade from medical_documents, but we delete explicitly
-  // to avoid relying on cascade ordering with service_role.
-  await svc.from('ocr_jobs').delete().eq('athlete_id', user.athleteId);
-  await svc.from('medical_documents').delete().eq('athlete_id', user.athleteId);
   await svc.from('athlete_public_profiles').delete().eq('athlete_id', user.athleteId);
   await svc.from('athlete_private_profiles').delete().eq('athlete_id', user.athleteId);
   await svc.from('profile_photo_assets').delete().eq('athlete_id', user.athleteId);

@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['./**/*.test.ts'],
+    // Loads .env files (vitest does not) and fails fast on missing Supabase vars.
+    setupFiles: ['./helpers/load-env.ts'],
     // RLS tests run against a real Supabase instance — no parallelism to
     // avoid rate-limiting the auth admin API or hitting connection limits.
     pool: 'forks',

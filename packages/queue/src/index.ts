@@ -21,7 +21,6 @@ export {
   type BaseJobData,
   type ImageOptimizationJobData,
   type NotificationJobData,
-  type OcrProcessingJobData,
   type PiiDeletionJobData,
   type QueueJobData,
   type QueueLogger,

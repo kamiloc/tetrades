@@ -76,13 +76,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="documents"
-        options={{
-          title: 'Documents',
-          tabBarIcon: ({ focused }) => <TabIcon name="file-text" focused={focused} locked />,
-        }}
-      />
-      <Tabs.Screen
         name="search"
         options={{
           title: 'Search',

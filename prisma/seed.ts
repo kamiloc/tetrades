@@ -2,8 +2,8 @@
  * Prisma seed — realistic Colombian athlete data for local development.
  *
  * Idempotent: wipes existing rows in reverse FK order before inserting fresh data.
- * L2-CONFIDENTIAL fields (private profile contacts, medical document payloads,
- * OCR output, verified data) are encrypted with @packages/crypto using
+ * L2-CONFIDENTIAL fields (private profile identity and contact data) are
+ * encrypted with @packages/crypto using
  * MASTER_ENCRYPTION_KEY from the local environment.
  *
  * Run via:
@@ -21,8 +21,6 @@ import {
   ConnectionStatus,
   DataLifecycleStatus,
   DataLifecycleType,
-  DocumentStatus,
-  OcrJobStatus,
   OnboardingStatus,
   PhotoVariant,
   PrismaClient,
@@ -47,10 +45,6 @@ const KEY_VERSION = 'v1';
 
 function enc(plaintext: string): Buffer {
   return encryptPII(plaintext, MASTER_KEY);
-}
-
-function encJSON(value: unknown): Buffer {
-  return encryptPII(JSON.stringify(value), MASTER_KEY);
 }
 
 function isoDate(input: string): Date {
@@ -280,8 +274,6 @@ async function wipe(): Promise<void> {
   await prisma.dataLifecycleRequest.deleteMany();
   await prisma.auditEvent.deleteMany();
   await prisma.piiConsentLog.deleteMany();
-  await prisma.ocrJob.deleteMany();
-  await prisma.medicalDocument.deleteMany();
   await prisma.athleteConnection.deleteMany();
   await prisma.athleteAchievement.deleteMany();
   await prisma.athletePublicProfile.deleteMany();
@@ -484,299 +476,6 @@ async function main(): Promise<void> {
   }
 
   // ---------------------------------------------------------------------------
-  // Medical documents + OCR jobs in every lifecycle state
-  // ---------------------------------------------------------------------------
-  console.log('Seed: creating medical documents and OCR jobs...');
-
-  type MedicalSeed = {
-    readonly athleteSlug: string;
-    readonly status: DocumentStatus;
-    readonly documentType: string;
-    readonly objectPath: string;
-    readonly sha256: string;
-    readonly ocr:
-      | { readonly kind: 'NONE' }
-      | {
-          readonly kind: 'JOB';
-          readonly status: OcrJobStatus;
-          readonly schemaValid: boolean;
-          readonly rawOutput: unknown | null;
-          readonly parsedData: unknown | null;
-          readonly confidenceMap: Record<string, number> | null;
-          readonly startedAt: string | null;
-          readonly finishedAt: string | null;
-        };
-    readonly verifiedData: Record<string, unknown> | null;
-    readonly verifiedAt: string | null;
-  };
-
-  const medicalSeeds: ReadonlyArray<MedicalSeed> = [
-    {
-      athleteSlug: 'daniel-mendoza-restrepo',
-      status: DocumentStatus.UPLOADED,
-      documentType: 'Examen médico deportivo — hemograma',
-      objectPath: 'medical-documents/daniel-mendoza/2025-02-hemograma.pdf',
-      sha256: '4f1a2c5e9b6d3a8f0e2b4c6d8a1f3e5b7c9d0e2f4a6b8c0d1e3f5a7b9c1d3e5f',
-      ocr: { kind: 'NONE' },
-      verifiedData: null,
-      verifiedAt: null,
-    },
-    {
-      athleteSlug: 'daniel-mendoza-restrepo',
-      status: DocumentStatus.PROCESSING,
-      documentType: 'Resonancia magnética — rodilla derecha',
-      objectPath: 'medical-documents/daniel-mendoza/2025-03-rmn-rodilla.pdf',
-      sha256: '6b2c4e8f0a3d5b7e9c1f4a6b8d0e2f4a6b8c0d1e3f5a7b9c1d3e5f7a9b1c3e5d',
-      ocr: {
-        kind: 'JOB',
-        status: OcrJobStatus.RUNNING,
-        schemaValid: false,
-        rawOutput: null,
-        parsedData: null,
-        confidenceMap: null,
-        startedAt: '2025-04-10T15:21:00Z',
-        finishedAt: null,
-      },
-      verifiedData: null,
-      verifiedAt: null,
-    },
-    {
-      athleteSlug: 'carolina-rios-villegas',
-      status: DocumentStatus.PENDING_REVIEW,
-      documentType: 'Perfil lipídico y bioquímico',
-      objectPath: 'medical-documents/carolina-rios/2025-01-perfil-lipidico.pdf',
-      sha256: '8c3d5f7a9b1c3e5d7f9b1d3e5f7a9c1e3d5f7a9b1c3e5d7f9b1c3e5d7f9b1c3e',
-      ocr: {
-        kind: 'JOB',
-        status: OcrJobStatus.SUCCEEDED,
-        schemaValid: true,
-        rawOutput: {
-          provider: 'claude-sonnet-4-20250514',
-          extractedAt: '2025-01-18T14:22:08Z',
-          fields: {
-            hemoglobina_g_dl: '14.6',
-            colesterol_total_mg_dl: '186',
-            ldl_mg_dl: '102',
-            hdl_mg_dl: '58',
-            trigliceridos_mg_dl: '112',
-            doctor: 'Dra. Beatriz Londoño',
-            clinica: 'Clínica Comfamiliar — Pereira',
-          },
-        },
-        parsedData: {
-          hemoglobina: 14.6,
-          colesterolTotal: 186,
-          ldl: 102,
-          hdl: 58,
-          trigliceridos: 112,
-          doctorName: 'Dra. Beatriz Londoño',
-          clinicAddress: 'Clínica Comfamiliar, Pereira, Risaralda',
-          collectedOn: '2025-01-17',
-        },
-        confidenceMap: {
-          hemoglobina: 0.97,
-          colesterolTotal: 0.95,
-          ldl: 0.93,
-          hdl: 0.94,
-          trigliceridos: 0.92,
-          doctorName: 0.88,
-          clinicAddress: 0.86,
-          collectedOn: 0.99,
-        },
-        startedAt: '2025-01-18T14:21:55Z',
-        finishedAt: '2025-01-18T14:22:08Z',
-      },
-      verifiedData: null,
-      verifiedAt: null,
-    },
-    {
-      athleteSlug: 'sebastian-cardenas-aristizabal',
-      status: DocumentStatus.VERIFIED,
-      documentType: 'Evaluación cardiológica con ecocardiograma',
-      objectPath: 'medical-documents/sebastian-cardenas/2024-12-cardiologia.pdf',
-      sha256: '9d4e6f8a0b2c4d6e8f0a2c4d6e8f0a2c4d6e8f0a2c4d6e8f0a2c4d6e8f0a2c4d',
-      ocr: {
-        kind: 'JOB',
-        status: OcrJobStatus.SUCCEEDED,
-        schemaValid: true,
-        rawOutput: {
-          provider: 'claude-sonnet-4-20250514',
-          extractedAt: '2024-12-05T11:04:30Z',
-          fields: {
-            frecuencia_cardiaca_reposo: '52 lpm',
-            presion_arterial: '118/74 mmHg',
-            fraccion_eyeccion: '62%',
-            diagnostico: 'Sin anomalías estructurales. Apto para entrenamiento de alta intensidad.',
-            doctor: 'Dr. Hernán Posada Vélez',
-            clinica: 'Centro Cardiovascular del Valle — Cali',
-          },
-        },
-        parsedData: {
-          restingHeartRate: 52,
-          bloodPressureSystolic: 118,
-          bloodPressureDiastolic: 74,
-          ejectionFractionPercent: 62,
-          diagnosis: 'Sin anomalías estructurales. Apto para entrenamiento de alta intensidad.',
-          doctorName: 'Dr. Hernán Posada Vélez',
-          clinicAddress: 'Centro Cardiovascular del Valle, Cali, Valle del Cauca',
-          collectedOn: '2024-12-04',
-        },
-        confidenceMap: {
-          restingHeartRate: 0.98,
-          bloodPressureSystolic: 0.97,
-          bloodPressureDiastolic: 0.97,
-          ejectionFractionPercent: 0.95,
-          diagnosis: 0.9,
-          doctorName: 0.93,
-          clinicAddress: 0.91,
-          collectedOn: 0.99,
-        },
-        startedAt: '2024-12-05T11:04:18Z',
-        finishedAt: '2024-12-05T11:04:30Z',
-      },
-      verifiedData: {
-        restingHeartRate: 52,
-        bloodPressureSystolic: 118,
-        bloodPressureDiastolic: 74,
-        ejectionFractionPercent: 62,
-        diagnosis: 'Sin anomalías estructurales. Apto para entrenamiento de alta intensidad.',
-        doctorName: 'Dr. Hernán Posada Vélez',
-        clinicAddress: 'Centro Cardiovascular del Valle, Cali, Valle del Cauca',
-        collectedOn: '2024-12-04',
-        verifiedNotes: 'Valores confirmados con el documento original.',
-      },
-      verifiedAt: '2024-12-06T16:42:00Z',
-    },
-    {
-      athleteSlug: 'valentina-hernandez-lozano',
-      status: DocumentStatus.REJECTED,
-      documentType: 'Densitometría ósea (DEXA)',
-      objectPath: 'medical-documents/valentina-hernandez/2024-11-dexa.pdf',
-      sha256: '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
-      ocr: {
-        kind: 'JOB',
-        status: OcrJobStatus.SUCCEEDED,
-        schemaValid: true,
-        rawOutput: {
-          provider: 'claude-sonnet-4-20250514',
-          extractedAt: '2024-11-22T19:55:42Z',
-          fields: {
-            t_score_columna: '-0.4',
-            t_score_cadera: '-0.2',
-            densidad_columna_g_cm2: '1.182',
-            doctor: 'Dra. Ana María Cuello',
-            clinica: 'Centro de Diagnóstico Caribe — Barranquilla',
-            observacion: 'Imagen parcialmente recortada en la página 2.',
-          },
-        },
-        parsedData: {
-          tScoreSpine: -0.4,
-          tScoreHip: -0.2,
-          spineDensity: 1.182,
-          doctorName: 'Dra. Ana María Cuello',
-          clinicAddress: 'Centro de Diagnóstico Caribe, Barranquilla, Atlántico',
-          collectedOn: '2024-11-21',
-          notes: 'Imagen parcialmente recortada en la página 2.',
-        },
-        confidenceMap: {
-          tScoreSpine: 0.74,
-          tScoreHip: 0.71,
-          spineDensity: 0.83,
-          doctorName: 0.65,
-          clinicAddress: 0.61,
-          collectedOn: 0.92,
-          notes: 0.55,
-        },
-        startedAt: '2024-11-22T19:55:31Z',
-        finishedAt: '2024-11-22T19:55:42Z',
-      },
-      verifiedData: null,
-      verifiedAt: null,
-    },
-    {
-      athleteSlug: 'andres-quintero-salazar',
-      status: DocumentStatus.UPLOADED,
-      documentType: 'Evaluación nutricional con bioimpedancia',
-      objectPath: 'medical-documents/andres-quintero/2025-04-bioimpedancia.pdf',
-      sha256: '2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c',
-      ocr: { kind: 'NONE' },
-      verifiedData: null,
-      verifiedAt: null,
-    },
-  ];
-
-  type DocumentLocator = {
-    readonly id: string;
-    readonly athleteSlug: string;
-    readonly status: DocumentStatus;
-  };
-
-  const documentLocators: DocumentLocator[] = [];
-
-  for (const seed of medicalSeeds) {
-    const aid = athleteId(seed.athleteSlug);
-
-    const verifiedDataEnc =
-      seed.verifiedData === null ? null : encJSON(seed.verifiedData);
-
-    const verifiedByUserAccountId =
-      seed.status === DocumentStatus.VERIFIED ? systemAccount.id : null;
-
-    const doc = await prisma.medicalDocument.create({
-      data: {
-        athleteId: aid,
-        documentTypeEnc: enc(seed.documentType),
-        objectPathEnc: enc(seed.objectPath),
-        mimeType: 'application/pdf',
-        sha256: seed.sha256,
-        status: seed.status,
-        verifiedDataEnc,
-        verifiedByUserAccountId,
-        verifiedAt: seed.verifiedAt === null ? null : new Date(seed.verifiedAt),
-      },
-      select: { id: true },
-    });
-    documentLocators.push({ id: doc.id, athleteSlug: seed.athleteSlug, status: seed.status });
-
-    if (seed.ocr.kind === 'JOB') {
-      const job = seed.ocr;
-      await prisma.ocrJob.create({
-        data: {
-          medicalDocumentId: doc.id,
-          athleteId: aid,
-          modelName: 'claude-sonnet-4-20250514',
-          promptVersion: '2025-04-01',
-          status: job.status,
-          rawOutputEnc: job.rawOutput === null ? null : encJSON(job.rawOutput),
-          parsedDataEnc: job.parsedData === null ? null : encJSON(job.parsedData),
-          confidenceMap: job.confidenceMap === null ? undefined : job.confidenceMap,
-          schemaValid: job.schemaValid,
-          retryCount: 0,
-          requestId: randomUUID(),
-          startedAt: job.startedAt === null ? null : new Date(job.startedAt),
-          finishedAt: job.finishedAt === null ? null : new Date(job.finishedAt),
-        },
-      });
-    } else {
-      // Documents in UPLOADED state get a QUEUED OCR job representing the
-      // pending background work (mirrors the production flow where upload
-      // confirmation enqueues processOCR).
-      await prisma.ocrJob.create({
-        data: {
-          medicalDocumentId: doc.id,
-          athleteId: aid,
-          modelName: 'claude-sonnet-4-20250514',
-          promptVersion: '2025-04-01',
-          status: OcrJobStatus.QUEUED,
-          schemaValid: false,
-          retryCount: 0,
-          requestId: randomUUID(),
-        },
-      });
-    }
-  }
-
-  // ---------------------------------------------------------------------------
   // PII consent logs
   // ---------------------------------------------------------------------------
   console.log('Seed: creating consent logs...');
@@ -789,14 +488,6 @@ async function main(): Promise<void> {
     readonly revokedAt: string | null;
     readonly evidenceRef: string | null;
   }> = [
-    {
-      purposeCode: 'MEDICAL_DATA_PROCESSING',
-      consentVersion: '2025-01-15',
-      granted: true,
-      grantedAt: '2025-01-15T10:00:00Z',
-      revokedAt: null,
-      evidenceRef: 'consent-ui:medical:v2025-01-15',
-    },
     {
       purposeCode: 'PUBLIC_PROFILE_DISPLAY',
       consentVersion: '2025-01-15',
@@ -851,37 +542,6 @@ async function main(): Promise<void> {
         metadata: { source: 'seed' },
       },
     });
-  }
-
-  for (const locator of documentLocators) {
-    const aid = athleteId(locator.athleteSlug);
-    await prisma.auditEvent.create({
-      data: {
-        actorUserAccountId: systemAccount.id,
-        athleteId: aid,
-        eventType: 'MEDICAL_DOCUMENT_UPLOADED',
-        targetType: 'MedicalDocument',
-        targetId: locator.id,
-        purposeCode: 'MEDICAL_DATA_PROCESSING',
-        requestId: randomUUID(),
-        metadata: { documentStatus: locator.status, source: 'seed' },
-      },
-    });
-
-    if (locator.status === DocumentStatus.VERIFIED) {
-      await prisma.auditEvent.create({
-        data: {
-          actorUserAccountId: systemAccount.id,
-          athleteId: aid,
-          eventType: 'MEDICAL_DOCUMENT_VERIFIED',
-          targetType: 'MedicalDocument',
-          targetId: locator.id,
-          purposeCode: 'MEDICAL_DATA_VERIFICATION',
-          requestId: randomUUID(),
-          metadata: { source: 'seed' },
-        },
-      });
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -952,8 +612,6 @@ async function main(): Promise<void> {
     photoAssets: await prisma.profilePhotoAsset.count(),
     achievements: await prisma.athleteAchievement.count(),
     connections: await prisma.athleteConnection.count(),
-    medicalDocuments: await prisma.medicalDocument.count(),
-    ocrJobs: await prisma.ocrJob.count(),
     consentLogs: await prisma.piiConsentLog.count(),
     auditEvents: await prisma.auditEvent.count(),
     lifecycleRequests: await prisma.dataLifecycleRequest.count(),

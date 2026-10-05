@@ -17,18 +17,6 @@ export const onboardingStatusEnum = z.enum([
 ]);
 export type OnboardingStatus = z.infer<typeof onboardingStatusEnum>;
 
-export const documentStatusEnum = z.enum([
-  'UPLOADED',
-  'PROCESSING',
-  'PENDING_REVIEW',
-  'VERIFIED',
-  'REJECTED',
-]);
-export type DocumentStatus = z.infer<typeof documentStatusEnum>;
-
-export const ocrJobStatusEnum = z.enum(['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED']);
-export type OcrJobStatus = z.infer<typeof ocrJobStatusEnum>;
-
 export const connectionStatusEnum = z.enum(['PENDING', 'ACCEPTED', 'DECLINED', 'BLOCKED']);
 export type ConnectionStatus = z.infer<typeof connectionStatusEnum>;
 

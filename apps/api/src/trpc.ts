@@ -17,7 +17,7 @@ export const router = t.router;
  * Procedure entry/exit logging at `debug` — invisible in production, where
  * the logger level is `info` (middleware/logging.ts). Logs the procedure
  * path and outcome only; never input or output values, which can contain
- * L2 data on medical/private-profile procedures.
+ * L2 data on private-profile procedures.
  */
 const procedureLogging = t.middleware(async ({ ctx, path, type, next }) => {
   ctx.log.debug({ procedure: path, type }, 'procedure start');

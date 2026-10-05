@@ -53,25 +53,6 @@ enum OnboardingStatus {
   @@map("onboarding_status")
 }
 
-enum DocumentStatus {
-  UPLOADED
-  PROCESSING
-  PENDING_REVIEW
-  VERIFIED
-  REJECTED
-
-  @@map("document_status")
-}
-
-enum OcrJobStatus {
-  QUEUED
-  RUNNING
-  SUCCEEDED
-  FAILED
-
-  @@map("ocr_job_status")
-}
-
 enum ConnectionStatus {
   PENDING
   ACCEPTED
@@ -145,7 +126,6 @@ model UserAccount {
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
   athlete                Athlete?
-  verifiedDocuments      MedicalDocument[]      @relation("MedicalDocumentVerifier")
   auditEvents            AuditEvent[]
   submittedLifecycleReqs DataLifecycleRequest[] @relation("LifecycleRequester")
 
@@ -195,8 +175,6 @@ model Athlete {
   privateProfile       AthletePrivateProfile?
   photos               ProfilePhotoAsset[]
   achievements         AthleteAchievement[]
-  medicalDocuments     MedicalDocument[]
-  ocrJobs              OcrJob[]
   consentLogs          PiiConsentLog[]
   auditEvents          AuditEvent[]
   lifecycleRequests    DataLifecycleRequest[]
@@ -341,83 +319,6 @@ model AthleteConnection {
   @@index([requesterId, status])
   @@index([addresseeId, status])
   @@map("athlete_connections")
-}
-
-// ============================================================================
-// Medical & OCR
-// ============================================================================
-
-model MedicalDocument {
-  /// L1-INTERNAL — opaque identifier; encrypted CONTENT is L2 in *_enc fields
-  id                      String         @id @default(cuid())
-  /// L1-INTERNAL — FK to athlete; the relationship is L1, the content is L2
-  athleteId               String         @map("athlete_id")
-  /// L2-CONFIDENTIAL (encrypted)
-  documentTypeEnc         Bytes          @map("document_type_enc")
-  /// L2-CONFIDENTIAL (encrypted)
-  objectPathEnc           Bytes          @map("object_path_enc")
-  /// L1-INTERNAL — file format, not content
-  mimeType                String         @map("mime_type")
-  /// L1-INTERNAL — integrity hash, not content
-  sha256                  String
-  /// L1-INTERNAL — workflow status, not medical data itself
-  status                  DocumentStatus @default(UPLOADED)
-  /// L2-CONFIDENTIAL (encrypted JSON) — only populated when status = VERIFIED
-  verifiedDataEnc         Bytes?         @map("verified_data_enc")
-  /// L1-INTERNAL — FK to verifier UserAccount
-  verifiedByUserAccountId String?        @map("verified_by_user_account_id")
-  /// L1-INTERNAL
-  uploadedAt              DateTime       @default(now()) @map("uploaded_at")
-  /// L1-INTERNAL
-  verifiedAt              DateTime?      @map("verified_at")
-
-  athlete    Athlete      @relation(fields: [athleteId], references: [id], onDelete: Restrict)
-  verifiedBy UserAccount? @relation("MedicalDocumentVerifier", fields: [verifiedByUserAccountId], references: [id], onDelete: Restrict)
-  ocrJobs    OcrJob[]
-
-  @@index([athleteId, status])
-  @@index([verifiedByUserAccountId])
-  @@map("medical_documents")
-}
-
-model OcrJob {
-  /// L1-INTERNAL
-  id                String       @id @default(cuid())
-  /// L1-INTERNAL
-  medicalDocumentId String       @map("medical_document_id")
-  /// L1-INTERNAL — DENORMALIZED: must equal medicalDocument.athleteId. Enforced by application
-  /// layer on insert. Enables direct RLS policy: USING (auth.uid() = athlete_id)
-  athleteId         String       @map("athlete_id")
-  /// L1-INTERNAL
-  modelName         String       @map("model_name")
-  /// L1-INTERNAL
-  promptVersion     String       @map("prompt_version")
-  /// L1-INTERNAL
-  status            OcrJobStatus @default(QUEUED)
-  /// L2-CONFIDENTIAL (encrypted JSON) — immutable once set; contains raw extracted medical values
-  rawOutputEnc      Bytes?       @map("raw_output_enc")
-  /// L2-CONFIDENTIAL (encrypted JSON) — structured medical data
-  parsedDataEnc     Bytes?       @map("parsed_data_enc")
-  /// L1-INTERNAL — numeric confidence scores per field, not medical values
-  confidenceMap     Json?        @map("confidence_map")
-  /// L1-INTERNAL
-  schemaValid       Boolean      @default(false) @map("schema_valid")
-  /// L1-INTERNAL
-  retryCount        Int          @default(0) @map("retry_count")
-  /// L1-INTERNAL
-  requestId         String       @map("request_id")
-  /// L1-INTERNAL
-  startedAt         DateTime?    @map("started_at")
-  /// L1-INTERNAL
-  finishedAt        DateTime?    @map("finished_at")
-
-  medicalDocument MedicalDocument @relation(fields: [medicalDocumentId], references: [id], onDelete: Cascade)
-  athlete         Athlete         @relation(fields: [athleteId], references: [id], onDelete: Restrict)
-
-  @@index([medicalDocumentId, status])
-  @@index([athleteId])
-  @@index([requestId])
-  @@map("ocr_jobs")
 }
 
 // ============================================================================

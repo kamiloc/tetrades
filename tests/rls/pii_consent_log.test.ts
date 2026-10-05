@@ -39,7 +39,7 @@ describe.skipIf(!envReady)('pii_consent_log RLS', () => {
     await svc.from('pii_consent_log').insert({
       id: consentLogId,
       athlete_id: user1.athleteId,
-      purpose_code: 'MEDICAL_DATA_UPLOAD',
+      purpose_code: 'PROFILE_DATA_PROCESSING',
       consent_version: 'v1.0',
       granted: true,
     });
@@ -69,7 +69,7 @@ describe.skipIf(!envReady)('pii_consent_log RLS', () => {
     const { error } = await user1.client.from('pii_consent_log').insert({
       id: randomUUID(),
       athlete_id: user1.athleteId,
-      purpose_code: 'MEDICAL_DATA_UPLOAD',
+      purpose_code: 'PROFILE_DATA_PROCESSING',
       consent_version: 'v1.0',
       granted: true,
     });

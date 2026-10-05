@@ -23,8 +23,6 @@ import type {
   Athlete,
   AthleteAchievement,
   AuditEvent,
-  MedicalDocument,
-  OcrJob,
   PiiConsentLog,
   Sport,
   UserAccount,
@@ -33,8 +31,6 @@ import type {
   Athlete as PrismaAthlete,
   AthleteAchievement as PrismaAthleteAchievement,
   AuditEvent as PrismaAuditEvent,
-  MedicalDocument as PrismaMedicalDocument,
-  OcrJob as PrismaOcrJob,
   PiiConsentLog as PrismaPiiConsentLog,
   Sport as PrismaSport,
   UserAccount as PrismaUserAccount,
@@ -52,8 +48,7 @@ type _userAccount_ok = Assert<IsAssignable<PrismaUserAccount, UserAccount>>;
 type _sport_ok = Assert<IsAssignable<PrismaSport, Sport>>;
 type _athlete_ok = Assert<IsAssignable<PrismaAthlete, Athlete>>;
 type _achievement_ok = Assert<IsAssignable<PrismaAthleteAchievement, AthleteAchievement>>;
-type _medicalDoc_ok = Assert<IsAssignable<PrismaMedicalDocument, MedicalDocument>>;
-// Prisma `Json?` columns (OcrJob.confidenceMap, AuditEvent.metadata) generate
+// Prisma `Json?` columns (AuditEvent.metadata) generate
 // as `Prisma.JsonValue | null`, a recursive union
 // (`string | number | boolean | JsonObject | JsonArray | null`). The Zod
 // schemas narrow these to `Record<string, unknown> | null`, which is the
@@ -67,10 +62,6 @@ type _medicalDoc_ok = Assert<IsAssignable<PrismaMedicalDocument, MedicalDocument
 // `Pick` is driven by the Zod-side key set (a plain object union) because
 // `Omit<PrismaT, ...>` over Prisma's complex `$Result.DefaultSelection<...>`
 // type leaks phantom keys that defeat the structural check.
-type OcrJobBridgeKeys = Exclude<keyof OcrJob, 'confidenceMap'>;
-type _ocrJob_ok = Assert<
-  IsAssignable<Pick<PrismaOcrJob, OcrJobBridgeKeys>, Pick<OcrJob, OcrJobBridgeKeys>>
->;
 type _piiConsent_ok = Assert<IsAssignable<PrismaPiiConsentLog, PiiConsentLog>>;
 type AuditEventBridgeKeys = Exclude<keyof AuditEvent, 'metadata'>;
 type _auditEvent_ok = Assert<

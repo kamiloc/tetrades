@@ -58,11 +58,8 @@ Trainer request → membership check (`ACTIVE` `ClubMembership` for the trainer'
 
 ## Current state vs. target (known drift)
 
-The pivot is not yet implemented. As of this writing:
+The medical/OCR removal (`remove-medical-ocr-domain`) is applied in code, schema, policies, and tests, pending the user-run database migration and deletion of the `medical-documents` Storage bucket. The club, metric, trainer, and visibility entities (ADR-013) are not yet implemented (`add-clubs-metrics-visibility-model`):
 
-- `prisma/schema.prisma` still contains `MedicalDocument` and `OcrJob`, and none of the pivot entities
-- `apps/api` still mounts the `medical` router (alongside `athlete`, `achievement`, `connection`, `storage`, `sport`) and has the `processOCR` job
-- `supabase/policies/` and `tests/rls/` still cover `medical_documents` and `ocr_jobs`
-- `apps/mobile` still has a `documents` tab
-
-These are pending removal and must not be extended.
+- `prisma/schema.prisma` has none of the pivot entities
+- `apps/api` mounts `athlete`, `achievement`, `connection`, `storage`, and `sport` routers only
+- `deletePII` and `sendNotification` workers are stubs that throw `not implemented`

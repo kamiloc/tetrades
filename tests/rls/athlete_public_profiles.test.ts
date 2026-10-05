@@ -46,6 +46,7 @@ describe.skipIf(!envReady)('athlete_public_profiles RLS', () => {
 
     // Create user2 public profile via service_role so user1 can try to UPDATE it
     await svc.from('athlete_public_profiles').insert({
+      updated_at: new Date().toISOString(),
       athlete_id: user2.athleteId,
       public_bio: 'User2 bio',
       is_searchable: true,
@@ -86,6 +87,7 @@ describe.skipIf(!envReady)('athlete_public_profiles RLS', () => {
 
   it('allows owner to INSERT their own public profile', async () => {
     const { error } = await user1.client.from('athlete_public_profiles').insert({
+      updated_at: new Date().toISOString(),
       athlete_id: user1.athleteId,
       public_bio: 'My public bio',
       is_searchable: true,
@@ -100,6 +102,7 @@ describe.skipIf(!envReady)('athlete_public_profiles RLS', () => {
     // user2 already has a profile; using a hypothetical extra athleteId check:
     // attempt to insert with user1's client but for a non-owned athlete_id
     const { error } = await user1.client.from('athlete_public_profiles').upsert({
+      updated_at: new Date().toISOString(),
       athlete_id: '00000000-0000-0000-0000-000000000099',
       is_searchable: false,
     });

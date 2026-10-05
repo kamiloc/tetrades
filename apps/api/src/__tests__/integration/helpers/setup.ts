@@ -201,15 +201,36 @@ export async function createFixtureAthlete(
   return { athleteId: athlete.id, userAccountId: userAccount.id, slug: athlete.slug };
 }
 
+const FK_VIOLATION_CODE = 'P2003';
+const ATHLETE_DELETE_ATTEMPTS = 5;
+const ATHLETE_DELETE_RETRY_DELAY_MS = 200;
+
 export async function cleanupAthleteRows(athleteId: string): Promise<void> {
-  await prisma.auditEvent.deleteMany({ where: { athleteId } });
   await prisma.athleteConnection.deleteMany({
     where: { OR: [{ requesterId: athleteId }, { addresseeId: athleteId }] },
   });
   await prisma.athleteAchievement.deleteMany({ where: { athleteId } });
   await prisma.athletePublicProfile.deleteMany({ where: { athleteId } });
   await prisma.athletePrivateProfile.deleteMany({ where: { athleteId } });
-  await prisma.athlete.deleteMany({ where: { id: athleteId } });
+
+  // Decryption audit rows are persisted fire-and-forget (services/audit.ts),
+  // so one from the last request of a test can land after the first delete.
+  // Re-delete audit rows and retry when the athlete FK is still violated.
+  for (let attempt = 1; ; attempt += 1) {
+    await prisma.auditEvent.deleteMany({ where: { athleteId } });
+    try {
+      await prisma.athlete.deleteMany({ where: { id: athleteId } });
+      return;
+    } catch (error) {
+      const isFkViolation =
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === FK_VIOLATION_CODE;
+      if (!isFkViolation || attempt >= ATHLETE_DELETE_ATTEMPTS) throw error;
+      await new Promise((resolve) => setTimeout(resolve, ATHLETE_DELETE_RETRY_DELAY_MS));
+    }
+  }
 }
 
 export async function cleanupFixtureAthlete(fixture: FixtureAthlete): Promise<void> {

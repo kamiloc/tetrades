@@ -44,6 +44,7 @@ describe.skipIf(!envReady)('athlete_private_profiles RLS', () => {
 
     // Create user2 private profile via service_role so user1 can attempt cross-tenant ops
     await svc.from('athlete_private_profiles').insert({
+      updated_at: new Date().toISOString(),
       athlete_id: user2.athleteId,
       encryption_key_version: 'v1',
       onboarding_status: 'NOT_STARTED',
@@ -62,6 +63,7 @@ describe.skipIf(!envReady)('athlete_private_profiles RLS', () => {
   it('allows owner to SELECT their own private profile', async () => {
     // Insert user1's profile first so they can SELECT it
     await svc.from('athlete_private_profiles').insert({
+      updated_at: new Date().toISOString(),
       athlete_id: user1.athleteId,
       encryption_key_version: 'v1',
       onboarding_status: 'NOT_STARTED',
@@ -94,6 +96,7 @@ describe.skipIf(!envReady)('athlete_private_profiles RLS', () => {
     // user1 already has a profile (created in test a above via svc, then queried).
     // Attempting another INSERT for the same PK must fail.
     const { error } = await user1.client.from('athlete_private_profiles').insert({
+      updated_at: new Date().toISOString(),
       athlete_id: user1.athleteId,
       encryption_key_version: 'v2',
       onboarding_status: 'IDENTITY_PENDING',
@@ -107,6 +110,7 @@ describe.skipIf(!envReady)('athlete_private_profiles RLS', () => {
 
   it('denies user from INSERT private profile for another athlete', async () => {
     const { error } = await user1.client.from('athlete_private_profiles').insert({
+      updated_at: new Date().toISOString(),
       athlete_id: user2.athleteId,
       encryption_key_version: 'v1',
       onboarding_status: 'NOT_STARTED',

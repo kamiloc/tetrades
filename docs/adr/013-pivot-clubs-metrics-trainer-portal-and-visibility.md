@@ -33,14 +33,20 @@ The product no longer handles medical records or OCR. It now centers on club aff
 
 ### 5. Membership requires athlete consent
 
-- A club (or trainer) can invite an athlete, but the association becomes effective only when the athlete confirms. Until then the membership is `PENDING_ATHLETE_CONFIRMATION` and grants no read or write access.
-- A pending membership must not appear on the athlete's public profile or in club rosters visible to others.
-- State names are provisional until the schema is written. The invariant is not: no confirmed consent, no access.
+- A club (or trainer) can invite an athlete, but the association becomes effective only when the athlete confirms.
+- `ClubMembership.status` has exactly four states:
+  - `PENDING_ATHLETE_CONFIRMATION` — invited, not yet confirmed. Grants no read or write access.
+  - `ACTIVE` — the athlete confirmed. The only state that grants trainer access.
+  - `COMPLETED` — the athlete is no longer in the club. Terminal.
+  - `REJECTED` — the athlete rejected the club's invitation. Terminal.
+- Allowed transitions: `PENDING_ATHLETE_CONFIRMATION → ACTIVE`, `PENDING_ATHLETE_CONFIRMATION → REJECTED`, `ACTIVE → COMPLETED`. No other transitions; terminal states are never reopened (a new invitation creates a new membership).
+- Only `ACTIVE` grants access. `PENDING_ATHLETE_CONFIRMATION`, `COMPLETED`, and `REJECTED` grant none, so trainer write access ends when a membership leaves `ACTIVE`.
+- A `PENDING_ATHLETE_CONFIRMATION` or `REJECTED` membership must not appear on the athlete's public profile or in club rosters visible to others.
 
 ### 6. Trainer-reported metric entries
 
 - "Trainer-reported" is the standard term for metric entries submitted by a trainer. Do not use "coach-submitted" or similar variants.
-- Writes are accepted only when the trainer's club has an `ACTIVE` `ClubMembership` with the athlete at write time.
+- Writes are accepted only when the trainer's club has an `ACTIVE` `ClubMembership` with the athlete at write time. A `COMPLETED` membership accepts no new entries.
 - Every entry records the reporting trainer. Entries are attributable and never anonymous.
 - `AthleteMetricSummary` is derived from entries. It is never written directly by a client.
 
@@ -53,7 +59,8 @@ The product no longer handles medical records or OCR. It now centers on club aff
 ## Required tests
 
 - RLS deny-tests for `Club`, `ClubMembership`, and `AthleteMetricEntry` across tenants, using two distinct users per `AGENTS.md`.
-- A test proving a trainer cannot write a metric entry for an athlete whose membership is `PENDING_ATHLETE_CONFIRMATION`.
+- A test proving a trainer cannot write a metric entry for an athlete whose membership is `PENDING_ATHLETE_CONFIRMATION`, `COMPLETED`, or `REJECTED`.
+- Tests proving each disallowed membership transition is rejected.
 - A test proving a trainer from club A cannot read or write for an athlete whose membership is with club B.
 - A test proving trainers cannot read `AthletePrivateProfile`.
 - A test proving list and detail endpoints return consistent results under identical visibility settings.
@@ -64,8 +71,12 @@ The product no longer handles medical records or OCR. It now centers on club aff
 - The trainer portal adds a new third-party actor; the access matrix and threat model must cover it.
 - Until the schema and policies exist, docs mark these entities PLANNED and code must not assume them.
 
+## Resolved items
+
+- **Trainer role model (2026-10-03):** a trainer is derived solely from `ClubTrainer` rows. No new `UserRole` value is added.
+- **Membership states (2026-10-03):** `COMPLETED` and `REJECTED` as defined in section 5.
+
 ## Open items
 
-- Whether a trainer is a new `UserRole` or is derived solely from `ClubTrainer`.
-- Final membership state names and transitions.
-- Whether athletes can remove an `ACTIVE` membership and how that affects previously reported entries.
+- Whether previously reported metric entries are retained, hidden, or otherwise changed when a membership becomes `COMPLETED`.
+- Who may initiate `ACTIVE → COMPLETED` (athlete, club, or both).
