@@ -8,7 +8,7 @@
  *
  * startQueueInfrastructure() is called once by buildServer() when
  * UPSTASH_REDIS_URL is configured. It creates the shared Redis connection,
- * the queue registry, and the four workers, and hands back a handle whose
+ * the queue registry, and the three workers, and hands back a handle whose
  * close() runs the graceful shutdown sequence.
  *
  * Shutdown ORDER MATTERS and is fixed here (and locked by a unit test):
@@ -20,13 +20,11 @@
  */
 import { closeRedis, createQueueRegistry, createRedisConnection } from '@packages/queue';
 import type { QueueRegistry, WorkerHandle } from '@packages/queue';
-import type { PrismaClient } from '@prisma/client';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Redis } from 'ioredis';
 
 import { createDeletePIIWorker } from '../jobs/deletePII.js';
 import { createOptimizeImageWorker } from '../jobs/optimizeImage.js';
-import { createProcessOCRWorker } from '../jobs/processOCR.js';
 import { createSendNotificationWorker } from '../jobs/sendNotification.js';
 
 export interface QueueInfrastructure {
@@ -60,15 +58,11 @@ export async function runShutdownSequence(
 export function startQueueInfrastructure(
   redisUrl: string,
   logger: FastifyBaseLogger,
-  // Injected (not imported from lib/prisma.js) so importing this module never
-  // triggers lib/prisma's import-time env validation in unit tests.
-  prisma: PrismaClient,
 ): QueueInfrastructure {
   const connection = createRedisConnection(redisUrl, logger);
   const registry = createQueueRegistry(connection);
 
   const workers: WorkerHandle[] = [
-    createProcessOCRWorker(connection, logger, prisma),
     createOptimizeImageWorker(connection, logger),
     createDeletePIIWorker(connection, logger),
     createSendNotificationWorker(connection, logger),

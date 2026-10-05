@@ -1,0 +1,40 @@
+---
+config:
+  theme: dark
+  layout: dagre
+---
+
+%% Fragment: auth. Canonical entities are complete; REFERENCE ONLY entities show just the fields touched by relationships.
+%% Composite: docs/erm.mmd
+
+erDiagram
+  USER_ACCOUNT {
+    string id PK
+    string supabase_user_id UK
+    string role
+    string status
+    datetime created_at
+    datetime updated_at
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in athlete-profile-core.mmd
+  ATHLETE {
+    string id PK
+    string user_account_id FK,UK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in compliance.mmd
+  AUDIT_EVENT {
+    string id PK
+    string actor_user_account_id FK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in compliance.mmd
+  DATA_LIFECYCLE_REQUEST {
+    string id PK
+    string requested_by FK
+  }
+
+  USER_ACCOUNT ||--|| ATHLETE : "owns"
+  USER_ACCOUNT ||--o{ AUDIT_EVENT : "logs_event"
+  USER_ACCOUNT ||--o{ DATA_LIFECYCLE_REQUEST : "submits_request"

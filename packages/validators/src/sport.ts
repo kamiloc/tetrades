@@ -31,6 +31,9 @@ export type CreateSportInput = z.infer<typeof createSportInput>;
 export const sportPublicOutput = sportSchema;
 export type SportPublicOutput = z.infer<typeof sportPublicOutput>;
 
+export const sportPublicListOutput = z.array(sportPublicOutput);
+export type SportPublicListOutput = z.infer<typeof sportPublicListOutput>;
+
 // ──────────────────────────────────────────────
 // QUERY INPUT SCHEMAS
 // ──────────────────────────────────────────────

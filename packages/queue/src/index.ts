@@ -1,7 +1,7 @@
 /**
  * @packages/queue — BullMQ queue infrastructure (Sprint 4).
  *
- * Exports (per the CLAUDE.md package contract): queue instances, typed job
+ * Exports (per the AGENTS.md package contract): queue instances, typed job
  * payloads, the shared ioredis connection factory, and the worker scaffold.
  * Job execution logic (processors) lives in apps/api/src/jobs/, never here.
  */
@@ -21,7 +21,6 @@ export {
   type BaseJobData,
   type ImageOptimizationJobData,
   type NotificationJobData,
-  type OcrProcessingJobData,
   type PiiDeletionJobData,
   type QueueJobData,
   type QueueLogger,

@@ -1,0 +1,25 @@
+---
+config:
+  theme: dark
+  layout: dagre
+---
+
+%% Fragment: connections. Canonical entities are complete; REFERENCE ONLY entities show just the fields touched by relationships.
+%% Composite: docs/erm.mmd
+
+erDiagram
+  ATHLETE_CONNECTION {
+    string id PK
+    string requester_id FK
+    string addressee_id FK
+    string status
+    datetime created_at
+    datetime responded_at
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in athlete-profile-core.mmd
+  ATHLETE {
+    string id PK
+  }
+
+  ATHLETE ||--o{ ATHLETE_CONNECTION : "initiates_or_receives"

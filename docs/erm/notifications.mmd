@@ -1,0 +1,26 @@
+---
+config:
+  theme: dark
+  layout: dagre
+---
+
+%% Fragment: notifications. Canonical entities are complete; REFERENCE ONLY entities show just the fields touched by relationships.
+%% Composite: docs/erm.mmd
+%% Rules: ADR-013 and openspec change add-clubs-metrics-visibility-model.
+
+erDiagram
+  DEVICE_TOKEN {
+    string id PK
+    string user_account_id FK
+    string token UK
+    string platform "IOS | ANDROID"
+    datetime created_at
+    datetime last_seen_at
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in auth.mmd
+  USER_ACCOUNT {
+    string id PK
+  }
+
+  USER_ACCOUNT ||--o{ DEVICE_TOKEN : "registers_device"

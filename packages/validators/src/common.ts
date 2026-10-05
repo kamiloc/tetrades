@@ -12,6 +12,14 @@ export const paginationInput = z.object({
 });
 export type PaginationInput = z.infer<typeof paginationInput>;
 
+// Cursor page envelope for list outputs. `nextCursor` is the id of the
+// last item when more rows may exist, otherwise null.
+export const paginatedOutput = <T extends z.ZodTypeAny>(item: T) =>
+  z.object({
+    items: z.array(item),
+    nextCursor: cuidSchema.nullable(),
+  });
+
 export const slugSchema = z
   .string()
   .min(3)

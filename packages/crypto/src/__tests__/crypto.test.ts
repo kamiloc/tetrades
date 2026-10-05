@@ -273,7 +273,7 @@ describe('payload structure', () => {
   });
 
   it('payload does not contain the plaintext anywhere', () => {
-    const plaintext = 'super-secret-medical-value-12345';
+    const plaintext = 'super-secret-private-value-12345';
     const encrypted = encryptPII(plaintext, TEST_MASTER_KEY);
     const payloadStr = Buffer.from(encrypted).toString('utf-8');
     expect(payloadStr).not.toContain(plaintext);

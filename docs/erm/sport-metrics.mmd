@@ -1,0 +1,68 @@
+---
+config:
+  theme: dark
+  layout: dagre
+---
+
+%% Fragment: sport-metrics. Canonical entities are complete; REFERENCE ONLY entities show just the fields touched by relationships.
+%% Composite: docs/erm.mmd
+%% Rules: ADR-013 and openspec change add-clubs-metrics-visibility-model.
+
+erDiagram
+  METRIC_DEFINITION {
+    string id PK
+    string key UK
+    string name
+    string unit
+    string sport_id FK
+    boolean is_active
+  }
+
+  ATHLETE_METRIC_ENTRY {
+    string id PK
+    string athlete_id FK
+    string metric_definition_id FK
+    string club_membership_id FK
+    string reported_by_club_trainer_id FK
+    decimal value
+    datetime measured_at
+    datetime created_at
+  }
+
+  ATHLETE_METRIC_SUMMARY {
+    string athlete_id PK,FK
+    string metric_definition_id PK,FK
+    decimal latest_value
+    datetime latest_measured_at
+    int entry_count
+    datetime updated_at
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in athlete-profile-core.mmd
+  ATHLETE {
+    string id PK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in athlete-profile-core.mmd
+  SPORT {
+    string id PK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in clubs.mmd
+  CLUB_TRAINER {
+    string id PK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in clubs.mmd
+  CLUB_MEMBERSHIP {
+    string id PK
+    string status
+  }
+
+  SPORT |o--o{ METRIC_DEFINITION : "scopes"
+  METRIC_DEFINITION ||--o{ ATHLETE_METRIC_ENTRY : "defines"
+  ATHLETE ||--o{ ATHLETE_METRIC_ENTRY : "has_entries"
+  CLUB_TRAINER ||--o{ ATHLETE_METRIC_ENTRY : "reports"
+  CLUB_MEMBERSHIP ||--o{ ATHLETE_METRIC_ENTRY : "authorizes"
+  METRIC_DEFINITION ||--o{ ATHLETE_METRIC_SUMMARY : "summarized_by"
+  ATHLETE ||--o{ ATHLETE_METRIC_SUMMARY : "has_summaries"

@@ -4,6 +4,7 @@ config:
   layout: dagre
 ---
 
+%% Full composite ERM. Built-capability fragments: docs/erm/<capability>.mmd
 
 erDiagram
   %% === Identity & Classification ===
@@ -45,6 +46,8 @@ erDiagram
     text public_bio
     string city
     string primary_position
+    int height_cm
+    float weight_kg
     int connection_count_cache
     string avatar_asset_id FK
     boolean is_searchable
@@ -102,42 +105,95 @@ erDiagram
   ATHLETE ||--o{ ATHLETE_ACHIEVEMENT : "earns"
   ATHLETE ||--o{ ATHLETE_CONNECTION : "initiates_or_receives"
 
-  %% === Medical & OCR ===
-  MEDICAL_DOCUMENT {
+  %% === Clubs, Metrics & Visibility (ADR-013) ===
+  CLUB {
     string id PK
-    string athlete_id FK
-    bytes document_type_enc
-    bytes object_path_enc
-    string mime_type
-    string sha256
-    string status
-    bytes verified_data_enc
-    string verified_by_user_account_id FK
-    datetime uploaded_at
-    datetime verified_at
+    string slug UK
+    string name
+    string country_code
+    string city
+    datetime created_at
   }
 
-  OCR_JOB {
+  CLUB_TRAINER {
     string id PK
-    string medical_document_id FK
-    string athlete_id FK
-    string model_name
-    string prompt_version
-    string status
-    bytes raw_output_enc
-    bytes parsed_data_enc
-    json confidence_map
-    boolean schema_valid
-    int retry_count
-    string request_id
-    datetime started_at
-    datetime finished_at
+    string club_id FK
+    string user_account_id FK
+    datetime created_at
   }
 
-  MEDICAL_DOCUMENT ||--o{ OCR_JOB : "processed_by"
-  MEDICAL_DOCUMENT ||--o| USER_ACCOUNT : "verified_by_user"
-  ATHLETE ||--o{ MEDICAL_DOCUMENT : "submits_doc"
-  ATHLETE ||--o{ OCR_JOB : "owns_ocr_job"
+  CLUB_MEMBERSHIP {
+    string id PK
+    string club_id FK
+    string athlete_id FK
+    string status "PENDING_ATHLETE_CONFIRMATION | ACTIVE | COMPLETED | REJECTED"
+    string invited_by_club_trainer_id FK
+    datetime created_at
+    datetime responded_at
+    datetime ended_at
+  }
+
+  METRIC_DEFINITION {
+    string id PK
+    string key UK
+    string name
+    string unit
+    string sport_id FK
+    boolean is_active
+  }
+
+  ATHLETE_METRIC_ENTRY {
+    string id PK
+    string athlete_id FK
+    string metric_definition_id FK
+    string club_membership_id FK
+    string reported_by_club_trainer_id FK
+    decimal value
+    datetime measured_at
+    datetime created_at
+  }
+
+  ATHLETE_METRIC_SUMMARY {
+    string athlete_id PK,FK
+    string metric_definition_id PK,FK
+    decimal latest_value
+    datetime latest_measured_at
+    int entry_count
+    datetime updated_at
+  }
+
+  ATHLETE_VISIBILITY_SETTINGS {
+    string athlete_id PK,FK
+    string club_memberships_audience "PRIVATE | CONNECTIONS | PUBLIC"
+    string metrics_audience "PRIVATE | CONNECTIONS | PUBLIC"
+    datetime updated_at
+  }
+
+  CLUB ||--o{ CLUB_TRAINER : "staffed_by"
+  USER_ACCOUNT ||--o{ CLUB_TRAINER : "acts_as_trainer"
+  CLUB ||--o{ CLUB_MEMBERSHIP : "has_members"
+  ATHLETE ||--o{ CLUB_MEMBERSHIP : "belongs_to"
+  CLUB_TRAINER ||--o{ CLUB_MEMBERSHIP : "invites"
+  SPORT |o--o{ METRIC_DEFINITION : "scopes"
+  METRIC_DEFINITION ||--o{ ATHLETE_METRIC_ENTRY : "defines"
+  ATHLETE ||--o{ ATHLETE_METRIC_ENTRY : "has_entries"
+  CLUB_TRAINER ||--o{ ATHLETE_METRIC_ENTRY : "reports"
+  CLUB_MEMBERSHIP ||--o{ ATHLETE_METRIC_ENTRY : "authorizes"
+  METRIC_DEFINITION ||--o{ ATHLETE_METRIC_SUMMARY : "summarized_by"
+  ATHLETE ||--o{ ATHLETE_METRIC_SUMMARY : "has_summaries"
+  ATHLETE ||--o| ATHLETE_VISIBILITY_SETTINGS : "controls_visibility"
+
+  %% === Notifications ===
+  DEVICE_TOKEN {
+    string id PK
+    string user_account_id FK
+    string token UK
+    string platform "IOS | ANDROID"
+    datetime created_at
+    datetime last_seen_at
+  }
+
+  USER_ACCOUNT ||--o{ DEVICE_TOKEN : "registers_device"
 
   %% === Compliance & Audit ===
   PII_CONSENT_LOG {
@@ -148,7 +204,7 @@ erDiagram
     boolean granted
     datetime granted_at
     datetime revoked_at
-    string evidence_ref 
+    string evidence_ref
   }
 
   AUDIT_EVENT {

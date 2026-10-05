@@ -1,0 +1,117 @@
+---
+config:
+  theme: dark
+  layout: dagre
+---
+
+%% Fragment: athlete-profile-core. Canonical entities are complete; REFERENCE ONLY entities show just the fields touched by relationships.
+%% Composite: docs/erm.mmd
+
+erDiagram
+  ATHLETE {
+    string id PK
+    string user_account_id FK,UK
+    string slug UK
+    string display_name
+    string sport_id FK
+    string country_code
+    string profile_status
+    boolean is_under_legal_hold
+    datetime created_at
+    datetime updated_at
+  }
+
+  SPORT {
+    string id PK
+    string name UK
+    string category
+    boolean is_active
+  }
+
+  ATHLETE_PUBLIC_PROFILE {
+    string athlete_id PK,FK
+    text public_bio
+    string city
+    string primary_position
+    int height_cm
+    float weight_kg
+    int connection_count_cache
+    string avatar_asset_id FK
+    boolean is_searchable
+    datetime updated_at
+  }
+
+  ATHLETE_PRIVATE_PROFILE {
+    string athlete_id PK,FK
+    bytes exact_dob_enc
+    bytes contact_email_enc
+    bytes contact_phone_enc
+    bytes gov_id_enc
+    string encryption_key_version
+    string onboarding_status
+    datetime updated_at
+  }
+
+  PROFILE_PHOTO_ASSET {
+    string id PK
+    string athlete_id FK
+    string variant
+    string object_path
+    int width
+    int height
+    string processing_status
+    datetime created_at
+  }
+
+  ATHLETE_ACHIEVEMENT {
+    string id PK
+    string athlete_id FK
+    string title
+    string organization
+    date achieved_on
+    string verification_status
+    string verification_source
+    datetime created_at
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in auth.mmd
+  USER_ACCOUNT {
+    string id PK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in connections.mmd
+  ATHLETE_CONNECTION {
+    string id PK
+    string requester_id FK
+    string addressee_id FK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in compliance.mmd
+  PII_CONSENT_LOG {
+    string id PK
+    string athlete_id FK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in compliance.mmd
+  AUDIT_EVENT {
+    string id PK
+    string athlete_id FK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in compliance.mmd
+  DATA_LIFECYCLE_REQUEST {
+    string id PK
+    string athlete_id FK
+  }
+
+  USER_ACCOUNT ||--|| ATHLETE : "owns"
+  SPORT ||--o{ ATHLETE : "classified_by"
+  ATHLETE ||--|| ATHLETE_PUBLIC_PROFILE : "has_public_profile"
+  ATHLETE ||--|| ATHLETE_PRIVATE_PROFILE : "has_private_profile"
+  ATHLETE ||--o{ PROFILE_PHOTO_ASSET : "uploads_photo"
+  ATHLETE_PUBLIC_PROFILE ||--o| PROFILE_PHOTO_ASSET : "avatar_photo"
+  ATHLETE ||--o{ ATHLETE_ACHIEVEMENT : "earns"
+  ATHLETE ||--o{ ATHLETE_CONNECTION : "initiates_or_receives"
+  ATHLETE ||--o{ PII_CONSENT_LOG : "grants"
+  ATHLETE ||--o{ AUDIT_EVENT : "subject_of"
+  ATHLETE ||--o{ DATA_LIFECYCLE_REQUEST : "data_subject"

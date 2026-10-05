@@ -1,7 +1,10 @@
 # ADR-009: Medical OCR State Machine and Verification Flow
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-013](013-pivot-clubs-metrics-trainer-portal-and-visibility.md)
+- **Superseded on:** 2026-10-03
 - **Date:** 2026-04-02
+
+> **Superseded.** The medical records and OCR domain was removed from the product. This ADR no longer applies and is retained as a historical record. The code, policies, and tests that implemented it have been removed.
 
 ## Decision
 

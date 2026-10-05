@@ -21,7 +21,7 @@
 --   - UPDATE: service_role only. Workflow transitions (IN_PROGRESS,
 --     COMPLETED, BLOCKED_LEGAL_HOLD, FAILED) happen in background jobs.
 --   - DELETE: omitted. Lifecycle requests are retained for the same 5-year
---     window as audit events (CLAUDE.md "Retention & Legal Hold").
+--     window as audit events (AGENTS.md "Retention & Legal Hold").
 -- ============================================
 
 ALTER TABLE public.data_lifecycle_requests ENABLE ROW LEVEL SECURITY;
@@ -74,4 +74,4 @@ CREATE POLICY "data_lifecycle_requests_insert_own"
 -- UPDATE: intentionally omitted. Status transitions are driven by background
 --         jobs running under service_role (export generation, deletePII,
 --         legal-hold checks).
--- DELETE: intentionally omitted. 5-year retention per CLAUDE.md.
+-- DELETE: intentionally omitted. 5-year retention per AGENTS.md.

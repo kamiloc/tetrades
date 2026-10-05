@@ -3,16 +3,23 @@ import {
   athletePrivateProfileOwnerOutput,
   athletePublicProfileListOutput,
   athletePublicProfileSchema,
+  bootstrapAthleteInput,
+  bootstrapAthleteOutput,
+  createDeletionRequestInput,
+  dataLifecycleRequestOwnerOutput,
   getAthleteProfileInput,
   getAthletePublicProfileInput,
+  myAthleteOutput,
+  onboardingStateOutput,
   searchAthletesInput,
   updateAthletePrivateProfileInput,
   updateAthletePublicProfileInput,
 } from '@packages/validators';
 import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
 
 import { getEnv } from '../env.js';
+import { requestDeletion } from '../services/dataLifecycle.js';
+import { requireViewerAthlete } from '../services/viewer.js';
 import { protectedProcedure, publicProcedure, router } from '../trpc.js';
 
 export const athleteRouter = router({
@@ -300,13 +307,7 @@ export const athleteRouter = router({
     }),
 
   getMyAthlete: protectedProcedure
-    .output(
-      z.object({
-        athleteId:   z.string(),
-        displayName: z.string().nullable(),
-        sport:       z.string().nullable(),
-      }),
-    )
+    .output(myAthleteOutput)
     .query(async ({ ctx }) => {
       const userAccount = await ctx.prisma.userAccount.findUnique({
         where: { supabaseUserId: ctx.userId },
@@ -347,13 +348,7 @@ export const athleteRouter = router({
    * layer needs a deterministic decision tree without try/catch.
    */
   getOnboardingState: protectedProcedure
-    .output(
-      z.object({
-        hasUserAccount: z.boolean(),
-        hasAthlete:     z.boolean(),
-        athleteId:      z.string().nullable(),
-      }),
-    )
+    .output(onboardingStateOutput)
     .query(async ({ ctx }) => {
       const userAccount = await ctx.prisma.userAccount.findUnique({
         where: { supabaseUserId: ctx.userId },
@@ -381,14 +376,8 @@ export const athleteRouter = router({
    * second call are ignored — use `updateProfile` to change them later.
    */
   bootstrap: protectedProcedure
-    .input(
-      z.object({
-        displayName: z.string().trim().min(2).max(100),
-        sportId:     z.string().min(1),
-        countryCode: z.string().length(2).toUpperCase(),
-      }),
-    )
-    .output(z.object({ athleteId: z.string() }))
+    .input(bootstrapAthleteInput)
+    .output(bootstrapAthleteOutput)
     .mutation(async ({ ctx, input }) => {
       // Upsert UserAccount as a defensive fallback when the auth.users →
       // user_accounts Postgres trigger has not been applied yet. With the
@@ -475,6 +464,20 @@ export const athleteRouter = router({
       });
 
       return { athleteId: created.id };
+    }),
+
+  // Habeas Data deletion (athlete-data-lifecycle spec). Context-addressed:
+  // there is no athleteId input, so only the caller's own data can be
+  // targeted. Persists the request, then enqueues pii-deletion.
+  requestDeletion: protectedProcedure
+    .input(createDeletionRequestInput)
+    .output(dataLifecycleRequestOwnerOutput)
+    .mutation(async ({ ctx }) => {
+      const viewer = await requireViewerAthlete(ctx.prisma, ctx.userId);
+      return requestDeletion(
+        { prisma: ctx.prisma, jobs: ctx.jobs, log: ctx.log },
+        { athleteId: viewer.athleteId, userAccountId: viewer.userAccountId, requestId: ctx.requestId },
+      );
     }),
 });
 

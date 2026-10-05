@@ -17,18 +17,6 @@ export const onboardingStatusEnum = z.enum([
 ]);
 export type OnboardingStatus = z.infer<typeof onboardingStatusEnum>;
 
-export const documentStatusEnum = z.enum([
-  'UPLOADED',
-  'PROCESSING',
-  'PENDING_REVIEW',
-  'VERIFIED',
-  'REJECTED',
-]);
-export type DocumentStatus = z.infer<typeof documentStatusEnum>;
-
-export const ocrJobStatusEnum = z.enum(['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED']);
-export type OcrJobStatus = z.infer<typeof ocrJobStatusEnum>;
-
 export const connectionStatusEnum = z.enum(['PENDING', 'ACCEPTED', 'DECLINED', 'BLOCKED']);
 export type ConnectionStatus = z.infer<typeof connectionStatusEnum>;
 
@@ -52,3 +40,19 @@ export const dataLifecycleStatusEnum = z.enum([
   'FAILED',
 ]);
 export type DataLifecycleStatus = z.infer<typeof dataLifecycleStatusEnum>;
+
+// ADR-013 §5 — only ACTIVE grants trainer access.
+export const clubMembershipStatusEnum = z.enum([
+  'PENDING_ATHLETE_CONFIRMATION',
+  'ACTIVE',
+  'COMPLETED',
+  'REJECTED',
+]);
+export type ClubMembershipStatus = z.infer<typeof clubMembershipStatusEnum>;
+
+// ADR-013 — a missing AthleteVisibilitySettings row resolves to PRIVATE.
+export const visibilityAudienceEnum = z.enum(['PRIVATE', 'CONNECTIONS', 'PUBLIC']);
+export type VisibilityAudience = z.infer<typeof visibilityAudienceEnum>;
+
+export const devicePlatformEnum = z.enum(['IOS', 'ANDROID']);
+export type DevicePlatform = z.infer<typeof devicePlatformEnum>;

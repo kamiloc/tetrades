@@ -3,6 +3,7 @@ import type { CreateFastifyContextOptions } from '@trpc/server/adapters/fastify'
 import type { FastifyBaseLogger } from 'fastify';
 
 import { getEnv } from './env.js';
+import { disabledJobEnqueuer, type JobEnqueuer } from './lib/jobs.js';
 import { prisma } from './lib/prisma.js';
 import { verifyAuthToken } from './middleware/auth.js';
 
@@ -22,6 +23,8 @@ export interface Context {
    * module-level logger, so correlation is automatic.
    */
   log: FastifyBaseLogger;
+  /** Background-job port; always enqueue AFTER persisting the triggering row. */
+  jobs: JobEnqueuer;
 }
 
 const env = getEnv();
@@ -33,7 +36,19 @@ const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
   },
 });
 
-export async function createContext({ req }: CreateFastifyContextOptions): Promise<Context> {
+/** buildServer() binds the job port; tests may inject their own. */
+export function createContextFactory(
+  jobs: JobEnqueuer,
+): (opts: CreateFastifyContextOptions) => Promise<Context> {
+  return async (opts) => ({ ...(await createBaseContext(opts)), jobs });
+}
+
+/** Context without background jobs (enqueue rejects). */
+export const createContext = createContextFactory(disabledJobEnqueuer);
+
+async function createBaseContext({
+  req,
+}: CreateFastifyContextOptions): Promise<Omit<Context, 'jobs'>> {
   // The rate-limit onRequest hook (middleware/rateLimit.ts) verifies the JWT
   // before routing; reuse its result to avoid a second Supabase call.
   const authResult =

@@ -1,0 +1,61 @@
+---
+config:
+  theme: dark
+  layout: dagre
+---
+
+%% Fragment: compliance. Canonical entities are complete; REFERENCE ONLY entities show just the fields touched by relationships.
+%% Composite: docs/erm.mmd
+
+erDiagram
+  PII_CONSENT_LOG {
+    string id PK
+    string athlete_id FK
+    string purpose_code
+    string consent_version
+    boolean granted
+    datetime granted_at
+    datetime revoked_at
+    string evidence_ref
+  }
+
+  AUDIT_EVENT {
+    string id PK
+    string actor_user_account_id FK
+    string athlete_id FK
+    string event_type
+    string target_type
+    string target_id
+    string purpose_code
+    string request_id
+    json metadata
+    datetime created_at
+  }
+
+  DATA_LIFECYCLE_REQUEST {
+    string id PK
+    string athlete_id FK
+    string requested_by FK
+    string request_type
+    string status
+    string artifact_path
+    datetime created_at
+    datetime expires_at
+    datetime completed_at
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in athlete-profile-core.mmd
+  ATHLETE {
+    string id PK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in auth.mmd
+  USER_ACCOUNT {
+    string id PK
+  }
+
+  ATHLETE ||--o{ PII_CONSENT_LOG : "grants"
+  USER_ACCOUNT ||--o{ AUDIT_EVENT : "logs_event"
+  ATHLETE ||--o{ AUDIT_EVENT : "subject_of"
+  USER_ACCOUNT ||--o{ DATA_LIFECYCLE_REQUEST : "submits_request"
+  ATHLETE ||--o{ DATA_LIFECYCLE_REQUEST : "data_subject"

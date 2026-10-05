@@ -73,6 +73,7 @@ describe.skipIf(!envReady)('user_accounts RLS', () => {
 
   it('blocks authenticated INSERT on user_accounts', async () => {
     const { error } = await user1.client.from('user_accounts').insert({
+      updated_at: new Date().toISOString(),
       id: randomUUID(),
       supabase_user_id: randomUUID(),
       role: 'ATHLETE',

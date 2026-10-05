@@ -149,12 +149,12 @@ describe('resolveRateLimit', () => {
 
   it('sensitive procedure → sensitive tier keyed by userId', () => {
     const decision = resolveRateLimit({
-      url: '/trpc/medical.uploadDocument',
+      url: '/trpc/storage.getUploadUrl',
       userId: 'user-1',
       role: 'ATHLETE',
       ip: '203.0.113.9',
       limits: LIMITS,
-      sensitiveProcedures: new Set(['medical.uploadDocument']),
+      sensitiveProcedures: new Set(['storage.getUploadUrl']),
     });
     expect(decision.tier).toBe('sensitive');
     expect(decision.max).toBe(5);
@@ -163,12 +163,12 @@ describe('resolveRateLimit', () => {
 
   it('a batch containing one sensitive procedure gets the sensitive tier', () => {
     const decision = resolveRateLimit({
-      url: '/trpc/athlete.getProfile,medical.uploadDocument?batch=1',
+      url: '/trpc/athlete.getProfile,storage.getUploadUrl?batch=1',
       userId: 'user-1',
       role: 'ATHLETE',
       ip: '203.0.113.9',
       limits: LIMITS,
-      sensitiveProcedures: new Set(['medical.uploadDocument']),
+      sensitiveProcedures: new Set(['storage.getUploadUrl']),
     });
     expect(decision.tier).toBe('sensitive');
     expect(decision.max).toBe(5);
@@ -176,30 +176,30 @@ describe('resolveRateLimit', () => {
 
   it('sensitive tier wins over admin tier (cost protection applies to everyone)', () => {
     const decision = resolveRateLimit({
-      url: '/trpc/medical.uploadDocument',
+      url: '/trpc/storage.getUploadUrl',
       userId: 'admin-1',
       role: 'SYSTEM',
       ip: '203.0.113.9',
       limits: LIMITS,
-      sensitiveProcedures: new Set(['medical.uploadDocument']),
+      sensitiveProcedures: new Set(['storage.getUploadUrl']),
     });
     expect(decision.tier).toBe('sensitive');
   });
 
   it('unauthenticated sensitive request falls back to IP-keyed sensitive bucket', () => {
     const decision = resolveRateLimit({
-      url: '/trpc/medical.uploadDocument',
+      url: '/trpc/storage.getUploadUrl',
       userId: null,
       role: null,
       ip: '203.0.113.9',
       limits: LIMITS,
-      sensitiveProcedures: new Set(['medical.uploadDocument']),
+      sensitiveProcedures: new Set(['storage.getUploadUrl']),
     });
     expect(decision.tier).toBe('sensitive');
     expect(decision.key).toBe('sensitive:ip:203.0.113.9');
   });
 
-  it('ships with an empty sensitive set until Sprint 4 wires OCR endpoints', () => {
+  it('ships with an empty sensitive set until upload endpoints are registered', () => {
     expect(SENSITIVE_PROCEDURES.size).toBe(0);
   });
 

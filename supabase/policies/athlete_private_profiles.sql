@@ -12,7 +12,7 @@
 -- Trust model:
 --   Only the owning athlete may SELECT / INSERT / UPDATE their own private
 --   profile. There is no shared-access role for L2 data in the application
---   layer — see CLAUDE.md "Break-Glass Access Policy" for the database-only
+--   layer — see AGENTS.md "Break-Glass Access Policy" for the database-only
 --   service_role bypass procedure.
 -- ============================================
 

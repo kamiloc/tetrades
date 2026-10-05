@@ -68,31 +68,31 @@ function validateAuditContext(ctx: AuditContext): void {
   if (!ctx.actorId.trim())
     throw new Error(
       'decryptPII requires a complete AuditContext. Missing or empty field: actorId. ' +
-        'Decryption without audit is forbidden per CLAUDE.md.',
+        'Decryption without audit is forbidden per AGENTS.md.',
     );
   if (!ctx.purpose.trim())
     throw new Error(
       'decryptPII requires a complete AuditContext. Missing or empty field: purpose. ' +
-        'Decryption without audit is forbidden per CLAUDE.md.',
+        'Decryption without audit is forbidden per AGENTS.md.',
     );
   if (!ctx.targetTable.trim())
     throw new Error(
       'decryptPII requires a complete AuditContext. Missing or empty field: targetTable. ' +
-        'Decryption without audit is forbidden per CLAUDE.md.',
+        'Decryption without audit is forbidden per AGENTS.md.',
     );
   if (!ctx.targetRecordId.trim())
     throw new Error(
       'decryptPII requires a complete AuditContext. Missing or empty field: targetRecordId. ' +
-        'Decryption without audit is forbidden per CLAUDE.md.',
+        'Decryption without audit is forbidden per AGENTS.md.',
     );
   if (!ctx.targetField.trim())
     throw new Error(
       'decryptPII requires a complete AuditContext. Missing or empty field: targetField. ' +
-        'Decryption without audit is forbidden per CLAUDE.md.',
+        'Decryption without audit is forbidden per AGENTS.md.',
     );
   if (!ctx.requestId.trim())
     throw new Error(
       'decryptPII requires a complete AuditContext. Missing or empty field: requestId. ' +
-        'Decryption without audit is forbidden per CLAUDE.md.',
+        'Decryption without audit is forbidden per AGENTS.md.',
     );
 }

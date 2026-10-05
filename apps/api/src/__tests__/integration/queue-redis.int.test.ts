@@ -9,9 +9,8 @@
  *   4. the connection factory connects and logs at info level
  *   5. graceful shutdown drains workers before Redis closes (logged sequence)
  *   6. rate-limit counters persist across server restarts (Redis keys)
- *   plus: an OCR job for a nonexistent document fails loudly and its
- *   failure log carries the payload requestId (worker-level plumbing; the
- *   OCR pipeline itself is covered by process-ocr.int.test.ts).
+ *   plus: a job on a stub worker fails loudly and its failure log carries
+ *   the payload requestId (worker-level plumbing).
  */
 import './helpers/load-env.js';
 
@@ -25,7 +24,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { startQueueInfrastructure } from '../../queue/lifecycle.js';
 import { makeRecordingLogger, type RecordedLog } from '../helpers/recording-logger.js';
 
-import { dbReady, prisma, startServer } from './helpers/setup.js';
+import { dbReady, startServer } from './helpers/setup.js';
 
 const REDIS_URL = process.env['UPSTASH_REDIS_URL'] ?? '';
 const redisReady = REDIS_URL.length > 0;
@@ -81,21 +80,25 @@ describe.skipIf(!redisReady)('redis connection factory (live)', () => {
 
 describe.skipIf(!redisReady || !dbReady)('queue infrastructure (live)', () => {
   it(
-    'OCR worker fails a job for a nonexistent document (requestId in logs), ' +
+    'a stub worker fails a job (requestId in logs), ' +
       'then shutdown drains workers before closing Redis',
     async () => {
       const lines: RecordedLog[] = [];
-      const infra = startQueueInfrastructure(REDIS_URL, makeRecordingLogger(lines), prisma);
-      const ocrQueue = infra.registry.queues[QUEUE_NAMES.OCR_PROCESSING];
+      const infra = startQueueInfrastructure(REDIS_URL, makeRecordingLogger(lines));
+      // image-optimization is the remaining stub worker (it always throws
+      // 'not implemented'); notifications and pii-deletion are real now.
+      const imageQueue = infra.registry.queues[QUEUE_NAMES.IMAGE_OPTIMIZATION];
 
       const requestId = randomUUID();
       // attempts: 1 overrides the default 3 so the test does not sit through
-      // the 2s/4s retry backoff; behavior per attempt is identical. The
-      // document id does not exist, so the real 4.2 processor fails before
-      // touching any state.
-      await ocrQueue.add(
-        'process',
-        { documentId: 'doc_int_test', athleteId: 'ath_int_test', requestId },
+      // the 2s/4s retry backoff; behavior per attempt is identical.
+      await imageQueue.add(
+        'optimize',
+        {
+          athleteId: 'ath_int_test',
+          originalPath: 'ath_int_test/original.jpg',
+          requestId,
+        },
         { attempts: 1 },
       );
 
@@ -116,13 +119,11 @@ describe.skipIf(!redisReady || !dbReady)('queue infrastructure (live)', () => {
         (line) => line.obj['event'] === 'job_failed' && line.obj['requestId'] === requestId,
       );
       expect(failed?.level).toBe('error');
-      expect(failed?.obj['queue']).toBe(QUEUE_NAMES.OCR_PROCESSING);
-      expect((failed?.obj['error'] as { message: string }).message).toBe(
-        'medical document not found',
-      );
+      expect(failed?.obj['queue']).toBe(QUEUE_NAMES.IMAGE_OPTIMIZATION);
+      expect((failed?.obj['error'] as { message: string }).message).toBe('not implemented');
 
       // Leave no failed jobs behind on the shared broker.
-      await ocrQueue.obliterate({ force: true });
+      await imageQueue.obliterate({ force: true });
 
       await infra.close();
 

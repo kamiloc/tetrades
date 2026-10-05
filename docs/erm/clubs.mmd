@@ -1,0 +1,53 @@
+---
+config:
+  theme: dark
+  layout: dagre
+---
+
+%% Fragment: clubs. Canonical entities are complete; REFERENCE ONLY entities show just the fields touched by relationships.
+%% Composite: docs/erm.mmd
+%% Rules: ADR-013 and openspec change add-clubs-metrics-visibility-model.
+
+erDiagram
+  CLUB {
+    string id PK
+    string slug UK
+    string name
+    string country_code
+    string city
+    datetime created_at
+  }
+
+  CLUB_TRAINER {
+    string id PK
+    string club_id FK
+    string user_account_id FK
+    datetime created_at
+  }
+
+  CLUB_MEMBERSHIP {
+    string id PK
+    string club_id FK
+    string athlete_id FK
+    string status "PENDING_ATHLETE_CONFIRMATION | ACTIVE | COMPLETED | REJECTED"
+    string invited_by_club_trainer_id FK
+    datetime created_at
+    datetime responded_at
+    datetime ended_at
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in athlete-profile-core.mmd
+  ATHLETE {
+    string id PK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in auth.mmd
+  USER_ACCOUNT {
+    string id PK
+  }
+
+  CLUB ||--o{ CLUB_TRAINER : "staffed_by"
+  USER_ACCOUNT ||--o{ CLUB_TRAINER : "acts_as_trainer"
+  CLUB ||--o{ CLUB_MEMBERSHIP : "has_members"
+  ATHLETE ||--o{ CLUB_MEMBERSHIP : "belongs_to"
+  CLUB_TRAINER ||--o{ CLUB_MEMBERSHIP : "invites"

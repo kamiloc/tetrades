@@ -91,6 +91,7 @@ describe.skipIf(!envReady)('athletes RLS', () => {
 
   it('blocks authenticated INSERT on athletes (no policy)', async () => {
     const { error } = await user1.client.from('athletes').insert({
+      updated_at: new Date().toISOString(),
       id: '00000000-0000-0000-0000-000000000001',
       user_account_id: user1.userAccountId,
       slug: 'injected-athlete',

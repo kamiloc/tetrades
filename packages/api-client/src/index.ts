@@ -29,4 +29,23 @@ export {
   useConnections,
 } from './hooks/connection';
 
+export {
+  useInviteAthleteToClub,
+  useRespondToClubInvitation,
+  useLeaveClub,
+  useMyClubMemberships,
+  useClubRoster,
+} from './hooks/club';
+
+export {
+  useMetricDefinitions,
+  useReportMetricEntry,
+  useMetricEntries,
+  useMetricSummaries,
+} from './hooks/metric';
+
+export { useMyVisibilitySettings, useUpdateVisibilitySettings } from './hooks/visibility';
+
+export { useRegisterDeviceToken, useRemoveDeviceToken } from './hooks/notification';
+
 export { useQueryClient } from '@tanstack/react-query';
