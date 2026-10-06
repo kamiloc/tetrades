@@ -7,9 +7,10 @@
  *   (no DELETE policy — deletePII as service_role)
  *
  * Tested criteria:
- *   (a) a missing row returns nothing (API resolves it to PRIVATE)
+ *   (a) a missing row returns nothing (API resolves it to the category defaults)
  *   (b) owner can INSERT their own settings
- *   (c) owner can SELECT their own settings
+ *   (c) owner can SELECT their own settings; omitted columns take their
+ *       defaults (club memberships PRIVATE, achievements PUBLIC)
  *   (d) a different athlete cannot SELECT them (cross-tenant)
  *   (e) a trainer of the athlete's ACTIVE club cannot SELECT them
  *   (f) a different athlete cannot INSERT settings for the owner
@@ -69,7 +70,7 @@ describe.skipIf(!envReady)('athlete_visibility_settings RLS', () => {
   const read = (user: TestUser) =>
     user.client
       .from('athlete_visibility_settings')
-      .select('metrics_audience, club_memberships_audience')
+      .select('metrics_audience, club_memberships_audience, achievements_audience')
       .eq('athlete_id', owner.athleteId);
 
   it('(a) returns nothing when the owner has no settings row', async () => {
@@ -87,10 +88,16 @@ describe.skipIf(!envReady)('athlete_visibility_settings RLS', () => {
     expect(error).toBeNull();
   });
 
-  it('(c) allows the owner to SELECT their settings, with PRIVATE default', async () => {
+  it('(c) allows the owner to SELECT their settings, with column defaults', async () => {
     const { data, error } = await read(owner);
     expect(error).toBeNull();
-    expect(data).toEqual([{ metrics_audience: 'CONNECTIONS', club_memberships_audience: 'PRIVATE' }]);
+    expect(data).toEqual([
+      {
+        metrics_audience: 'CONNECTIONS',
+        club_memberships_audience: 'PRIVATE',
+        achievements_audience: 'PUBLIC',
+      },
+    ]);
   });
 
   it('(d) denies a different athlete', async () => {

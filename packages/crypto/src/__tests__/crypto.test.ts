@@ -53,10 +53,10 @@ describe('round-trip', () => {
 
   it('encrypts and decrypts a JSON string with deep equality', () => {
     const data = {
-      hemoglobin: 14.5,
-      diagnosis: 'anemia leve',
-      date: '2025-01-15',
-      doctor: 'Dr. García',
+      governmentIdType: 'CC',
+      governmentIdNumber: '1020456789',
+      dateOfBirth: '2004-03-17',
+      contactPhone: '+57 310 555 0142',
       nested: { values: [1, 2, 3] },
     };
     const plaintext = JSON.stringify(data);
@@ -66,7 +66,7 @@ describe('round-trip', () => {
   });
 
   it('encrypts and decrypts Colombian Spanish unicode text', () => {
-    const plaintext = 'Médico: Dr. Ñoño — diagnóstico: déficit de hierro, ü, â, ê';
+    const plaintext = 'Dirección: Calle 10 # 5-23, Peñalisa — Antioquia, ü, â, ê';
     const encrypted = encryptPII(plaintext, TEST_MASTER_KEY);
     const decrypted = decryptPII(encrypted, TEST_MASTER_KEY, testAuditCtx);
     expect(decrypted).toBe(plaintext);

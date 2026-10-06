@@ -1,6 +1,6 @@
 # PII Access Matrix
 
-Trainer and club rows follow [ADR-013](adr/013-pivot-clubs-metrics-trainer-portal-and-visibility.md). They are enforced in the API services (`membership`, `metrics`, `visibility`) and, as defense in depth, in RLS (`supabase/policies/`).
+Trainer and club rows follow [ADR-013](adr/013-pivot-clubs-metrics-trainer-portal-and-visibility.md); achievement visibility follows [ADR-014](adr/014-achievement-visibility-default.md). They are enforced in the API services (`membership`, `metrics`, `visibility`) and, as defense in depth, in RLS (`supabase/policies/`).
 
 ## Roles
 
@@ -30,6 +30,22 @@ Trainer and club rows follow [ADR-013](adr/013-pivot-clubs-metrics-trainer-porta
 - Support Admin: allow
 - API Server: allow
 - Job Worker: usually not needed
+
+### Athlete achievements (L0)
+
+Audience-controlled by `achievementsAudience`, which defaults to `PUBLIC` when unset (ADR-014). Non-owners only ever see `VERIFIED` achievements, and only public fields (`id`, `title`, `organization`, `achievedOn`, `verificationStatus`).
+
+| Actor / state                                         | Read                                  | Write |
+| ----------------------------------------------------- | ------------------------------------- | ----- |
+| Athlete (own)                                         | allow, every verification status      | allow own (verification status is server-controlled) |
+| Other athlete with an `ACCEPTED` connection           | `VERIFIED` only, if audience is `CONNECTIONS` or `PUBLIC` | deny |
+| Other athlete without a connection                    | `VERIFIED` only, if audience is `PUBLIC` | deny |
+| Public Visitor (anonymous)                            | `VERIFIED` only, if audience is `PUBLIC` | deny |
+| Trainer (any membership state)                        | same as any other athlete or visitor; no club-based access | deny |
+| API Server                                            | through `achievement.listAchievements` with the visibility filter; `verifyAchievement` is SYSTEM-only | — |
+| Job Worker (`deletePII`)                              | —                                     | delete |
+
+RLS SELECT on `athlete_achievements` is owner-only; audience filtering is enforced in the API visibility service.
 
 ### Private athlete profile (`AthletePrivateProfile`, L2)
 

@@ -22,4 +22,5 @@ This directory contains accepted architecture decisions derived from the active 
 - ADR-010 Background Jobs, Storage, and Image Processing
 - ADR-011 Web/Mobile Runtime Decisions
 - ADR-012 Testing, Logging, and Agent Session Protocol
-- ADR-013 Pivot: Clubs, Sport Metrics, Trainer Portal, and Visibility Controls
+- ADR-013 Pivot: Clubs, Sport Metrics, Trainer Portal, and Visibility Controls — §7 default **partially superseded by ADR-014** (achievements only)
+- ADR-014 Achievement Visibility and Its PUBLIC Default

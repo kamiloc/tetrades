@@ -199,13 +199,36 @@ describe('visibility inputs', () => {
     expect(updateAthleteVisibilityInput.safeParse({ metricsAudience: 'FRIENDS' }).success).toBe(false);
   });
 
+  it('accepts an achievements-only update', () => {
+    expect(updateAthleteVisibilityInput.safeParse({ achievementsAudience: 'PRIVATE' }).success).toBe(
+      true,
+    );
+  });
+
+  it('rejects an unknown achievements audience', () => {
+    expect(
+      updateAthleteVisibilityInput.safeParse({ achievementsAudience: 'FRIENDS' }).success,
+    ).toBe(false);
+  });
+
   it('owner output allows null updatedAt for defaults', () => {
+    expect(
+      athleteVisibilitySettingsOwnerOutput.safeParse({
+        clubMembershipsAudience: 'PRIVATE',
+        metricsAudience: 'PRIVATE',
+        achievementsAudience: 'PUBLIC',
+        updatedAt: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('owner output requires the achievements audience', () => {
     expect(
       athleteVisibilitySettingsOwnerOutput.safeParse({
         clubMembershipsAudience: 'PRIVATE',
         metricsAudience: 'PRIVATE',
         updatedAt: null,
       }).success,
-    ).toBe(true);
+    ).toBe(false);
   });
 });

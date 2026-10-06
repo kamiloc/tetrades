@@ -4,35 +4,47 @@
 -- Tested in:    tests/rls/athlete_achievements.test.ts
 --
 -- Data classification:
---   All fields are L0-PUBLIC. However per task 2.3 decision the SELECT
---   surface is intentionally narrower than the classification would allow:
---   authenticated-only (no anon). Public profile pages source achievements
---   via the tRPC server-side caller (service_role bypasses RLS), so anon
---   access is not required here.
+--   All fields are L0-PUBLIC except created_at (L1-INTERNAL).
 --
--- Trust model:
---   - SELECT: any authenticated user can read any athlete's achievements
---             (enables the in-app social feed / verification view).
+-- Trust model (athlete-visibility spec, ADR-014):
+--   - SELECT: only the owning athlete. Other audiences (connections,
+--             strangers, anonymous visitors) are served by the API, which
+--             applies the athlete's achievements audience (default PUBLIC)
+--             and returns only VERIFIED rows in the public shape. RLS grants
+--             only the owner, like club_memberships and athlete_metric_entries,
+--             so no other party can read this table directly.
 --   - INSERT / UPDATE / DELETE: only the owning athlete.
 -- ============================================
 
 ALTER TABLE public.athlete_achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.athlete_achievements FORCE ROW LEVEL SECURITY;
 
+-- Replaced by athlete_achievements_select_own (add-achievement-visibility).
+DROP POLICY IF EXISTS "athlete_achievements_select_authenticated" ON public.athlete_achievements;
+
 -- ────────────────────────────────────────────────────────────────────────────
--- Policy:      athlete_achievements_select_authenticated
+-- Policy:      athlete_achievements_select_own
 -- Command:     SELECT
 -- Role:        authenticated
--- Purpose:     Any signed-in user can browse achievements across the network.
--- NULL safety: No nullable predicate. The policy is unconditionally TRUE for
---              authenticated callers.
+-- Purpose:     The athlete can read their own achievements in every
+--              verification status. Nobody else reads this table directly.
+-- NULL safety: athlete_id is NOT NULL; a NULL auth.uid() (anon) matches no
+--              user_accounts row, so the EXISTS is false and nothing is visible.
 -- Composition: ONLY SELECT policy on this table.
 -- ────────────────────────────────────────────────────────────────────────────
-CREATE POLICY "athlete_achievements_select_authenticated"
+CREATE POLICY "athlete_achievements_select_own"
   ON public.athlete_achievements
   FOR SELECT
   TO authenticated
-  USING (TRUE);
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.athletes a
+      JOIN public.user_accounts ua ON ua.id = a.user_account_id
+      WHERE a.id = athlete_achievements.athlete_id
+        AND ua.supabase_user_id = auth.uid()::text
+    )
+  );
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- Policy:      athlete_achievements_insert_own

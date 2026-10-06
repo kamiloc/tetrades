@@ -1,6 +1,6 @@
 /**
  * Visibility service — pure rule (design D5, athlete-visibility spec).
- * Every audience × relation, plus the missing-settings (PRIVATE) default.
+ * Every audience × relation, plus the per-category missing-settings default.
  * The Prisma `where` form is exercised against the DB in
  * integration/metrics-service.int.test.ts.
  */
@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AUDIENCE_RELATIONS,
+  CATEGORY_DEFAULT_AUDIENCE,
   audienceFor,
   canView,
   metricEntryVisibilityWhere,
@@ -20,7 +21,7 @@ import {
 
 const AUDIENCES: VisibilityAudience[] = ['PRIVATE', 'CONNECTIONS', 'PUBLIC'];
 const RELATIONS: AudienceRelation[] = ['OWNER', 'CONNECTION', 'STRANGER'];
-const CATEGORIES: VisibilityCategory[] = ['clubMemberships', 'metrics'];
+const CATEGORIES: VisibilityCategory[] = ['clubMemberships', 'metrics', 'achievements'];
 
 const EXPECTED: Record<VisibilityAudience, Record<AudienceRelation, boolean>> = {
   PRIVATE: { OWNER: true, CONNECTION: false, STRANGER: false },
@@ -28,12 +29,21 @@ const EXPECTED: Record<VisibilityAudience, Record<AudienceRelation, boolean>> = 
   PUBLIC: { OWNER: true, CONNECTION: true, STRANGER: true },
 };
 
+const FIELD: Record<VisibilityCategory, keyof AudienceSettings> = {
+  clubMemberships: 'clubMembershipsAudience',
+  metrics: 'metricsAudience',
+  achievements: 'achievementsAudience',
+};
+
 function settingsWith(category: VisibilityCategory, audience: VisibilityAudience): AudienceSettings {
-  // The other category is set to the opposite extreme to prove categories are independent.
+  // The other categories are set to the opposite extreme to prove categories are independent.
   const other: VisibilityAudience = audience === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC';
-  return category === 'metrics'
-    ? { metricsAudience: audience, clubMembershipsAudience: other }
-    : { clubMembershipsAudience: audience, metricsAudience: other };
+  return {
+    clubMembershipsAudience: other,
+    metricsAudience: other,
+    achievementsAudience: other,
+    [FIELD[category]]: audience,
+  };
 }
 
 describe('canView', () => {
@@ -48,13 +58,22 @@ describe('canView', () => {
     }
   }
 
-  describe('missing settings row resolves to PRIVATE', () => {
+  describe('missing settings row resolves to the category default', () => {
+    it('defaults are PRIVATE for club memberships and metrics, PUBLIC for achievements', () => {
+      expect(CATEGORY_DEFAULT_AUDIENCE).toStrictEqual({
+        clubMemberships: 'PRIVATE',
+        metrics: 'PRIVATE',
+        achievements: 'PUBLIC',
+      });
+    });
+
     for (const category of CATEGORIES) {
-      it(category, () => {
-        expect(audienceFor(category, null)).toBe('PRIVATE');
-        expect(canView(category, 'OWNER', null)).toBe(true);
-        expect(canView(category, 'CONNECTION', null)).toBe(false);
-        expect(canView(category, 'STRANGER', null)).toBe(false);
+      const audience = CATEGORY_DEFAULT_AUDIENCE[category];
+      it(`${category} → ${audience}`, () => {
+        expect(audienceFor(category, null)).toBe(audience);
+        for (const relation of RELATIONS) {
+          expect(canView(category, relation, null)).toBe(EXPECTED[audience][relation]);
+        }
       });
     }
   });
@@ -72,6 +91,23 @@ describe('where builders', () => {
     expect(where.OR).toHaveLength(1);
     expect(JSON.stringify(where)).toContain('"PUBLIC"');
     expect(JSON.stringify(where)).not.toContain('"PRIVATE"');
+  });
+
+  it('attach a missing settings row to the category default branch', () => {
+    // Anonymous viewers get only the PUBLIC branch, so a missing row matches
+    // there for achievements (default PUBLIC) and nowhere for metrics.
+    expect(JSON.stringify(visibleAthleteWhere('achievements', null))).toContain(
+      '{"visibilitySettings":{"is":null}}',
+    );
+    expect(JSON.stringify(visibleAthleteWhere('metrics', null))).not.toContain(
+      '{"visibilitySettings":{"is":null}}',
+    );
+  });
+
+  it('filter achievements on their own column', () => {
+    const where = JSON.stringify(visibleAthleteWhere('achievements', null));
+    expect(where).toContain('"achievementsAudience":"PUBLIC"');
+    expect(where).not.toContain('metricsAudience');
   });
 
   it('give an athlete viewer a branch for every audience, including missing settings', () => {

@@ -10,6 +10,12 @@ import './helpers/load-env.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  canView,
+  loadAudienceSettings,
+  type AudienceRelation,
+} from '../../services/visibility.js';
+
+import {
   addClubTrainer,
   apiClient,
   authReady,
@@ -405,20 +411,86 @@ describe.skipIf(!authReady)('club, metric, and visibility routers', () => {
     });
   });
 
+  describe('achievement reads: audience rule parity', () => {
+    let friend: AuthedUser;
+
+    beforeAll(async () => {
+      friend = await createAuthedUser({ sportId, label: 'cmv-friend' });
+      await prisma.athleteConnection.create({
+        data: { requesterId: athleteIdOf(athlete), addresseeId: athleteIdOf(friend), status: 'ACCEPTED' },
+      });
+      await prisma.athleteAchievement.create({
+        data: {
+          athleteId: athleteIdOf(athlete),
+          title: 'Subcampeona Mundial Juvenil de Patinaje',
+          organization: 'World Skate',
+          achievedOn: new Date('2024-09-14'),
+          verificationStatus: 'VERIFIED',
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await cleanupAuthedUser(friend);
+    });
+
+    it('listAchievements returns achievements exactly when canView admits the caller', async () => {
+      const callers: [AuthedUser | undefined, AudienceRelation][] = [
+        [athlete, 'OWNER'],
+        [friend, 'CONNECTION'],
+        [stranger, 'STRANGER'],
+        [trainerA, 'STRANGER'],
+        [undefined, 'STRANGER'],
+      ];
+      for (const audience of ['PRIVATE', 'CONNECTIONS', 'PUBLIC'] as const) {
+        await as(athlete).visibility.update.mutate({ achievementsAudience: audience });
+        const settings = await loadAudienceSettings(prisma, athleteIdOf(athlete));
+        for (const [caller, relation] of callers) {
+          const seen = await as(caller).achievement.listAchievements.query({
+            athleteId: athleteIdOf(athlete),
+          });
+          expect(seen.length > 0, `${audience} / ${relation} / ${caller?.email ?? 'anon'}`).toBe(
+            canView('achievements', relation, settings),
+          );
+        }
+      }
+    });
+  });
+
   // ── visibility ────────────────────────────────────────────────────────────
 
   describe('visibility', () => {
-    it('returns PRIVATE defaults when no row exists, then the stored settings', async () => {
+    it('returns category defaults when no row exists, then the stored settings', async () => {
       await prisma.athleteVisibilitySettings.deleteMany({ where: { athleteId: athleteIdOf(stranger) } });
       expect(await as(stranger).visibility.get.query()).toEqual({
         clubMembershipsAudience: 'PRIVATE',
         metricsAudience: 'PRIVATE',
+        achievementsAudience: 'PUBLIC',
         updatedAt: null,
       });
       const updated = await as(stranger).visibility.update.mutate({ metricsAudience: 'CONNECTIONS' });
       expect(updated.metricsAudience).toBe('CONNECTIONS');
       expect(updated.clubMembershipsAudience).toBe('PRIVATE');
+      expect(updated.achievementsAudience).toBe('PUBLIC');
       expect((await as(stranger).visibility.get.query()).metricsAudience).toBe('CONNECTIONS');
+    });
+
+    it('updates achievements visibility without touching the other categories', async () => {
+      await prisma.athleteVisibilitySettings.deleteMany({ where: { athleteId: athleteIdOf(stranger) } });
+      const updated = await as(stranger).visibility.update.mutate({ achievementsAudience: 'PRIVATE' });
+      expect(updated).toMatchObject({
+        clubMembershipsAudience: 'PRIVATE',
+        metricsAudience: 'PRIVATE',
+        achievementsAudience: 'PRIVATE',
+      });
+      expect((await as(stranger).visibility.get.query()).achievementsAudience).toBe('PRIVATE');
+    });
+
+    it("never changes another athlete's achievements setting", async () => {
+      await as(athlete).visibility.update.mutate({ achievementsAudience: 'CONNECTIONS' });
+      const injected = { achievementsAudience: 'PRIVATE' as const, athleteId: athleteIdOf(athlete) };
+      await as(stranger).visibility.update.mutate(injected);
+      expect((await as(athlete).visibility.get.query()).achievementsAudience).toBe('CONNECTIONS');
     });
 
     it("never touches another athlete's settings (owner-only by construction)", async () => {

@@ -53,6 +53,13 @@ export const athleteAchievementPublicOutput = z.object({
 });
 export type AthleteAchievementPublicOutput = z.infer<typeof athleteAchievementPublicOutput>;
 
+// listAchievements returns this shape to every caller, the owner included:
+// no L1 fields and no internal ids, so it is safe for anonymous reads.
+export const athleteAchievementPublicListOutput = z.array(athleteAchievementPublicOutput);
+export type AthleteAchievementPublicListOutput = z.infer<
+  typeof athleteAchievementPublicListOutput
+>;
+
 export const athleteAchievementOwnerOutput = athleteAchievementSchema;
 export type AthleteAchievementOwnerOutput = z.infer<typeof athleteAchievementOwnerOutput>;
 

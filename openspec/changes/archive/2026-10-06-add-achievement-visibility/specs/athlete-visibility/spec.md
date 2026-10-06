@@ -1,10 +1,11 @@
-# athlete-visibility Specification
+# Spec Delta
 
-## Purpose
+## RENAMED Requirements
 
-Gives each athlete control over which audience may see their club memberships and sport metrics, and guarantees the control is applied uniformly across every read path.
+- FROM: `### Requirement: Absence of settings means most restrictive`
+- TO: `### Requirement: Absence of settings means the category default`
 
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Athlete owns visibility settings
 The system SHALL let an athlete read and change only their own visibility settings, with audiences `PRIVATE`, `CONNECTIONS`, and `PUBLIC` for club memberships, for metrics, and for achievements.
@@ -55,16 +56,7 @@ The system SHALL apply the same visibility filter to every procedure that return
 - **WHEN** any caller (anonymous, stranger, connection, or owner) reads an athlete's achievements under each of the three audiences
 - **THEN** every procedure returning achievement data returns achievements exactly when the audience admits that caller, and returns the same achievements
 
-### Requirement: Owner and active-club access are not widened or narrowed by settings
-The system SHALL always return an athlete's own data to the athlete, and SHALL return an athlete's club-scoped metric entries to trainers of a club with an `ACTIVE` membership regardless of audience settings.
-
-#### Scenario: Athlete reads own private data
-- **WHEN** an athlete with `PRIVATE` metrics reads their own metrics
-- **THEN** all their entries and summaries are returned
-
-#### Scenario: Active trainer reads club entries
-- **WHEN** a trainer of an athlete's `ACTIVE` club reads that club's entries for the athlete
-- **THEN** the entries are returned even if visibility is `PRIVATE`
+## ADDED Requirements
 
 ### Requirement: Achievement reads are filtered by audience
 The system SHALL return an athlete's achievements to someone other than the athlete only when the athlete's achievements audience admits that caller. `PUBLIC` admits everyone, including anonymous callers. `CONNECTIONS` admits callers with an `ACCEPTED` connection. `PRIVATE` admits no one else. Trainers get no extra access through club membership.

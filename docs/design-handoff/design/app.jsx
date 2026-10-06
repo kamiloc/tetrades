@@ -13,7 +13,6 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 const HEADER_BY_TAB = {
   profile:     { title: 'Profile',     subtitle: 'Your athlete identity' },
   connections: { title: 'Connections', subtitle: '247 athletes · 3 pending' },
-  documents:   { title: 'Documents',   subtitle: 'Verified medical records' },
   search:      { title: 'Discover',    subtitle: 'Find athletes & teams' },
 };
 
@@ -31,7 +30,6 @@ function App() {
     switch (active) {
       case 'profile':     return <ProfileScreen />;
       case 'connections': return <ConnectionsScreen />;
-      case 'documents':   return <DocumentsScreen />;
       case 'search':      return <SearchScreen />;
       default:            return null;
     }
@@ -109,7 +107,6 @@ function App() {
             app/(tabs)/_layout.tsx<br/>
             ├── profile.tsx<br/>
             ├── connections.tsx<br/>
-            ├── documents.tsx<br/>
             └── search.tsx
           </div>
         </TweakSection>

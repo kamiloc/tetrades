@@ -10,6 +10,7 @@ import type { CreateAchievementInput } from '@packages/validators';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 import {
+  addClubTrainer,
   apiClient,
   authReady,
   cleanupAuthedUser,
@@ -17,7 +18,10 @@ import {
   cleanupFixtureAthletes,
   createAuthedUser,
   createFixtureAthlete,
+  createTestClub,
+  createTestMembership,
   createTestSport,
+  cleanupTestClub,
   dbReady,
   deleteTestSport,
   expectTRPCCode,
@@ -151,25 +155,57 @@ describe.skipIf(!authReady)('achievement correctness', () => {
     expect(inDb.verificationStatus).toBe('PENDING');
   });
 
+  // athlete-visibility spec: achievements are filtered by the athlete's
+  // achievements audience; non-owners only ever see VERIFIED rows.
   describe('listAchievements visibility', () => {
+    let friend: AuthedUser;
+    let trainer: AuthedUser;
+    let clubId: string;
     let verifiedId: string;
     let pendingId: string;
 
-    beforeAll(async () => {
+    const UNKNOWN_ID = 'cunknownid000000000000000';
+    const ownerAthleteId = (): string => {
       if (owner.athleteId === null) throw new Error('fixture invariant');
+      return owner.athleteId;
+    };
+    const read = (user?: AuthedUser) =>
+      apiClient(server.url, user?.accessToken).achievement.listAchievements.query({
+        athleteId: ownerAthleteId(),
+      });
+    const idsSeenBy = async (user?: AuthedUser) => (await read(user)).map((a) => a.id);
+    const setAudience = (achievementsAudience: 'PRIVATE' | 'CONNECTIONS' | 'PUBLIC') =>
+      apiClient(server.url, owner.accessToken).visibility.update.mutate({ achievementsAudience });
+
+    beforeAll(async () => {
+      [friend, trainer] = await Promise.all([
+        createAuthedUser({ sportId, label: 'achfriend' }),
+        createAuthedUser({ sportId, label: 'achtrainer', withAthlete: false }),
+      ]);
+      if (friend.athleteId === null) throw new Error('fixture invariant');
+      await prisma.athleteConnection.create({
+        data: { requesterId: ownerAthleteId(), addresseeId: friend.athleteId, status: 'ACCEPTED' },
+      });
+      clubId = await createTestClub('achclub');
+      const clubTrainerId = await addClubTrainer(clubId, trainer.userAccountId);
+      await createTestMembership({
+        clubId, athleteId: ownerAthleteId(), clubTrainerId, status: 'ACTIVE',
+      });
+
       const verified = await prisma.athleteAchievement.create({
         data: {
-          athleteId: owner.athleteId,
+          athleteId: ownerAthleteId(),
           title: 'Medalla de Oro Juegos Panamericanos',
           organization: 'Panam Sports',
           achievedOn: new Date('2023-10-25'),
           verificationStatus: 'VERIFIED',
+          verificationSource: 'Acta oficial Panam Sports 2023',
         },
         select: { id: true },
       });
       const pending = await prisma.athleteAchievement.create({
         data: {
-          athleteId: owner.athleteId,
+          athleteId: ownerAthleteId(),
           title: 'Récord departamental 100m',
           organization: 'Liga de Atletismo del Valle',
           achievedOn: new Date('2024-03-09'),
@@ -181,27 +217,67 @@ describe.skipIf(!authReady)('achievement correctness', () => {
       pendingId = pending.id;
     });
 
-    it('returns only VERIFIED achievements to a non-owner', async () => {
-      if (owner.athleteId === null) throw new Error('fixture invariant');
-      const seen = await apiClient(server.url, visitor.accessToken)
-        .achievement.listAchievements.query({ athleteId: owner.athleteId });
-
-      const ids = seen.map((achievement) => achievement.id);
-      expect(ids).toContain(verifiedId);
-      expect(ids).not.toContain(pendingId);
-      expect(seen.every((achievement) => achievement.verificationStatus === 'VERIFIED')).toBe(
-        true,
-      );
+    afterAll(async () => {
+      await prisma.clubMembership.deleteMany({ where: { athleteId: ownerAthleteId() } });
+      await cleanupTestClub(clubId);
+      await cleanupAuthedUser(friend);
+      await cleanupAuthedUser(trainer);
     });
 
-    it('returns all achievements to the owner', async () => {
-      if (owner.athleteId === null) throw new Error('fixture invariant');
-      const seen = await apiClient(server.url, owner.accessToken)
-        .achievement.listAchievements.query({ athleteId: owner.athleteId });
-
-      const ids = seen.map((achievement) => achievement.id);
+    it('returns every status to the owner, even under PRIVATE', async () => {
+      await setAudience('PRIVATE');
+      const ids = await idsSeenBy(owner);
       expect(ids).toContain(verifiedId);
       expect(ids).toContain(pendingId);
+    });
+
+    it('PRIVATE hides achievements from connections, strangers, and anonymous callers', async () => {
+      await setAudience('PRIVATE');
+      expect(await read(friend)).toEqual([]);
+      expect(await read(visitor)).toEqual([]);
+      expect(await read()).toEqual([]);
+    });
+
+    it('CONNECTIONS admits an ACCEPTED connection only', async () => {
+      await setAudience('CONNECTIONS');
+      expect(await idsSeenBy(friend)).toEqual([verifiedId]);
+      expect(await read(visitor)).toEqual([]);
+      expect(await read()).toEqual([]);
+    });
+
+    it('PUBLIC admits everyone, including anonymous callers, but never PENDING rows', async () => {
+      await setAudience('PUBLIC');
+      for (const caller of [friend, visitor, undefined]) {
+        expect(await idsSeenBy(caller)).toEqual([verifiedId]);
+      }
+    });
+
+    it('a missing settings row defaults to PUBLIC', async () => {
+      await prisma.athleteVisibilitySettings.deleteMany({ where: { athleteId: ownerAthleteId() } });
+      expect(await idsSeenBy(visitor)).toEqual([verifiedId]);
+      expect(await idsSeenBy()).toEqual([verifiedId]);
+    });
+
+    it('an ACTIVE-club trainer gets no extra access under PRIVATE', async () => {
+      await setAudience('PRIVATE');
+      expect(await read(trainer)).toEqual([]);
+    });
+
+    it('returns only public fields', async () => {
+      await setAudience('PUBLIC');
+      for (const caller of [owner, undefined]) {
+        for (const achievement of await read(caller)) {
+          expect(Object.keys(achievement).sort()).toEqual(
+            ['achievedOn', 'id', 'organization', 'title', 'verificationStatus'],
+          );
+        }
+      }
+    });
+
+    it('rejects invalid input and is NOT_FOUND for an unknown athlete', async () => {
+      const anon = apiClient(server.url).achievement.listAchievements;
+      await expectTRPCCode(anon.query({ athleteId: 'not-a-cuid' }), 'BAD_REQUEST');
+      await expectTRPCCode(anon.query({ athleteId: UNKNOWN_ID }), 'NOT_FOUND');
     });
   });
 });

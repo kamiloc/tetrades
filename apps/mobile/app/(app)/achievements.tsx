@@ -1,5 +1,5 @@
 import { trpc, useAddAchievement, useMyAthlete, useQueryClient } from '@packages/api-client';
-import type { AthleteAchievement, VerificationStatus } from '@packages/validators';
+import type { AthleteAchievementPublicOutput, VerificationStatus } from '@packages/validators';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -76,7 +76,7 @@ const badgeConfig: Record<VerificationStatus, BadgeConfig> = {
   },
 };
 
-function AchievementCard({ achievement }: { achievement: AthleteAchievement }) {
+function AchievementCard({ achievement }: { achievement: AthleteAchievementPublicOutput }) {
   const badge = badgeConfig[achievement.verificationStatus];
   const formattedDate = achievement.achievedOn.toLocaleDateString('es-CO', {
     year: 'numeric',
@@ -268,7 +268,7 @@ export default function AchievementsScreen() {
       </ScrollView>
 
       {/* Achievements list */}
-      <FlatList<AthleteAchievement>
+      <FlatList<AthleteAchievementPublicOutput>
         data={filteredAchievements}
         keyExtractor={item => item.id}
         contentContainerClassName="px-4 pb-32"

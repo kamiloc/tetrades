@@ -36,11 +36,11 @@
 //        signin → "Welcome back,\nathlete."
 //        create → "Build your verified\nathletic identity."
 //    - body (14.5, white 62%, line 1.5, max-width 300):
-//        signin → "Sign in to your verified records, network, and document vault."
-//        create → "Cryptographically signed physicals, clearances, and stats —
-//                  owned by you, shareable with coaches and teams."
+//        signin → "Sign in to your verified record, network, and club stats."
+//        create → "Verified achievements, club history, and trainer-reported
+//                  stats — owned by you, shared on your terms."
 //    - 3 value-prop rows (gap 12):
-//        shield · "Records signed by team medical staff"
+//        shield · "Stats reported by your club's trainers"
 //        users  · "A trusted network of athletes & coaches"
 //        lock   · "End-to-end secure · athlete-owned"
 //      Each row: 28×28 tile (radius 8, bg white-6%, border white-10%) +
