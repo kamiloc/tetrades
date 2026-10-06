@@ -449,7 +449,7 @@ describe.skipIf(!authReady)('club, metric, and visibility routers', () => {
           const seen = await as(caller).achievement.listAchievements.query({
             athleteId: athleteIdOf(athlete),
           });
-          expect(seen.length > 0, `${audience} / ${relation} / ${caller?.email ?? 'anon'}`).toBe(
+          expect(seen.items.length > 0, `${audience} / ${relation} / ${caller?.email ?? 'anon'}`).toBe(
             canView('achievements', relation, settings),
           );
         }

@@ -8,10 +8,16 @@
  * (visibleAthleteWhere), so any future list of achievements reuses it.
  *
  * Every caller gets the public shape: no L1 fields, no internal ids.
+ * The procedure is public, so reads are always cursor-paginated (take ≤ 50).
  */
-import type { AthleteAchievementPublicListOutput } from '@packages/validators';
+import type {
+  AthleteAchievementPublicListOutput,
+  ListAchievementsInput,
+} from '@packages/validators';
 import type { PrismaClient } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
+
+import { cursorArgs, toPage } from '../lib/pagination.js';
 
 import type { Viewer } from './viewer.js';
 import { visibleAthleteWhere } from './visibility.js';
@@ -24,12 +30,13 @@ const publicAchievementSelect = {
   verificationStatus: true,
 } as const;
 
-/** Achievements `viewer` may see; empty when the audience does not admit them. */
+/** A page of achievements `viewer` may see; empty when the audience does not admit them. */
 export async function listAchievements(
   prisma: PrismaClient,
   viewer: Viewer | null,
-  athleteId: string,
+  input: ListAchievementsInput,
 ): Promise<AthleteAchievementPublicListOutput> {
+  const { athleteId } = input;
   const athlete = await prisma.athlete.findUnique({
     where: { id: athleteId },
     select: { id: true },
@@ -39,7 +46,7 @@ export async function listAchievements(
   }
 
   const isOwner = viewer?.athleteId === athleteId;
-  return prisma.athleteAchievement.findMany({
+  const rows = await prisma.athleteAchievement.findMany({
     where: isOwner
       ? { athleteId }
       : {
@@ -48,6 +55,8 @@ export async function listAchievements(
           athlete: visibleAthleteWhere('achievements', viewer),
         },
     orderBy: [{ achievedOn: 'desc' }, { id: 'desc' }],
+    ...cursorArgs(input),
     select: publicAchievementSelect,
   });
+  return toPage(rows, input.take, (a) => a.id);
 }

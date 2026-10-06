@@ -110,20 +110,23 @@ function AchievementCard({ achievement }: { achievement: AthleteAchievementPubli
   );
 }
 
+const ACHIEVEMENTS_PAGE_SIZE = 20;
+
 export default function AchievementsScreen() {
   const queryClient = useQueryClient();
 
   const myAthleteQuery = useMyAthlete();
   const athleteId = myAthleteQuery.data?.athleteId ?? null;
 
-  const achievementsQuery = trpc.achievement.listAchievements.useQuery(
-    { athleteId: athleteId ?? '' },
-    { enabled: !!athleteId },
+  // Paginated: the next page loads as the list nears its end (onEndReached).
+  const achievementsQuery = trpc.achievement.listAchievements.useInfiniteQuery(
+    { athleteId: athleteId ?? '', take: ACHIEVEMENTS_PAGE_SIZE },
+    { enabled: !!athleteId, getNextPageParam: page => page.nextCursor ?? undefined },
   );
 
   const addAchievement = useAddAchievement();
 
-  const achievements = achievementsQuery.data ?? [];
+  const achievements = achievementsQuery.data?.pages.flatMap(page => page.items) ?? [];
 
   const [activeFilter, setActiveFilter] = useState<Filter>('ALL');
 
@@ -275,7 +278,13 @@ export default function AchievementsScreen() {
         onRefresh={() => {
           void achievementsQuery.refetch();
         }}
-        refreshing={achievementsQuery.isFetching}
+        refreshing={achievementsQuery.isRefetching && !achievementsQuery.isFetchingNextPage}
+        onEndReachedThreshold={0.5}
+        onEndReached={() => {
+          if (achievementsQuery.hasNextPage && !achievementsQuery.isFetchingNextPage) {
+            void achievementsQuery.fetchNextPage();
+          }
+        }}
         ListEmptyComponent={
           <EmptyState filter={activeFilter} isLoading={achievementsQuery.isLoading} />
         }

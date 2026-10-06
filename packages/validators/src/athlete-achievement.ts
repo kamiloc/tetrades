@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { cuidSchema, datetimeSchema } from './common.js';
+import { cuidSchema, datetimeSchema, paginatedOutput, paginationInput } from './common.js';
 import { verificationStatusEnum } from './enums.js';
 
 // ──────────────────────────────────────────────
@@ -55,7 +55,8 @@ export type AthleteAchievementPublicOutput = z.infer<typeof athleteAchievementPu
 
 // listAchievements returns this shape to every caller, the owner included:
 // no L1 fields and no internal ids, so it is safe for anonymous reads.
-export const athleteAchievementPublicListOutput = z.array(athleteAchievementPublicOutput);
+// Cursor-paginated (AGENTS.md Performance rules) because the procedure is public.
+export const athleteAchievementPublicListOutput = paginatedOutput(athleteAchievementPublicOutput);
 export type AthleteAchievementPublicListOutput = z.infer<
   typeof athleteAchievementPublicListOutput
 >;
@@ -66,7 +67,7 @@ export type AthleteAchievementOwnerOutput = z.infer<typeof athleteAchievementOwn
 export const athleteAchievementListOutput = z.array(athleteAchievementSchema);
 export type AthleteAchievementListOutput = z.infer<typeof athleteAchievementListOutput>;
 
-export const listAchievementsInput = z.object({
+export const listAchievementsInput = paginationInput.extend({
   athleteId: cuidSchema,
 });
 export type ListAchievementsInput = z.infer<typeof listAchievementsInput>;

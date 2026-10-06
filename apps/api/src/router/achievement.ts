@@ -57,7 +57,7 @@ export const achievementRouter = router({
     .input(listAchievementsInput)
     .output(athleteAchievementPublicListOutput)
     .query(async ({ ctx, input }) =>
-      listAchievements(ctx.prisma, await resolveViewer(ctx.prisma, ctx.userId), input.athleteId),
+      listAchievements(ctx.prisma, await resolveViewer(ctx.prisma, ctx.userId), input),
     ),
 
   verifyAchievement: protectedProcedure

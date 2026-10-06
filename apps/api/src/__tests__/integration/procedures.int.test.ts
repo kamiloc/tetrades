@@ -169,10 +169,12 @@ describe.skipIf(!authReady)('achievement correctness', () => {
       if (owner.athleteId === null) throw new Error('fixture invariant');
       return owner.athleteId;
     };
-    const read = (user?: AuthedUser) =>
+    const page = (user?: AuthedUser, args: { take?: number; cursor?: string } = {}) =>
       apiClient(server.url, user?.accessToken).achievement.listAchievements.query({
         athleteId: ownerAthleteId(),
+        ...args,
       });
+    const read = async (user?: AuthedUser) => (await page(user)).items;
     const idsSeenBy = async (user?: AuthedUser) => (await read(user)).map((a) => a.id);
     const setAudience = (achievementsAudience: 'PRIVATE' | 'CONNECTIONS' | 'PUBLIC') =>
       apiClient(server.url, owner.accessToken).visibility.update.mutate({ achievementsAudience });
@@ -274,9 +276,54 @@ describe.skipIf(!authReady)('achievement correctness', () => {
       }
     });
 
+    it('paginates with a cursor, without repeats, for owner and public callers', async () => {
+      await setAudience('PUBLIC');
+      const extra = await Promise.all(
+        Array.from({ length: 3 }, (_, i) =>
+          prisma.athleteAchievement.create({
+            data: {
+              athleteId: ownerAthleteId(),
+              title: `Copa Departamental ${i}`,
+              organization: 'Liga de Atletismo del Valle',
+              achievedOn: new Date('2024-01-15'),
+              verificationStatus: 'VERIFIED',
+            },
+            select: { id: true },
+          }),
+        ),
+      );
+      try {
+        for (const caller of [owner, undefined]) {
+          const seen: string[] = [];
+          let cursor: string | undefined;
+          for (;;) {
+            const result = await page(caller, { take: 2, ...(cursor === undefined ? {} : { cursor }) });
+            expect(result.items.length).toBeLessThanOrEqual(2);
+            seen.push(...result.items.map((a) => a.id));
+            if (result.nextCursor === null) break;
+            cursor = result.nextCursor;
+          }
+          // Owner pages through every row; the public caller through VERIFIED rows only.
+          const expected = await prisma.athleteAchievement.findMany({
+            where: {
+              athleteId: ownerAthleteId(),
+              ...(caller === owner ? {} : { verificationStatus: 'VERIFIED' as const }),
+            },
+            select: { id: true },
+          });
+          expect(new Set(seen).size).toBe(seen.length);
+          expect([...seen].sort()).toEqual(expected.map((a) => a.id).sort());
+          expect(seen).toEqual(expect.arrayContaining(extra.map((a) => a.id)));
+        }
+      } finally {
+        await prisma.athleteAchievement.deleteMany({ where: { id: { in: extra.map((a) => a.id) } } });
+      }
+    });
+
     it('rejects invalid input and is NOT_FOUND for an unknown athlete', async () => {
       const anon = apiClient(server.url).achievement.listAchievements;
       await expectTRPCCode(anon.query({ athleteId: 'not-a-cuid' }), 'BAD_REQUEST');
+      await expectTRPCCode(anon.query({ athleteId: ownerAthleteId(), take: 51 }), 'BAD_REQUEST');
       await expectTRPCCode(anon.query({ athleteId: UNKNOWN_ID }), 'NOT_FOUND');
     });
   });

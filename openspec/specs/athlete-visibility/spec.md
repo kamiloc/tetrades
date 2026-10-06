@@ -106,3 +106,22 @@ The system SHALL return, for each achievement, only its identifier, title, organ
 #### Scenario: Anonymous caller receives no internal fields
 - **WHEN** an anonymous caller reads a `PUBLIC` athlete's achievements
 - **THEN** each returned achievement contains no creation timestamp, verification source, or athlete identifier
+
+### Requirement: Achievement reads are paginated
+The system SHALL return an athlete's achievements in pages, most recent first, to every caller including the owner and anonymous callers. A page holds 20 achievements by default and at most 50. Each page carries a cursor for the next page, or none when no more achievements remain. Pages are filtered by the same audience and verification rules as an unpaginated read.
+
+#### Scenario: Default page size
+- **WHEN** a caller reads achievements without a page size for an athlete with more than 20 visible achievements
+- **THEN** 20 achievements are returned along with a cursor for the next page
+
+#### Scenario: Following the cursor
+- **WHEN** a caller requests successive pages using each returned cursor until none is returned
+- **THEN** every visible achievement is returned exactly once, and no hidden achievement appears on any page
+
+#### Scenario: Page size above the maximum
+- **WHEN** a caller requests a page of more than 50 achievements
+- **THEN** the request is rejected as invalid input
+
+#### Scenario: Last page
+- **WHEN** a caller reads the page that contains the last visible achievement
+- **THEN** no next-page cursor is returned
