@@ -81,3 +81,45 @@ The product no longer handles medical records or OCR. It now centers on club aff
 ## Open items
 
 None.
+
+Refactor design_handoff/ to match the latest prototype at the project root. Use the existing handoff as the base: keep its structure, tone, README format, stack constraints and token approach. Change only what the new design requires.
+
+Source of truth (root): index.html, app.jsx, screens.jsx, screens-2.jsx, states.jsx, ios-frame.jsx, tweaks-panel.jsx. Ignore web/.
+
+## 1. Navigation changes
+- Tabs are now: Profile (user) · Connections (users, badge 3) · Performance (activity) · Clubs (flag, badge 2). See TABS in screens.jsx and HEADER_BY_TAB in app.jsx.
+- Delete app/(tabs)/documents.tsx and search.tsx. Remove the lock-dot decorator.
+- Add app/(tabs)/performance.tsx and clubs.tsx stubs in the same style as the existing stubs (detailed header comment: layout, exact copy, data, tokens).
+- Update _layout.tsx with the new order, icons and badges. Badges come from useConnections().pendingCount and useClubs().requestCount. Omit a badge when its count is 0 or when the tab is in an empty or error state (TabBar hideBadges in screens.jsx).
+
+## 2. New screens (screens-2.jsx)
+- Performance: header "Performance" / "Season 2026 · Midfielder". Contains PF_KPI cards, SpeedChart (PF_SPEED × PF_MONTHS, react-native-svg, no chart lib), PF_BENCH percentile bars, PF_TESTS rows with verified/pending chips, and MSegmented.
+- Clubs & trainers: header "Clubs & trainers" / "3 clubs · 2 trainer requests". Contains CL_REQ trainer requests with permission chips, the CL_HIST club timeline (current club flagged), and the CL_STAFF access list.
+Write full README specs (§3 Performance, §4 Clubs & trainers) at the same detail level as Profile.
+
+## 3. Empty + error states (states.jsx) — NEW
+Every tab supports three data states: loaded | empty | error (the prototype's "Data state" tweak).
+- Tokens (add to tokens/colors.ts): danger #C23B3B, dangerTint #FDECEC, dangerLine #F6D4D4, dash #CBD3DF.
+- Shared components (add to "Components to build"):
+  - StatePanel: hero card. tone blue|danger, 52×52 icon tile with radius 16, optional eyebrow, title 18/700, body 13.5 muted (max-width 280), primary / ghost "Try again" (refresh icon) / secondary text button, optional monospace error code. Blue tone uses the #F7FAFF→#FFF gradient with a blueLine border; danger tone uses a white background with a dangerLine border.
+  - EmptyRow: inline empty row inside a section card. 34×34 dashed tile, icon, 13px muted text.
+  - OfflineBanner: dangerTint banner with a wifi-off icon, message and a "Retry" link.
+- Per-tab states (copy every string verbatim from states.jsx):
+  - Profile: empty = dashed avatar, "—" stats, "Build your passport" panel, empty Achievements row. Error = "Couldn't load your profile" + Try again / Sign out.
+  - Connections: empty = "No connections yet" + Find athletes / Invite teammates, empty Pending row. Error = offline banner + dimmed cached network + "Couldn't load requests" panel (partial failure).
+  - Performance: empty = dashed "—" KPI grid + "No performance data yet" + Log a session / Invite a trainer. Error = "Couldn't load performance data".
+  - Clubs: empty = "Add your club history" + empty Trainer requests and Staff rows. Error = "You're offline" (wifi-off icon).
+  - Header subtitles change per state (TAB_STATES[tab].sub).
+- Icons map to Feather: alert → alert-circle, refresh → refresh-cw, wifi-off → wifi-off.
+- In each tab stub, branch on the hook result: isLoading → skeleton, error → <Tab>Error, empty data → <Tab>Empty, otherwise loaded. Add a README section "## Data states" that covers the rule, the components and a per-tab table (empty trigger, error type, CTAs and actions).
+
+## 4. Bundle
+- design/: replace it with the current root prototype files (including screens-2.jsx and states.jsx) and keep the script load order from index.html.
+- tokens/: add every new value used in screens-2.jsx and states.jsx (chart line/grid/fill, percentile track, segmented bg #E9EDF3 radius 10, danger set, dash). Don't duplicate existing tokens.
+- README:
+  - Remove the Documents/Search specs, the Notify-me behavior and the stale "Auth gate (shared)" section.
+  - Update the Tab order, File map, Files-in-bundle tree, Interactions, State hooks (add usePerformance(), useClubs(), each returning { data, isLoading, error, refetch }), Accessibility (error panels announce via accessibilityLiveRegion="polite"; Try again ≥44pt) and Definition of done (each tab renders all 3 states).
+  - Out of scope: Documents and Search become future work, plus backend wiring for trainer accept/decline.
+  - Add "## Changelog" at the top, dated 2026-10-07, summarizing the changes above.
+
+Constraints: RN + Expo Router, TS strict, StyleSheet only, no new deps, Feather icons only. Take every value from source and don't invent anything. `tsc --noEmit` must pass. Finish by listing any prototype detail you couldn't map to a token or spec.
