@@ -2,7 +2,7 @@
 
 > **Sprint 3 deliverable.** Bottom-tab navigation shell for the Athlete
 > Passport iOS app. Profile tab is fully designed; Connections/Search are
-> populated; Documents is an intentional locked placeholder for Sprint 4.
+> populated. (The former Documents tab was removed by the ADR-013 pivot.)
 
 ---
 
@@ -53,7 +53,6 @@ apps/mobile/
 │       ├── _layout.tsx        ← bottom tab bar config (provided)
 │       ├── profile.tsx        ← stub (provided)
 │       ├── connections.tsx    ← stub (provided)
-│       ├── documents.tsx      ← stub, locked state (provided)
 │       └── search.tsx         ← stub (provided)
 └── tokens/
     ├── colors.ts              ← provided
@@ -109,7 +108,7 @@ Roboto (Android). Use the named presets in `text.*`:
 | `headerLargeTitle` |   26 |  700   | Header `<h1>` on every screen                    |
 | `headerSubtitle`   |   13 |  400   | Header subline (`Your athlete identity`, etc.)   |
 | `headerBrand`      |   11 |  600   | `THE ATHLETE PASSPORT` wordmark (tracked, upper) |
-| `cardTitle`        |   19 |  700   | "Marcus Chen", "Verified medical records"        |
+| `cardTitle`        |   19 |  700   | "Marcus Chen"                                    |
 | `rowTitle`         |   14 |  600   | List row titles                                  |
 | `body`             |   15 |  400   | Bio paragraph, descriptive copy                  |
 | `meta`             |   12 |  400   | Row meta, captions                               |
@@ -206,10 +205,10 @@ The per-tab AuthGate from earlier drafts is **removed** — unauthenticated user
      - **signin** → `"Welcome back,\nathlete."`
      - **create** → `"Build your verified\nathletic identity."`
    - Body (`text.body`, white 62%, max-width 300):
-     - **signin** → "Sign in to your verified records, network, and document vault."
-     - **create** → "Cryptographically signed physicals, clearances, and stats — owned by you, shareable with coaches and teams."
+     - **signin** → "Sign in to your verified record, network, and club stats."
+     - **create** → "Verified achievements, club history, and trainer-reported stats — owned by you, shared on your terms."
    - **Value props** — 3 rows, gap 12. Each row: 28×28 tile (radius 8, white-6% bg, white-10% border) + Feather icon size 15 (white-78%) + 13.5 px label (white-78%):
-     - `shield` · "Records signed by team medical staff"
+     - `shield` · "Stats reported by your club's trainers"
      - `users`  · "A trusted network of athletes & coaches"
      - `lock`   · "End-to-end secure · athlete-owned"
 
@@ -244,8 +243,7 @@ The prototype shows neutral monogram placeholders so the design ships without tr
 |---|-----------------------|---------------|----------------|---------------|
 | 1 | `(tabs)/profile`      | Profile       | `user`         | —             |
 | 2 | `(tabs)/connections`  | Connections   | `users`        | Badge `3`     |
-| 3 | `(tabs)/documents`    | Documents     | `file-text`    | Lock dot      |
-| 4 | `(tabs)/search`       | Search        | `search`       | —             |
+| 3 | `(tabs)/search`       | Search        | `search`       | —             |
 
 **Initial active tab:** Profile (Expo Router defaults to the first child of the `(tabs)` group; keep `profile.tsx` first).
 
@@ -331,33 +329,7 @@ The prototype shows neutral monogram placeholders so the design ships without tr
 
 ---
 
-### 3. Documents — locked / Sprint 4 placeholder
-
-**Purpose:** placeholder until Sprint 4 ships medical-record verification.
-
-1. Header: title **"Documents"**, subtitle **"Verified medical records"**
-2. **Lock hero card** (padding `24/lg/0`):
-   - Card, padding `22/18`, center-aligned text, gradient bg `#F7FAFF → #FFFFFF`, border `blueLine`
-   - 56×56 ink-colored square (`radius.xl`, `colors.ink`, `shadow.ink`) centered, with white Feather `lock` size 26
-   - Eyebrow (marginTop 14, blue, uppercase): **"SPRINT 4 · COMING SOON"**
-   - Title (`text.cardTitle`): **"Verified medical records"**
-   - Body (`text.meta` 13.5, `muted`, max-width 280, line-height 1.5):
-     > "Securely upload physicals, ECGs, and clearance forms. Cryptographically signed by your team's medical staff."
-   - Primary CTA **"Notify me when ready"** — blue pill, `#FFF` text, padding `10/20`, `13/600`, `shadow.cta`
-3. **Preview · locked** section:
-   - Card with 4 rows at `opacity: 0.7`:
-     - Left: 38×44 doc placeholder — repeating diagonal stripe `#EEF1F6 / #F6F8FB` at 135°, 6px stripes, 1px `line` border, lock icon centered (Feather `lock` 14px, `subtle`)
-     - Center: title + meta (greyed)
-     - Right: Feather `lock` 16px, `subtle`
-   - Rows: **Annual Physical Examination** · **ECG · Cardiac Screening** · **Concussion Baseline (ImPACT)** · **Orthopedic Clearance**
-4. Footer note (marginTop 10, padding 0 6, 11.5px, `subtle`, line-height 1.5):
-   > "Document uploads, signing, and sharing will arrive in Sprint 4. Today this tab is a placeholder."
-
-**Notify-me CTA behavior:** POST `/api/notify-me` with `feature: 'documents'`, show a toast on success.
-
----
-
-### 4. Search
+### 3. Search
 
 **Purpose:** discover other athletes by name or sport.
 
@@ -420,7 +392,6 @@ Build these in `apps/mobile/components/`:
 - **Tab switching:** standard Expo Router. No cross-tab state; each screen owns its own data hooks.
 - **Pending-request badge:** the `3` is sourced from `useConnections().pendingCount`. When it hits 0, omit the `badge` prop on `<Tabs.Screen name="connections">`.
 - **Active tint:** label and icon swap to `colors.blue`; label weight goes from 500 → 700 (`text.tabLabel` → `text.tabLabelActive`).
-- **Documents `Notify me`:** POST to `/api/notify-me`, show toast `"We'll email you when Sprint 4 ships."`, optimistically disable the button.
 - **Search input:** debounce 200 ms before firing a query.
 - **Auth gate:** if `useSession()` returns no session, return `<AuthGate tabLabel={...} />` early from each tab. Sign-in button starts the OAuth flow (out of scope this sprint — link to `app/(auth)/sign-in.tsx`).
 - **Safe areas:** wrap each screen in `SafeAreaView` from `react-native-safe-area-context` (Expo bundled) with `edges={['top']}` — the dark header should extend behind the status bar but content must respect the notch. The tab bar bottom inset is handled by Expo Router automatically on iOS via the `paddingBottom: 20` we pass.
@@ -438,7 +409,7 @@ useConnections()   // { connections, pending, pendingCount, accept, reject, mess
 useSearchAthletes(q: string)
 ```
 
-All four screens should render skeleton states while `isLoading` and an empty state if `data?.length === 0`. The Documents tab is a hard-coded placeholder — no fetch.
+All three screens should render skeleton states while `isLoading` and an empty state if `data?.length === 0`.
 
 ---
 
@@ -474,7 +445,6 @@ design_handoff_athlete_passport_tabs/
 │       ├── _layout.tsx             ← tab bar wiring (Feather icons)
 │       ├── profile.tsx             ← stub
 │       ├── connections.tsx         ← stub
-│       ├── documents.tsx           ← stub (locked state)
 │       └── search.tsx              ← stub
 └── design/
     ├── index.html                  ← interactive prototype (open in browser)
@@ -496,7 +466,6 @@ login-mode copy (sign-in ↔ create), and preview alternate accents.
 - Real OAuth wiring (Apple / Google SDKs) — flag with product before adding deps
 - Profile **edit** mode
 - Connection request actions wired to the backend
-- Document upload / signing (Sprint 4)
 - Search results screen (`app/search/results.tsx`)
 - Push notifications
 - Light/dark theme — the design is intentionally light-themed only (the sign-in screen is permanently dark by design)
@@ -506,9 +475,9 @@ login-mode copy (sign-in ↔ create), and preview alternate accents.
 ## Definition of done
 
 - [ ] Unauthenticated users land on `(auth)/sign-in` and never see the tab UI.
-- [ ] `(tabs)/_layout.tsx` renders four tabs in the spec'd order with Feather icons; Connections shows badge `3`; Documents shows lock dot.
+- [ ] `(tabs)/_layout.tsx` renders three tabs in the spec'd order with Feather icons; Connections shows badge `3`.
 - [ ] Profile screen matches the prototype within ±2 px on iPhone 14 (375×812).
-- [ ] Connections, Documents (locked), and Search render their static content.
+- [ ] Connections and Search render their static content.
 - [ ] Successful sign-in routes to `(tabs)/profile`; sign-out routes back to `(auth)/sign-in`.
 - [ ] No imports from `nativewind`, `tailwind*`, `styled-components`, or any new npm dependency outside the Expo SDK (Apple/Google SDKs flagged for follow-up sprint).
 - [ ] `tsc --noEmit` passes under `"strict": true`.

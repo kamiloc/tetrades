@@ -746,6 +746,7 @@ async function seedClubsAndMetrics(
         athleteId: athleteId(v.athleteSlug),
         clubMembershipsAudience: v.clubMembershipsAudience,
         metricsAudience: v.metricsAudience,
+        achievementsAudience: v.achievementsAudience,
       },
       select: { athleteId: true },
     });

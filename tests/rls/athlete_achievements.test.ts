@@ -1,13 +1,16 @@
 /**
  * RLS tests — athlete_achievements table
  * Policies:
- *   athlete_achievements_select_authenticated  (USING TRUE for all authenticated)
+ *   athlete_achievements_select_own  (owner only; audiences are served by the API)
  *   athlete_achievements_insert_own
  *   athlete_achievements_update_own
  *   athlete_achievements_delete_own
  *
  * Tested criteria:
- *   (a) any authenticated user can SELECT achievements across the network
+ *   (a) owner can SELECT their own achievements; a different athlete, an
+ *       ACCEPTED connection, a trainer of the owner's ACTIVE club, and an
+ *       anonymous caller all read 0 rows, even for a VERIFIED achievement
+ *   (a2) NULL athlete_id is rejected on INSERT
  *   (b) owner can INSERT their own achievement
  *   (c) non-owner cannot INSERT achievement for another athlete
  *   (d) owner can UPDATE their own achievement
@@ -19,11 +22,16 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  addClubTrainer,
+  cleanupTestClub,
   cleanupTestUser,
+  createTestClub,
+  createTestMembership,
   createTestSport,
   createTestUser,
   deleteTestSport,
   envReady,
+  getAnonClient,
   getServiceClient,
   type TestUser,
 } from './helpers/setup.js';
@@ -33,14 +41,48 @@ describe.skipIf(!envReady)('athlete_achievements RLS', () => {
   let sportId: string;
   let user1: TestUser;
   let user2: TestUser;
+  let friend: TestUser;
+  let trainer: TestUser;
+  let clubId: string;
   let achievementUser1Id: string;
+  let verifiedUser1Id: string;
 
   beforeAll(async () => {
     sportId = await createTestSport(svc);
-    [user1, user2] = await Promise.all([
+    [user1, user2, friend, trainer] = await Promise.all([
       createTestUser(svc, sportId, 'ach-u1'),
       createTestUser(svc, sportId, 'ach-u2'),
+      createTestUser(svc, sportId, 'ach-friend'),
+      createTestUser(svc, sportId, 'ach-trainer'),
     ]);
+
+    const { error: connErr } = await svc.from('athlete_connections').insert({
+      id: randomUUID(),
+      requester_id: user1.athleteId,
+      addressee_id: friend.athleteId,
+      status: 'ACCEPTED',
+    });
+    if (connErr) throw new Error(`connection fixture: ${connErr.message}`);
+
+    clubId = await createTestClub(svc, 'ach-club');
+    const clubTrainerId = await addClubTrainer(svc, clubId, trainer);
+    await createTestMembership(svc, {
+      clubId,
+      athleteId: user1.athleteId,
+      clubTrainerId,
+      status: 'ACTIVE',
+    });
+
+    verifiedUser1Id = randomUUID();
+    const { error: verErr } = await svc.from('athlete_achievements').insert({
+      id: verifiedUser1Id,
+      athlete_id: user1.athleteId,
+      title: 'Oro Juegos Bolivarianos',
+      organization: 'ODEBO',
+      achieved_on: '2025-11-30',
+      verification_status: 'VERIFIED',
+    });
+    if (verErr) throw new Error(`verified achievement fixture: ${verErr.message}`);
 
     achievementUser1Id = randomUUID();
     await svc.from('athlete_achievements').insert({
@@ -54,20 +96,55 @@ describe.skipIf(!envReady)('athlete_achievements RLS', () => {
   });
 
   afterAll(async () => {
-    await Promise.all([cleanupTestUser(svc, user1), cleanupTestUser(svc, user2)]);
+    await cleanupTestClub(svc, clubId);
+    await Promise.all(
+      [user1, user2, friend, trainer].map((user) => cleanupTestUser(svc, user)),
+    );
     await deleteTestSport(svc, sportId);
   });
 
-  // ── (a) SELECT authenticated (any user can read) ────────────────────────────
+  // ── (a) SELECT own only ────────────────────────────────────────────────────
 
-  it('allows any authenticated user to SELECT achievements (USING TRUE)', async () => {
-    const { data, error } = await user2.client
+  const visibleIds = async (client: TestUser['client'] | ReturnType<typeof getAnonClient>) => {
+    const { data, error } = await client
       .from('athlete_achievements')
       .select('id')
-      .eq('id', achievementUser1Id);
-
+      .in('id', [achievementUser1Id, verifiedUser1Id]);
     expect(error).toBeNull();
-    expect(data).toHaveLength(1);
+    return (data ?? []).map((row: { id: string }) => row.id).sort();
+  };
+
+  it('allows the owner to SELECT their own achievements in every status', async () => {
+    expect(await visibleIds(user1.client)).toEqual([achievementUser1Id, verifiedUser1Id].sort());
+  });
+
+  it('denies a different athlete, even for a VERIFIED achievement', async () => {
+    expect(await visibleIds(user2.client)).toEqual([]);
+  });
+
+  it('denies an ACCEPTED connection (audiences are served by the API, not RLS)', async () => {
+    expect(await visibleIds(friend.client)).toEqual([]);
+  });
+
+  it("denies a trainer of the owner's ACTIVE club", async () => {
+    expect(await visibleIds(trainer.client)).toEqual([]);
+  });
+
+  it('denies an anonymous caller', async () => {
+    expect(await visibleIds(getAnonClient())).toEqual([]);
+  });
+
+  // ── (a2) NULL athlete_id ────────────────────────────────────────────────────
+
+  it('rejects an INSERT with a NULL athlete_id', async () => {
+    const { error } = await user1.client.from('athlete_achievements').insert({
+      id: randomUUID(),
+      athlete_id: null,
+      title: 'Sin atleta',
+      organization: 'Test Org',
+      achieved_on: '2024-03-01',
+    });
+    expect(error).not.toBeNull();
   });
 
   // ── (b) INSERT own ──────────────────────────────────────────────────────────

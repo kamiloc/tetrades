@@ -1,5 +1,5 @@
 import {
-  athleteAchievementListOutput,
+  athleteAchievementPublicListOutput,
   athleteAchievementSchema,
   createAchievementInput,
   listAchievementsInput,
@@ -7,7 +7,9 @@ import {
 } from '@packages/validators';
 import { TRPCError } from '@trpc/server';
 
-import { protectedProcedure, router } from '../trpc.js';
+import { listAchievements } from '../services/achievements.js';
+import { resolveViewer } from '../services/viewer.js';
+import { protectedProcedure, publicProcedure, router } from '../trpc.js';
 
 const achievementSelect = {
   id: true,
@@ -49,31 +51,14 @@ export const achievementRouter = router({
       return achievement;
     }),
 
-  listAchievements: protectedProcedure
+  // Public: anonymous callers see achievements whose audience is PUBLIC.
+  // Visibility and the verified-only rule live in services/achievements.ts.
+  listAchievements: publicProcedure
     .input(listAchievementsInput)
-    .output(athleteAchievementListOutput)
-    .query(async ({ ctx, input }) => {
-      const targetAthlete = await ctx.prisma.athlete.findUnique({
-        where: { id: input.athleteId },
-        select: { id: true, userAccount: { select: { supabaseUserId: true } } },
-      });
-
-      if (!targetAthlete) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Athlete not found' });
-      }
-
-      const isOwner = targetAthlete.userAccount.supabaseUserId === ctx.userId;
-
-      const achievements = await ctx.prisma.athleteAchievement.findMany({
-        where: isOwner
-          ? { athleteId: input.athleteId }
-          : { athleteId: input.athleteId, verificationStatus: 'VERIFIED' },
-        select: achievementSelect,
-        orderBy: { achievedOn: 'desc' },
-      });
-
-      return achievements;
-    }),
+    .output(athleteAchievementPublicListOutput)
+    .query(async ({ ctx, input }) =>
+      listAchievements(ctx.prisma, await resolveViewer(ctx.prisma, ctx.userId), input),
+    ),
 
   verifyAchievement: protectedProcedure
     .input(verifyAchievementInput)

@@ -129,7 +129,7 @@ Every field in every model belongs to exactly one classification level. When in 
   - `NOT_FOUND`: resource doesn't exist. `FORBIDDEN`: authenticated but not authorized. `BAD_REQUEST`: invalid beyond Zod. `INTERNAL_SERVER_ERROR`: unexpected failure.
 - Use `superjson` as the transformer and `httpBatchLink` on clients.
 - In Next.js Server Components, use `createCallerFactory`; do not call your own HTTP API.
-- Never expose internal ids (Supabase user id, internal foreign keys) from public procedures.
+- Never expose internal ids (Supabase user id, internal foreign keys) from public procedures. Exception: the athlete's own cuid (`athleteId`) is an accepted public identifier and may be returned.
 - One router file per domain; the root router in `router/index.ts` merges all of them. Never add a router file without updating the merge.
 - Extract business logic into service functions once a procedure exceeds ~10 lines.
 - **List endpoints enforce the same visibility and authorization filtering as detail endpoints** (ADR-013). A list procedure that skips the filter applied by its detail counterpart is a defect.

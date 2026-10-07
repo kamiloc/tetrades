@@ -600,6 +600,8 @@ model AthleteVisibilitySettings {
   /// L1-INTERNAL
   metricsAudience         VisibilityAudience @default(PRIVATE) @map("metrics_audience")
   /// L1-INTERNAL
+  achievementsAudience    VisibilityAudience @default(PUBLIC) @map("achievements_audience")
+  /// L1-INTERNAL
   updatedAt               DateTime           @updatedAt @map("updated_at")
 
   athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Restrict)

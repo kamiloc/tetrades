@@ -81,3 +81,7 @@ The product no longer handles medical records or OCR. It now centers on club aff
 ## Open items
 
 None.
+
+Refactor design_handoff/ to match the latest prototype at the project root. Use the existing handoff as the base: keep its structure, tone, README format, stack constraints and token approach. Change only what the new design requires.
+
+Source of truth (root): index.html, app.jsx, screens.jsx, screens-2.jsx, states.jsx, ios-frame.jsx, tweaks-panel.jsx. Ignore web/.

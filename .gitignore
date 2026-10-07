@@ -9,4 +9,5 @@ dist/
 *.env.local
 .env.*
 !.env.example
-docs/SPRINT_PLAN.md
+docs/SPRINT_PLAN_*.md
+.tsbuildinfo

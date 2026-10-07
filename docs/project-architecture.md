@@ -66,7 +66,7 @@ Mobile upload request → `storageRouter` signed upload flow → storage confirm
 
 ## Current state vs. target (known drift)
 
-The medical/OCR removal (`remove-medical-ocr-domain`) is applied in code, schema, policies, and tests, pending the user-run database migration and deletion of the `medical-documents` Storage bucket. The club, metric, trainer, and visibility model (ADR-013, `add-clubs-metrics-visibility-model`) is implemented in schema, RLS, services, and the `club`, `metric`, `visibility`, and `notification` routers, and the `deletePII` and `sendNotification` workers are real. Remaining drift:
+The medical/OCR removal (`remove-medical-ocr-domain`) is applied in code, schema, policies, tests, and the database (migration `20261004003536_remove_medical_ocr`). The `medical-documents` Storage bucket is deleted (verified 2026-10-06; only `profile-photos` remains). The club, metric, trainer, and visibility model (ADR-013, `add-clubs-metrics-visibility-model`) is implemented in schema, RLS, services, and the `club`, `metric`, `visibility`, and `notification` routers, and the `deletePII` and `sendNotification` workers are real. Remaining drift:
 
 - the trainer portal and athlete UI screens for clubs, metrics, and visibility do not exist yet
 - mobile push-token registration (`expo-notifications`) is not wired

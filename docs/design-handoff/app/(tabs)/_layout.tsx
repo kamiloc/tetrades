@@ -2,15 +2,15 @@
 // Athlete Passport — bottom-tab navigation (Expo Router).
 //
 // Tab order is FIXED (per product spec):
-//   1. Profile  2. Connections  3. Documents  4. Search
+//   1. Profile  2. Connections  3. Search
 //
 // Notes for the implementer:
 // - Icons use @expo/vector-icons (Feather), bundled with Expo.
 // - The dark app header is NOT part of the tab bar — implement it as a
 //   reusable <ScreenHeader> component rendered inside each screen, so each
 //   tab can decide its own title/subtitle without fighting the router.
-// - The notification badge (3) on Connections and the lock indicator on
-//   Documents come from app state; the values below are placeholders.
+// - The notification badge (3) on Connections comes from app state; the
+//   value below is a placeholder.
 
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -74,13 +74,6 @@ export default function TabsLayout() {
         options={{
           title: 'Connections',
           tabBarIcon: ({ focused }) => <TabIcon name="users" focused={focused} badge={3} />,
-        }}
-      />
-      <Tabs.Screen
-        name="documents"
-        options={{
-          title: 'Documents',
-          tabBarIcon: ({ focused }) => <TabIcon name="file-text" focused={focused} locked />,
         }}
       />
       <Tabs.Screen

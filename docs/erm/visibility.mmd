@@ -6,13 +6,14 @@ config:
 
 %% Fragment: visibility. Canonical entities are complete; REFERENCE ONLY entities show just the fields touched by relationships.
 %% Composite: docs/erm.mmd
-%% Rules: ADR-013 and openspec change add-clubs-metrics-visibility-model.
+%% Rules: ADR-013, ADR-014, and openspec changes add-clubs-metrics-visibility-model and add-achievement-visibility.
 
 erDiagram
   ATHLETE_VISIBILITY_SETTINGS {
     string athlete_id PK,FK
     string club_memberships_audience "PRIVATE | CONNECTIONS | PUBLIC"
     string metrics_audience "PRIVATE | CONNECTIONS | PUBLIC"
+    string achievements_audience "PRIVATE | CONNECTIONS | PUBLIC (default PUBLIC)"
     datetime updated_at
   }
 

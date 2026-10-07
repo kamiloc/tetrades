@@ -1091,65 +1091,78 @@ export const MEMBERSHIPS: ReadonlyArray<MembershipSeed> = [
   },
 ];
 
-// A missing row means PRIVATE; Valentina and Daniela deliberately have none.
+// A missing row means each category's default (PRIVATE for club memberships and
+// metrics, PUBLIC for achievements — ADR-014); Valentina and Daniela deliberately have none.
 export const VISIBILITY: ReadonlyArray<{
   readonly athleteSlug: string;
   readonly clubMembershipsAudience: VisibilityAudience;
   readonly metricsAudience: VisibilityAudience;
+  readonly achievementsAudience: VisibilityAudience;
 }> = [
   {
     athleteSlug: 'daniel-mendoza-restrepo',
     clubMembershipsAudience: VisibilityAudience.PUBLIC,
     metricsAudience: VisibilityAudience.PUBLIC,
+    achievementsAudience: VisibilityAudience.PUBLIC,
   },
   {
     athleteSlug: 'carolina-rios-villegas',
     clubMembershipsAudience: VisibilityAudience.PUBLIC,
     metricsAudience: VisibilityAudience.CONNECTIONS,
+    achievementsAudience: VisibilityAudience.PUBLIC,
   },
   {
     athleteSlug: 'sebastian-cardenas-aristizabal',
     clubMembershipsAudience: VisibilityAudience.CONNECTIONS,
     metricsAudience: VisibilityAudience.PRIVATE,
+    achievementsAudience: VisibilityAudience.CONNECTIONS,
   },
   {
     athleteSlug: 'andres-quintero-salazar',
     clubMembershipsAudience: VisibilityAudience.PRIVATE,
     metricsAudience: VisibilityAudience.PRIVATE,
+    achievementsAudience: VisibilityAudience.PRIVATE,
   },
   {
     athleteSlug: 'juan-esteban-moreno-patino',
     clubMembershipsAudience: VisibilityAudience.PUBLIC,
     metricsAudience: VisibilityAudience.PUBLIC,
+    achievementsAudience: VisibilityAudience.PUBLIC,
   },
   {
     athleteSlug: 'laura-sofia-gomez-ospina',
     clubMembershipsAudience: VisibilityAudience.PUBLIC,
     metricsAudience: VisibilityAudience.PUBLIC,
+    achievementsAudience: VisibilityAudience.PUBLIC,
   },
   {
     athleteSlug: 'kevin-andres-palacios-mosquera',
     clubMembershipsAudience: VisibilityAudience.PUBLIC,
     metricsAudience: VisibilityAudience.CONNECTIONS,
+    achievementsAudience: VisibilityAudience.PUBLIC,
   },
   {
     athleteSlug: 'maria-jose-benavides-ortiz',
     clubMembershipsAudience: VisibilityAudience.CONNECTIONS,
     metricsAudience: VisibilityAudience.CONNECTIONS,
+    achievementsAudience: VisibilityAudience.CONNECTIONS,
   },
   {
     athleteSlug: 'santiago-rueda-navarro',
     clubMembershipsAudience: VisibilityAudience.PUBLIC,
     metricsAudience: VisibilityAudience.PUBLIC,
+    achievementsAudience: VisibilityAudience.PUBLIC,
   },
   {
     athleteSlug: 'camilo-andres-bautista-rojas',
     clubMembershipsAudience: VisibilityAudience.PUBLIC,
     metricsAudience: VisibilityAudience.PUBLIC,
+    achievementsAudience: VisibilityAudience.PUBLIC,
   },
   {
     athleteSlug: 'isabella-quintana-zapata',
     clubMembershipsAudience: VisibilityAudience.PUBLIC,
     metricsAudience: VisibilityAudience.CONNECTIONS,
+    achievementsAudience: VisibilityAudience.PUBLIC,
   },
 ];

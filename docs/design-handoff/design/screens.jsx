@@ -502,102 +502,7 @@ function ConnectionRow({ name, sport, org, init, hue, verified, last }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 3) DOCUMENTS — Locked / Sprint 4 placeholder
-// ─────────────────────────────────────────────────────────────
-const DOC_PREVIEW = [
-  { title: 'Annual Physical Examination', meta: 'Stanford Sports Medicine' },
-  { title: 'ECG · Cardiac Screening',     meta: 'CardioCheck Clinic' },
-  { title: 'Concussion Baseline (ImPACT)', meta: 'Stanford Athletics' },
-  { title: 'Orthopedic Clearance',         meta: 'Bay Area Orthopedics' },
-];
-
-function DocumentsScreen() {
-  return (
-    <div data-screen-label="Documents" style={{ paddingBottom: 24 }}>
-      {/* Lock hero */}
-      <div style={{ padding: '24px 16px 0' }}>
-        <Card style={{
-          padding: '22px 18px',
-          background: 'linear-gradient(180deg, #F7FAFF 0%, #FFFFFF 100%)',
-          borderColor: '#D8E4FB',
-          textAlign: 'center',
-        }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 16, margin: '0 auto',
-            background: C.ink, color: '#fff',
-            display: 'grid', placeItems: 'center',
-            boxShadow: '0 8px 20px rgba(11,18,32,0.18)',
-          }}>
-            <Icon name="lock" size={26} color="#fff" stroke={1.9} />
-          </div>
-          <div style={{
-            marginTop: 14, fontSize: 11, fontWeight: 700, letterSpacing: '0.18em',
-            color: C.blue, textTransform: 'uppercase',
-          }}>Sprint 4 · Coming soon</div>
-          <h2 style={{
-            margin: '6px 0 6px', fontSize: 19, fontWeight: 700, color: C.text,
-            letterSpacing: -0.2,
-          }}>Verified medical records</h2>
-          <p style={{
-            margin: 0, fontSize: 13.5, color: C.muted, lineHeight: 1.5,
-            maxWidth: 280, marginLeft: 'auto', marginRight: 'auto',
-          }}>
-            Securely upload physicals, ECGs, and clearance forms. Cryptographically
-            signed by your team's medical staff.
-          </p>
-          <button style={{
-            marginTop: 14, background: C.blue, color: '#fff',
-            border: 'none', borderRadius: 999, padding: '10px 20px',
-            fontSize: 13, fontWeight: 600, letterSpacing: 0.1, cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(26,107,255,0.25)',
-          }}>Notify me when ready</button>
-        </Card>
-      </div>
-
-      {/* Locked preview rows */}
-      <div style={{ padding: '20px 16px 0' }}>
-        <SectionTitle>Preview · locked</SectionTitle>
-        <Card>
-          {DOC_PREVIEW.map((d, i) => (
-            <div key={d.title} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '14px 16px',
-              borderBottom: i === DOC_PREVIEW.length - 1 ? 'none' : `1px solid ${C.line}`,
-              opacity: 0.7,
-            }}>
-              <div style={{
-                width: 38, height: 44, borderRadius: 6, flexShrink: 0,
-                background: 'repeating-linear-gradient(135deg, #EEF1F6 0 6px, #F6F8FB 6px 12px)',
-                border: `1px solid ${C.line}`, position: 'relative',
-              }}>
-                <div style={{
-                  position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-                }}>
-                  <Icon name="lock" size={14} color={C.subtle} />
-                </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{d.title}</div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{d.meta}</div>
-              </div>
-              <Icon name="lock" size={16} color={C.subtle} />
-            </div>
-          ))}
-        </Card>
-        <div style={{
-          marginTop: 10, padding: '0 6px',
-          fontSize: 11.5, color: C.subtle, lineHeight: 1.5,
-        }}>
-          Document uploads, signing, and sharing will arrive in Sprint 4.
-          Today this tab is a placeholder.
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// 4) SEARCH SCREEN — empty state with suggestions
+// 3) SEARCH SCREEN — empty state with suggestions
 // ─────────────────────────────────────────────────────────────
 const SPORTS = ['Soccer', 'Basketball', 'Football', 'Track & Field', 'Volleyball',
                 'Baseball', 'Tennis', 'Swimming', 'Rowing', 'Lacrosse'];
@@ -763,13 +668,13 @@ function LoginScreen({ mode = 'signin', onAuth }) {
           lineHeight: 1.5, maxWidth: 300, textWrap: 'pretty',
         }}>
           {creating
-            ? 'Cryptographically signed physicals, clearances, and stats — owned by you, shareable with coaches and teams.'
-            : 'Sign in to your verified records, network, and document vault.'}
+            ? 'Verified achievements, club history, and trainer-reported stats — owned by you, shared on your terms.'
+            : 'Sign in to your verified record, network, and club stats.'}
         </p>
 
         {/* Value props */}
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <ValueProp icon="shield" label="Records signed by team medical staff" />
+          <ValueProp icon="shield" label="Stats reported by your club's trainers" />
           <ValueProp icon="users"  label="A trusted network of athletes & coaches" />
           <ValueProp icon="lock"   label="End-to-end secure · athlete-owned" />
         </div>
@@ -906,7 +811,6 @@ function ProviderMark({ variant }) {
 const TABS = [
   { id: 'profile',     label: 'Profile',     route: '(tabs)/profile',     icon: 'user' },
   { id: 'connections', label: 'Connections', route: '(tabs)/connections', icon: 'users',  badge: 3 },
-  { id: 'documents',   label: 'Documents',   route: '(tabs)/documents',   icon: 'doc',    lock: true },
   { id: 'search',      label: 'Search',      route: '(tabs)/search',      icon: 'search' },
 ];
 
@@ -916,7 +820,7 @@ function TabBar({ active, onChange }) {
       background: '#fff',
       borderTop: `1px solid ${C.line}`,
       paddingTop: 8, paddingBottom: 8,
-      display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+      display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
       position: 'relative',
     }}>
       {TABS.map(t => {
@@ -964,6 +868,6 @@ function TabBar({ active, onChange }) {
 Object.assign(window, {
   C, Icon, Header, ApMark, Avatar, Card, SectionTitle,
   VerifiedChip, PendingChip, BlueCheck, Tag,
-  ProfileScreen, ConnectionsScreen, DocumentsScreen, SearchScreen,
+  ProfileScreen, ConnectionsScreen, SearchScreen,
   LoginScreen, TabBar, TABS,
 });

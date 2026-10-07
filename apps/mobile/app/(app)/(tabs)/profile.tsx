@@ -39,6 +39,8 @@ function getInitials(name: string | null): string {
   return result.length > 0 ? result : '?';
 }
 
+const ACHIEVEMENT_PREVIEW_COUNT = 3;
+
 export default function ProfileScreen() {
   // All hooks first — Rules of Hooks forbid conditional returns above this block.
   const myAthleteQuery = useMyAthlete();
@@ -49,8 +51,9 @@ export default function ProfileScreen() {
     { athleteId: athleteId ?? '' },
     { enabled: !!athleteId },
   );
+  // The profile card previews the three most recent achievements.
   const achievementsQuery = trpc.achievement.listAchievements.useQuery(
-    { athleteId: athleteId ?? '' },
+    { athleteId: athleteId ?? '', take: ACHIEVEMENT_PREVIEW_COUNT },
     { enabled: !!athleteId },
   );
   const connectionsQuery = trpc.connection.listConnections.useQuery(
@@ -82,7 +85,7 @@ export default function ProfileScreen() {
   }
 
   const profile = profileQuery.data ?? null;
-  const achievements = achievementsQuery.data ?? [];
+  const achievements = achievementsQuery.data?.items ?? [];
   const connections = connectionsQuery.data ?? [];
   const displayName = myAthleteQuery.data?.displayName ?? null;
   const sport = myAthleteQuery.data?.sport ?? null;
@@ -255,7 +258,7 @@ export default function ProfileScreen() {
             </Text>
           </View>
         ) : (
-          achievements.slice(0, 3).map(item => (
+          achievements.map(item => (
             <View key={item.id} className="bg-paper rounded-xl p-4 mb-3">
               {/* Row 1: title + badge */}
               <View className="flex-row items-center justify-between">
