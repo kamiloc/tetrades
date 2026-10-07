@@ -324,6 +324,12 @@ Habeas Data grants athletes the right to deletion; legal obligations may require
 12. List all changed files.
 13. State which sprint exit criteria were satisfied.
 
+### OpenSpec branch lifecycle
+
+- For every OpenSpec proposal, invoke an `openspec-branch-manager` subagent, before creating proposal artifacts. It creates or selects `feat/<change-name>`; do not create proposal artifacts if branch setup fails.
+- When an OpenSpec proposal is fully implemented (all apply tasks complete), invoke that role as a subagent to review the scoped diff, commit it with a Conventional Commit message, and push the proposal branch. Archive may trigger this step if it has not already happened.
+- The subagent must leave unrelated or pre-existing work unstaged and uncommitted. It must never force-push or commit directly to `main`. Report blockers instead of guessing which changes belong to the proposal.
+
 ## Explicit confirmation required before you:
 
 - delete, modify, or broaden RLS policies

@@ -8,7 +8,11 @@
 //   3. Your Network card — list of ConnectionRow (avatar, name, BlueCheck,
 //      sport line, org line, [Message] outline button)
 //
-// Pull pending count from useConnections() — drives the tab-bar badge too.
+// Pull pendingCount from useConnections() — it drives the badge in _layout.tsx.
+// isLoading → ConnectionsSkeleton, error → ConnectionsError (offline banner,
+// cached network, and request error panel), empty data → ConnectionsEmpty,
+// otherwise render the loaded requests and network. Header subtitle comes from
+// TAB_STATES.connections.sub. Hide the tab badge while empty, loading, or errored.
 
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { colors, layout, space } from '@/tokens';
@@ -16,7 +20,7 @@ import { colors, layout, space } from '@/tokens';
 export default function ConnectionsScreen() {
   return (
     <View style={styles.root}>
-      {/* <ScreenHeader title="Connections" subtitle="247 athletes · 3 pending" /> */}
+        {/* <ScreenHeader title="Connections" subtitle={TAB_STATES.connections.sub[state]} /> */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}

@@ -18,6 +18,8 @@ export const fontSize = {
   caption:    11,  //  uppercase eyebrow / section title
   small:      12,  //  meta, captions, tab label
   footnote:   13,  //  list-row meta, body small
+  stateBody:  13.5, // state-panel body copy
+  stateTitle: 18,   // state-panel title
   body:       14,  //  primary body text
   bodyLg:     15,  //  emphasized body
   callout:    17,  //  stat values, section row title

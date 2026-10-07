@@ -10,17 +10,21 @@
 //   4. Achievements card — list of rows with VerifiedChip / PendingChip
 //   5. Passport completeness card — progress bar + "Finish" button
 //
-// All data comes from useProfile() (TODO: wire to backend in Sprint 3).
-// Show <AuthGate tabLabel="Profile" /> when !session.
+// Data states: call useProfile(); isLoading → ProfileSkeleton, error →
+// ProfileError with refetch and Sign out, no profile data → ProfileEmpty,
+// otherwise render the loaded profile. Header subtitle is TAB_STATES.profile.sub.
 
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { colors, layout, space } from '@/tokens';
-// import { useSession } from '@/lib/auth';
-// import { ScreenHeader, IdentityCard, AboutCard, AchievementsCard, PassportProgressCard, AuthGate } from '@/components';
+// import { useProfile } from '@/lib/hooks';
+// import { ScreenHeader, IdentityCard, AboutCard, AchievementsCard, PassportProgressCard,
+//   ProfileSkeleton, ProfileError, ProfileEmpty } from '@/components';
 
 export default function ProfileScreen() {
-  // const { session } = useSession();
-  // if (!session) return <AuthGate tabLabel="Profile" />;
+  // const { data, isLoading, error, refetch } = useProfile();
+  // if (isLoading) return <ProfileSkeleton />;
+  // if (error) return <ProfileError onRetry={refetch} onSignOut={signOut} />;
+  // if (!data) return <ProfileEmpty />;
 
   return (
     <View style={styles.root}>

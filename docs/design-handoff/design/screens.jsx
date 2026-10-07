@@ -17,6 +17,11 @@ const C = {
   blueTint: '#E8F0FF',
   pending: '#B5651D',
   pendingTint: '#FFF3E0',
+  danger: '#C23B3B',
+  dangerTint: '#FDECEC',
+  dangerLine: '#F6D4D4',
+  dash: '#CBD3DF',
+  segmented: '#E9EDF3',
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -32,8 +37,16 @@ const Icon = ({ name, size = 24, color = 'currentColor', stroke = 1.8 }) => {
       return (<svg {...p}><circle cx="9" cy="8" r="3.4"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><circle cx="17" cy="7" r="2.6"/><path d="M16 13.4c2.9.4 5.5 2.9 5.5 6.1"/></svg>);
     case 'doc':
       return (<svg {...p}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>);
-    case 'search':
-      return (<svg {...p}><circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.5-3.5"/></svg>);
+    case 'activity':
+      return (<svg {...p}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>);
+    case 'flag':
+      return (<svg {...p}><path d="M4 22V4"/><path d="M4 4c5-4 11 4 16 0v12c-5 4-11-4-16 0"/></svg>);
+    case 'alert':
+      return (<svg {...p}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>);
+    case 'refresh':
+      return (<svg {...p}><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 2M4 16l2 2a7 7 0 0 0 12.4-3"/></svg>);
+    case 'wifi-off':
+      return (<svg {...p}><path d="M1 9a16 16 0 0 1 5.2-3.4M8.5 4.4A16 16 0 0 1 23 9M5 13a10 10 0 0 1 3-2m4-1a10 10 0 0 1 7 3M9 17a4 4 0 0 1 6 0M2 2l20 20"/></svg>);
     case 'bell':
       return (<svg {...p}><path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 2 6.5H4c.5-1 2-2.5 2-6.5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>);
     case 'check':
@@ -301,11 +314,7 @@ function ProfileScreen() {
           <AchievementRow
             title="Combine: 40-yd dash · 4.61s"
             meta="2025 · Bay Area Showcase"
-            pending />
-          <AchievementRow
-            title="Annual Physical — Cleared"
-            meta="Mar 2025 · Stanford Sports Med"
-            verified last />
+            pending last />
         </Card>
       </div>
 
@@ -497,116 +506,6 @@ function ConnectionRow({ name, sport, org, init, hue, verified, last }) {
         ...btnGhost, padding: '6px 12px', fontSize: 12,
         color: C.blue, borderColor: '#D8E4FB',
       }}>Message</button>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// 3) SEARCH SCREEN — empty state with suggestions
-// ─────────────────────────────────────────────────────────────
-const SPORTS = ['Soccer', 'Basketball', 'Football', 'Track & Field', 'Volleyball',
-                'Baseball', 'Tennis', 'Swimming', 'Rowing', 'Lacrosse'];
-const RECENT = [
-  { q: 'Stanford soccer', meta: 'Sport · org' },
-  { q: 'D1 swimmers',     meta: 'Sport · division' },
-  { q: 'Sofia Martinez',  meta: 'Athlete' },
-];
-
-function SearchScreen() {
-  return (
-    <div data-screen-label="Search" style={{ paddingBottom: 24 }}>
-      {/* Search field */}
-      <div style={{ padding: '16px 16px 0' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          background: '#fff', border: `1px solid ${C.line}`, borderRadius: 12,
-          padding: '11px 14px', boxShadow: 'var(--shadow-sm)',
-        }}>
-          <Icon name="search" size={18} color={C.subtle} />
-          <span style={{ color: C.subtle, fontSize: 14.5, flex: 1 }}>
-            Search athletes by name or sport
-          </span>
-          <span style={{
-            fontSize: 11, color: C.muted, background: C.canvas,
-            padding: '2px 6px', borderRadius: 4, border: `1px solid ${C.line}`,
-          }}>⌘K</span>
-        </div>
-      </div>
-
-      {/* Browse by sport */}
-      <div style={{ padding: '20px 16px 0' }}>
-        <SectionTitle>Browse by sport</SectionTitle>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {SPORTS.map(s => (
-            <button key={s} style={{
-              background: '#fff', border: `1px solid ${C.line}`, borderRadius: 999,
-              padding: '8px 14px', fontSize: 13, fontWeight: 500, color: C.text,
-              cursor: 'pointer',
-            }}>{s}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Recent */}
-      <div style={{ padding: '20px 16px 0' }}>
-        <SectionTitle right={<a style={{ fontSize: 12.5, color: C.blue, fontWeight: 600 }}>Clear</a>}>
-          Recent
-        </SectionTitle>
-        <Card>
-          {RECENT.map((r, i) => (
-            <div key={r.q} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '12px 16px',
-              borderBottom: i === RECENT.length - 1 ? 'none' : `1px solid ${C.line}`,
-            }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: 9, background: C.canvas,
-                display: 'grid', placeItems: 'center', border: `1px solid ${C.line}`,
-              }}>
-                <Icon name="clock" size={15} color={C.muted} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{r.q}</div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>{r.meta}</div>
-              </div>
-              <Icon name="search" size={15} color={C.subtle} />
-            </div>
-          ))}
-        </Card>
-      </div>
-
-      {/* Suggested */}
-      <div style={{ padding: '20px 16px 0' }}>
-        <SectionTitle>Suggested for you</SectionTitle>
-        <Card>
-          {CONNECTIONS.slice(0, 3).map((c, i) => (
-            <div key={c.name} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '12px 16px',
-              borderBottom: i === 2 ? 'none' : `1px solid ${C.line}`,
-            }}>
-              <Avatar size={40} initials={c.init} hue={c.hue} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{c.name}</span>
-                  {c.verified && <BlueCheck size={12} />}
-                </div>
-                <div style={{ fontSize: 12.5, color: C.muted, marginTop: 1 }}>
-                  {c.sport} · {c.org}
-                </div>
-              </div>
-              <button style={{
-                background: C.blue, color: '#fff', border: 'none',
-                borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 600,
-                display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer',
-              }}>
-                <Icon name="plus" size={13} color="#fff" stroke={2.5} />
-                Connect
-              </button>
-            </div>
-          ))}
-        </Card>
-      </div>
     </div>
   );
 }
@@ -811,16 +710,17 @@ function ProviderMark({ variant }) {
 const TABS = [
   { id: 'profile',     label: 'Profile',     route: '(tabs)/profile',     icon: 'user' },
   { id: 'connections', label: 'Connections', route: '(tabs)/connections', icon: 'users',  badge: 3 },
-  { id: 'search',      label: 'Search',      route: '(tabs)/search',      icon: 'search' },
+  { id: 'performance', label: 'Performance', route: '(tabs)/performance', icon: 'activity' },
+  { id: 'clubs',       label: 'Clubs',       route: '(tabs)/clubs',       icon: 'flag', badge: 2 },
 ];
 
-function TabBar({ active, onChange }) {
+function TabBar({ active, onChange, hideBadges = false }) {
   return (
     <nav style={{
       background: '#fff',
       borderTop: `1px solid ${C.line}`,
       paddingTop: 8, paddingBottom: 8,
-      display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+      display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
       position: 'relative',
     }}>
       {TABS.map(t => {
@@ -834,7 +734,7 @@ function TabBar({ active, onChange }) {
           }}>
             <div style={{ position: 'relative', height: 24 }}>
               <Icon name={t.icon} size={24} color={on ? C.blue : '#8A93A4'} stroke={on ? 2.1 : 1.8} />
-              {t.badge && (
+              {t.badge && !(hideBadges && active === t.id) && (
                 <span style={{
                   position: 'absolute', top: -4, right: -8,
                   minWidth: 16, height: 16, padding: '0 4px',
@@ -843,16 +743,6 @@ function TabBar({ active, onChange }) {
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   border: '1.5px solid #fff', letterSpacing: 0,
                 }}>{t.badge}</span>
-              )}
-              {t.lock && (
-                <span style={{
-                  position: 'absolute', top: -4, right: -8,
-                  width: 14, height: 14, borderRadius: '50%',
-                  background: '#fff', display: 'grid', placeItems: 'center',
-                  border: `1.5px solid ${on ? C.blue : '#CBD2DE'}`,
-                }}>
-                  <Icon name="lock" size={8} color={on ? C.blue : '#8A93A4'} stroke={2.2} />
-                </span>
               )}
             </div>
             <span style={{
@@ -868,6 +758,6 @@ function TabBar({ active, onChange }) {
 Object.assign(window, {
   C, Icon, Header, ApMark, Avatar, Card, SectionTitle,
   VerifiedChip, PendingChip, BlueCheck, Tag,
-  ProfileScreen, ConnectionsScreen, SearchScreen,
+  ProfileScreen, ConnectionsScreen,
   LoginScreen, TabBar, TABS,
 });

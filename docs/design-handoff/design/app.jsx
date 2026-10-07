@@ -7,19 +7,21 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "activeTab": "profile",
   "authenticated": true,
   "authMode": "signin",
+  "dataState": "loaded",
   "accent": "#1A6BFF"
 }/*EDITMODE-END*/;
 
 const HEADER_BY_TAB = {
-  profile:     { title: 'Profile',     subtitle: 'Your athlete identity' },
-  connections: { title: 'Connections', subtitle: '247 athletes · 3 pending' },
-  search:      { title: 'Discover',    subtitle: 'Find athletes & teams' },
+  profile:     { title: 'Profile' },
+  connections: { title: 'Connections' },
+  performance: { title: 'Performance' },
+  clubs:       { title: 'Clubs & trainers' },
 };
 
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const active = t.activeTab;
-  const head = HEADER_BY_TAB[active];
+  const head = { ...HEADER_BY_TAB[active], subtitle: TAB_STATES[active].sub[t.dataState] };
 
   // override --blue at runtime if accent changed
   React.useEffect(() => {
@@ -27,10 +29,29 @@ function App() {
   }, [t.accent]);
 
   const renderTabBody = () => {
+    if (t.dataState === 'empty') {
+      switch (active) {
+        case 'profile': return <ProfileEmpty />;
+        case 'connections': return <ConnectionsEmpty />;
+        case 'performance': return <PerformanceEmpty />;
+        case 'clubs': return <ClubsEmpty />;
+        default: return null;
+      }
+    }
+    if (t.dataState === 'error') {
+      switch (active) {
+        case 'profile': return <ProfileError />;
+        case 'connections': return <ConnectionsError />;
+        case 'performance': return <PerformanceError />;
+        case 'clubs': return <ClubsError />;
+        default: return null;
+      }
+    }
     switch (active) {
       case 'profile':     return <ProfileScreen />;
       case 'connections': return <ConnectionsScreen />;
-      case 'search':      return <SearchScreen />;
+      case 'performance': return <PerformanceScreen />;
+      case 'clubs':       return <ClubsScreen />;
       default:            return null;
     }
   };
@@ -52,7 +73,7 @@ function App() {
               }}>
                 {renderTabBody()}
               </main>
-              <TabBar active={active} onChange={(id) => setTweak('activeTab', id)} />
+              <TabBar active={active} hideBadges={t.dataState !== 'loaded'} onChange={(id) => setTweak('activeTab', id)} />
             </React.Fragment>
           ) : (
             <main style={{ flex: 1, overflow: 'auto' }}>
@@ -81,6 +102,16 @@ function App() {
             onChange={(v) => setTweak('authenticated', v)}
           />
           <TweakRadio
+            label="Data state"
+            value={t.dataState}
+            onChange={(v) => setTweak('dataState', v)}
+            options={[
+              { value: 'loaded', label: 'Loaded' },
+              { value: 'empty', label: 'Empty' },
+              { value: 'error', label: 'Error' },
+            ]}
+          />
+          <TweakRadio
             label="Login mode"
             value={t.authMode}
             onChange={(v) => setTweak('authMode', v)}
@@ -107,7 +138,8 @@ function App() {
             app/(tabs)/_layout.tsx<br/>
             ├── profile.tsx<br/>
             ├── connections.tsx<br/>
-            └── search.tsx
+            ├── performance.tsx<br/>
+            └── clubs.tsx
           </div>
         </TweakSection>
       </TweaksPanel>
