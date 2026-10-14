@@ -183,8 +183,8 @@ export async function runPiiDeletion(
   try {
     await deleteAthleteRows(prisma, input.athleteId, athlete.userAccountId, input.dataLifecycleRequestId);
 
-    const paths = await deps.externals.listStorageObjects(`${input.athleteId}/`);
-    if (paths.length > 0) await deps.externals.removeStorageObjects(paths);
+    const objects = await deps.externals.listStorageObjects(`${input.athleteId}/`);
+    if (objects.length > 0) await deps.externals.removeStorageObjects(objects);
 
     // Only while the account still carries the real id (idempotent on retry).
     const supabaseUserId = athlete.userAccount.supabaseUserId;
@@ -349,8 +349,9 @@ export async function verifyDeletion(
     residue.push('user_accounts (not anonymized)');
   }
 
-  if ((await deps.externals.listStorageObjects(`${athleteId}/`)).length > 0) {
-    residue.push('storage profile-photos');
+  const leftovers = await deps.externals.listStorageObjects(`${athleteId}/`);
+  for (const bucket of new Set(leftovers.map((o) => o.bucket))) {
+    residue.push(`storage ${bucket}`);
   }
   return residue;
 }

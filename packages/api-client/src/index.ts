@@ -49,3 +49,9 @@ export { useMyVisibilitySettings, useUpdateVisibilitySettings } from './hooks/vi
 export { useRegisterDeviceToken, useRemoveDeviceToken } from './hooks/notification';
 
 export { useQueryClient } from '@tanstack/react-query';
+
+export {
+  useConfirmProfilePhotoUpload,
+  useProfilePhotoUploadUrl,
+  useProfilePhotoViewUrl,
+} from './hooks/storage';

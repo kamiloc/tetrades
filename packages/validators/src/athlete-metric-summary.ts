@@ -7,6 +7,8 @@ import { cuidSchema, datetimeSchema } from './common.js';
 // BASE SCHEMA — mirrors Prisma model 1:1
 // Derived from entries inside the reportEntry transaction; clients never
 // write summaries. PK is (athleteId, metricDefinitionId).
+// bestValue follows the definition's direction; both best fields are null
+// for NEUTRAL metrics.
 // ──────────────────────────────────────────────
 
 export const athleteMetricSummarySchema = z.object({
@@ -15,6 +17,8 @@ export const athleteMetricSummarySchema = z.object({
   latestValue: metricValueSchema, /// L1-INTERNAL
   latestMeasuredAt: datetimeSchema, /// L1-INTERNAL
   entryCount: z.number().int().min(0), /// L1-INTERNAL
+  bestValue: metricValueSchema.nullable(), /// L1-INTERNAL
+  bestMeasuredAt: datetimeSchema.nullable(), /// L1-INTERNAL
   updatedAt: datetimeSchema, /// L1-INTERNAL
 });
 export type AthleteMetricSummary = z.infer<typeof athleteMetricSummarySchema>;

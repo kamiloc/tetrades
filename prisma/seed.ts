@@ -22,6 +22,7 @@ import {
   ConnectionStatus,
   DataLifecycleStatus,
   DataLifecycleType,
+  MetricDirection,
   OnboardingStatus,
   PhotoVariant,
   PrismaClient,
@@ -525,11 +526,35 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
 ];
 
 // Photo variant pixel dimensions (mirror image-optimization rules).
-const PHOTO_VARIANTS: ReadonlyArray<{ variant: PhotoVariant; width: number; height: number }> = [
-  { variant: PhotoVariant.ORIGINAL, width: 2400, height: 2400 },
-  { variant: PhotoVariant.FULL_1200, width: 1200, height: 1200 },
-  { variant: PhotoVariant.CARD_400, width: 400, height: 400 },
-  { variant: PhotoVariant.THUMB_150, width: 150, height: 150 },
+// Bucket-relative paths in the ADR-015 layout. The ORIGINAL lives in the
+// private profile-photo-originals bucket, the variants in public profile-photos;
+// seeding writes rows only, no Storage objects.
+const SEED_PHOTO_VERSION = '1760400000000-5eed0000c0ffee00';
+const PHOTO_VARIANTS: ReadonlyArray<{
+  variant: PhotoVariant;
+  width: number;
+  height: number;
+  file: string;
+}> = [
+  { variant: PhotoVariant.ORIGINAL, width: 2400, height: 2400, file: `${SEED_PHOTO_VERSION}.jpg` },
+  {
+    variant: PhotoVariant.FULL_1200,
+    width: 1200,
+    height: 1200,
+    file: `${SEED_PHOTO_VERSION}/full-1200.webp`,
+  },
+  {
+    variant: PhotoVariant.CARD_400,
+    width: 400,
+    height: 400,
+    file: `${SEED_PHOTO_VERSION}/card-400.webp`,
+  },
+  {
+    variant: PhotoVariant.THUMB_150,
+    width: 150,
+    height: 150,
+    file: `${SEED_PHOTO_VERSION}/thumb-150.webp`,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -599,6 +624,7 @@ async function seedClubsAndMetrics(
   }
 
   const metricIds = new Map<string, string>();
+  const metricDirections = new Map<string, MetricDirection>();
   for (const metric of METRICS) {
     const sportId = metric.sportName === null ? null : sportRecords.get(metric.sportName);
     if (sportId === undefined) throw new Error(`Sport "${metric.sportName}" was not seeded.`);
@@ -607,12 +633,14 @@ async function seedClubsAndMetrics(
         key: metric.key,
         name: metric.name,
         unit: metric.unit,
+        direction: metric.direction,
         sportId,
         isActive: metric.isActive ?? true,
       },
       select: { id: true },
     });
     metricIds.set(metric.key, created.id);
+    metricDirections.set(created.id, metric.direction);
   }
 
   console.log('Seed: creating memberships (all four states) and metric series...');
@@ -625,6 +653,8 @@ async function seedClubsAndMetrics(
       latestValue: number;
       latestMeasuredAt: Date;
       entryCount: number;
+      bestValue: number | null;
+      bestMeasuredAt: Date | null;
     }
   >();
   const now = new Date();
@@ -704,6 +734,8 @@ async function seedClubsAndMetrics(
         });
 
         const key = `${aid}:${metricDefinitionId}`;
+        const direction = metricDirections.get(metricDefinitionId);
+        const tracksBest = direction !== undefined && direction !== MetricDirection.NEUTRAL;
         const current = summaries.get(key);
         if (current === undefined) {
           summaries.set(key, {
@@ -712,12 +744,24 @@ async function seedClubsAndMetrics(
             latestValue: value,
             latestMeasuredAt: measuredAt,
             entryCount: 1,
+            bestValue: tracksBest ? value : null,
+            bestMeasuredAt: tracksBest ? measuredAt : null,
           });
         } else {
           current.entryCount += 1;
           if (measuredAt >= current.latestMeasuredAt) {
             current.latestValue = value;
             current.latestMeasuredAt = measuredAt;
+          }
+          // Strictly better only, so the first recorded value keeps a tie.
+          const better =
+            current.bestValue === null ||
+            (direction === MetricDirection.HIGHER_IS_BETTER
+              ? value > current.bestValue
+              : value < current.bestValue);
+          if (tracksBest && better) {
+            current.bestValue = value;
+            current.bestMeasuredAt = measuredAt;
           }
         }
       }
@@ -830,9 +874,7 @@ async function main(): Promise<void> {
         data: {
           athleteId: athlete.id,
           variant: variant.variant,
-          objectPath: `profile-photos/${athlete.id}/${variant.variant.toLowerCase()}.${
-            variant.variant === PhotoVariant.ORIGINAL ? 'jpg' : 'webp'
-          }`,
+          objectPath: `${athlete.id}/${variant.file}`,
           width: variant.width,
           height: variant.height,
           processingStatus: ProcessingStatus.READY,

@@ -100,7 +100,7 @@ type EntryBridgeKeys = Exclude<keyof AthleteMetricEntry, 'value'>;
 type _metricEntry_ok = Assert<
   IsAssignable<Pick<PrismaAthleteMetricEntry, EntryBridgeKeys>, Pick<AthleteMetricEntry, EntryBridgeKeys>>
 >;
-type SummaryBridgeKeys = Exclude<keyof AthleteMetricSummary, 'latestValue'>;
+type SummaryBridgeKeys = Exclude<keyof AthleteMetricSummary, 'latestValue' | 'bestValue'>;
 type _metricSummary_ok = Assert<
   IsAssignable<
     Pick<PrismaAthleteMetricSummary, SummaryBridgeKeys>,

@@ -125,6 +125,15 @@ enum VisibilityAudience {
   @@map("visibility_audience")
 }
 
+/// Which way a metric improves. NEUTRAL metrics get no personal best.
+enum MetricDirection {
+  HIGHER_IS_BETTER
+  LOWER_IS_BETTER
+  NEUTRAL
+
+  @@map("metric_direction")
+}
+
 enum DevicePlatform {
   IOS
   ANDROID
@@ -520,17 +529,20 @@ model ClubMembership {
 
 model MetricDefinition {
   /// L0-PUBLIC
-  id       String  @id @default(cuid())
+  id        String          @id @default(cuid())
   /// L0-PUBLIC
-  key      String  @unique
+  key       String          @unique
   /// L0-PUBLIC
-  name     String
+  name      String
   /// L0-PUBLIC
-  unit     String
+  unit      String
   /// L0-PUBLIC
-  sportId  String? @map("sport_id")
+  /// Changing it later requires recomputing AthleteMetricSummary best values.
+  direction MetricDirection
   /// L0-PUBLIC
-  isActive Boolean @default(true) @map("is_active")
+  sportId   String?         @map("sport_id")
+  /// L0-PUBLIC
+  isActive  Boolean         @default(true) @map("is_active")
 
   sport     Sport?                 @relation(fields: [sportId], references: [id], onDelete: Restrict)
   entries   AthleteMetricEntry[]
@@ -572,17 +584,22 @@ model AthleteMetricEntry {
 /// Derived from entries in the reportEntry transaction; never written by clients.
 model AthleteMetricSummary {
   /// L1-INTERNAL
-  athleteId          String   @map("athlete_id")
+  athleteId          String    @map("athlete_id")
   /// L1-INTERNAL
-  metricDefinitionId String   @map("metric_definition_id")
+  metricDefinitionId String    @map("metric_definition_id")
   /// L1-INTERNAL
-  latestValue        Decimal  @map("latest_value") @db.Decimal(12, 4)
+  latestValue        Decimal   @map("latest_value") @db.Decimal(12, 4)
   /// L1-INTERNAL
-  latestMeasuredAt   DateTime @map("latest_measured_at")
+  latestMeasuredAt   DateTime  @map("latest_measured_at")
   /// L1-INTERNAL
-  entryCount         Int      @map("entry_count")
+  entryCount         Int       @map("entry_count")
   /// L1-INTERNAL
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  /// Personal best per the definition's direction; null for NEUTRAL metrics.
+  bestValue          Decimal?  @map("best_value") @db.Decimal(12, 4)
+  /// L1-INTERNAL
+  bestMeasuredAt     DateTime? @map("best_measured_at")
+  /// L1-INTERNAL
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
   athlete          Athlete          @relation(fields: [athleteId], references: [id], onDelete: Restrict)
   metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
