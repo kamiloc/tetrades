@@ -33,6 +33,7 @@ import { buildServer } from '../../../app.js';
 import { setEnvForTests } from '../../../env.js';
 import type { JobEnqueuer } from '../../../lib/jobs.js';
 import { prisma } from '../../../lib/prisma.js';
+import { createSupabaseDeletionExternals } from '../../../lib/supabaseAdmin.js';
 import type { AppRouter } from '../../../router/index.js';
 
 export { authReady, dbReady } from './load-env.js';
@@ -221,6 +222,8 @@ export async function cleanupAthleteRows(athleteId: string): Promise<void> {
   await prisma.athleteAchievement.deleteMany({ where: { athleteId } });
   await prisma.athletePublicProfile.deleteMany({ where: { athleteId } });
   await prisma.athletePrivateProfile.deleteMany({ where: { athleteId } });
+  // After the public profile, which may point at one as its avatar.
+  await prisma.profilePhotoAsset.deleteMany({ where: { athleteId } });
 
   // Decryption audit rows are persisted fire-and-forget (services/audit.ts),
   // so one from the last request of a test can land after the first delete.
@@ -240,6 +243,13 @@ export async function cleanupAthleteRows(athleteId: string): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, ATHLETE_DELETE_RETRY_DELAY_MS));
     }
   }
+}
+
+/** Removes an athlete's objects from both profile-photo buckets (ADR-015). */
+export async function purgeProfilePhotoObjects(athleteId: string): Promise<void> {
+  const externals = createSupabaseDeletionExternals();
+  const objects = await externals.listStorageObjects(`${athleteId}/`);
+  if (objects.length > 0) await externals.removeStorageObjects(objects);
 }
 
 export async function cleanupFixtureAthlete(fixture: FixtureAthlete): Promise<void> {

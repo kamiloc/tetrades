@@ -15,7 +15,7 @@ Examples:
 - sport
 - public bio, city, position, height, weight
 - verified achievements
-- public profile photo variants
+- public profile photo variants (`profile-photos` bucket)
 - connection count
 - club names and club-level public information: `Club` (except `createdAt`, L1)
 - metric catalog: `MetricDefinition`
@@ -28,7 +28,7 @@ Examples:
 
 - email address, account timestamps, device tokens
 - queue status metadata and request ids
-- profile photo originals (EXIF may contain GPS and device info)
+- profile photo originals (EXIF may contain GPS and device info), stored only in the private `profile-photo-originals` bucket ([ADR-015](adr/015-profile-photo-storage-split-buckets-and-upload-window.md))
 - consent, audit, and data-lifecycle records
 - club membership state and timestamps: `ClubMembership` (all fields except `clubId`)
 - trainer assignments: `ClubTrainer`

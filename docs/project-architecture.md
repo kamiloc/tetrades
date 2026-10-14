@@ -50,7 +50,7 @@ Next.js Server Component → tRPC `createCallerFactory` → explicit Prisma `sel
 
 ### Profile photo
 
-Mobile upload request → `storageRouter` signed upload flow → storage confirmation → BullMQ `optimizeImage` job (EXIF stripped) → public 150/400/1200 WebP variants
+`storage.getUploadUrl` (server-built path in the private `profile-photo-originals` bucket) → client uploads directly to Supabase Storage → `storage.confirmUpload` (15-minute window, object exists) → ORIGINAL row `QUEUED` → BullMQ `optimizeImage` job (EXIF stripped) → 150/400/1200 WebP variants in the public `profile-photos` bucket → rows `READY`, avatar set to CARD_400 ([ADR-015](adr/015-profile-photo-storage-split-buckets-and-upload-window.md))
 
 ### Trainer-reported metric entry
 
@@ -66,10 +66,9 @@ Mobile upload request → `storageRouter` signed upload flow → storage confirm
 
 ## Current state vs. target (known drift)
 
-The medical/OCR removal (`remove-medical-ocr-domain`) is applied in code, schema, policies, tests, and the database (migration `20261004003536_remove_medical_ocr`). The `medical-documents` Storage bucket is deleted (verified 2026-10-06; only `profile-photos` remains). The club, metric, trainer, and visibility model (ADR-013, `add-clubs-metrics-visibility-model`) is implemented in schema, RLS, services, and the `club`, `metric`, `visibility`, and `notification` routers, and the `deletePII` and `sendNotification` workers are real. Remaining drift:
+The medical/OCR removal (`remove-medical-ocr-domain`) is applied in code, schema, policies, tests, and the database (migration `20261004003536_remove_medical_ocr`). The `medical-documents` Storage bucket is deleted (verified 2026-10-06). Profile photos now use two buckets, `profile-photos` (public) and `profile-photo-originals` (private), per ADR-015. The club, metric, trainer, and visibility model (ADR-013, `add-clubs-metrics-visibility-model`) is implemented in schema, RLS, services, and the `club`, `metric`, `visibility`, and `notification` routers, and the `deletePII` and `sendNotification` workers are real. Remaining drift:
 
 - the trainer portal and athlete UI screens for clubs, metrics, and visibility do not exist yet
 - mobile push-token registration (`expo-notifications`) is not wired
 - no scheduled job yet purges deletion tombstones after the 5-year audit and consent retention
-- `optimizeImage` is still a stub that throws `not implemented`
 - there is no data-export endpoint

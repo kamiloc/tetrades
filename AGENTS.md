@@ -205,14 +205,17 @@ Authoritative detail lives in ADR-013. The invariants every agent must hold:
 
 ## Storage and image rules
 
-- Generate signed URLs only through `storageRouter`, never on the client. Maximum expiry is 15 minutes.
-- Upload flow: client requests a signed upload URL (`storageRouter.getUploadUrl`) → uploads directly to Supabase Storage → confirms (`storageRouter.confirmUpload`) → server enqueues the background job.
+Layout and upload window are set by ADR-015.
+
+- Generate signed URLs only through `storageRouter`, never on the client. Signed view URLs expire in at most 15 minutes. Supabase fixes signed upload tokens at 2 hours, so `confirmUpload` rejects any upload confirmed more than 15 minutes after its URL was issued.
+- Upload flow: client requests a signed upload URL (`storageRouter.getUploadUrl`) → uploads directly to Supabase Storage → confirms (`storageRouter.confirmUpload`) → server persists the ORIGINAL row, then enqueues the `optimizeImage` job.
+- Object paths are built server-side from the caller's athlete. Never accept a bucket or path from the client.
 - Never accept uploads through Fastify (no multipart).
-- Bucket `profile-photos/` (public for optimized variants only):
-  - `{athleteId}/original.{ext}` — L1-INTERNAL, never served publicly; signed URL through `storageRouter` for authenticated access only
-  - `{athleteId}/thumb-150.webp`, `card-400.webp`, `full-1200.webp` — L0-PUBLIC
+- Bucket `profile-photo-originals/` (private): `{athleteId}/{issuedAtMs}.{jpg|png|webp}` — L1-INTERNAL (may carry EXIF). Never served publicly; the owner reads it only through a `storageRouter` signed URL.
+- Bucket `profile-photos/` (public, optimized variants only): `{athleteId}/{issuedAtMs}/thumb-150.webp`, `card-400.webp`, `full-1200.webp` — L0-PUBLIC. Never write an original or any non-stripped file here.
+- After a successful run, the job removes the athlete's older uploads from both buckets, never newer ones.
 - Use `sharp` only (never jimp, canvas, ImageMagick). Generate exactly 3 variants: 150×150 (WebP q80), 400×400 (q85), 1200×1200 (q90), `fit: 'cover'`.
-- Strip EXIF from every variant: `sharp(input).withMetadata(false).resize(...).webp(...)`.
+- Strip EXIF from every variant: `sharp(input).rotate().resize(...).webp(...)`. `rotate()` applies the EXIF orientation first; never call `withMetadata`, `keepMetadata`, or `keepExif`, so sharp writes no metadata.
 - Image optimization runs in the `optimizeImage` job, never in a procedure.
 
 ## Web rules (Next.js)

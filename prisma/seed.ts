@@ -526,11 +526,35 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
 ];
 
 // Photo variant pixel dimensions (mirror image-optimization rules).
-const PHOTO_VARIANTS: ReadonlyArray<{ variant: PhotoVariant; width: number; height: number }> = [
-  { variant: PhotoVariant.ORIGINAL, width: 2400, height: 2400 },
-  { variant: PhotoVariant.FULL_1200, width: 1200, height: 1200 },
-  { variant: PhotoVariant.CARD_400, width: 400, height: 400 },
-  { variant: PhotoVariant.THUMB_150, width: 150, height: 150 },
+// Bucket-relative paths in the ADR-015 layout. The ORIGINAL lives in the
+// private profile-photo-originals bucket, the variants in public profile-photos;
+// seeding writes rows only, no Storage objects.
+const SEED_PHOTO_VERSION = '1760400000000';
+const PHOTO_VARIANTS: ReadonlyArray<{
+  variant: PhotoVariant;
+  width: number;
+  height: number;
+  file: string;
+}> = [
+  { variant: PhotoVariant.ORIGINAL, width: 2400, height: 2400, file: `${SEED_PHOTO_VERSION}.jpg` },
+  {
+    variant: PhotoVariant.FULL_1200,
+    width: 1200,
+    height: 1200,
+    file: `${SEED_PHOTO_VERSION}/full-1200.webp`,
+  },
+  {
+    variant: PhotoVariant.CARD_400,
+    width: 400,
+    height: 400,
+    file: `${SEED_PHOTO_VERSION}/card-400.webp`,
+  },
+  {
+    variant: PhotoVariant.THUMB_150,
+    width: 150,
+    height: 150,
+    file: `${SEED_PHOTO_VERSION}/thumb-150.webp`,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -850,9 +874,7 @@ async function main(): Promise<void> {
         data: {
           athleteId: athlete.id,
           variant: variant.variant,
-          objectPath: `profile-photos/${athlete.id}/${variant.variant.toLowerCase()}.${
-            variant.variant === PhotoVariant.ORIGINAL ? 'jpg' : 'webp'
-          }`,
+          objectPath: `${athlete.id}/${variant.file}`,
           width: variant.width,
           height: variant.height,
           processingStatus: ProcessingStatus.READY,

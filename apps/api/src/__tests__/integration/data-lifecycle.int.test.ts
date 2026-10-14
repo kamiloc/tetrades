@@ -12,6 +12,7 @@ import './helpers/load-env.js';
 import { randomUUID } from 'node:crypto';
 
 import type { QueueJobData, QueueName } from '@packages/queue';
+import type { StorageBucket } from '@packages/validators';
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -70,14 +71,15 @@ function captureLogger(): DeletionLogger & { lines: LogLine[] } {
   return { lines, info: at('info'), warn: at('warn'), error: at('error') };
 }
 
-const storageAdmin = () =>
+const storageAdmin = (bucket: StorageBucket) =>
   createClient(process.env['SUPABASE_URL'] ?? '', process.env['SUPABASE_SERVICE_ROLE_KEY'] ?? '', {
     auth: { autoRefreshToken: false, persistSession: false },
-  }).storage.from('profile-photos');
+  }).storage.from(bucket);
 
-async function uploadPhoto(athleteId: string, name: string): Promise<void> {
-  const { error } = await storageAdmin().upload(`${athleteId}/${name}`, Buffer.from('test-image'), {
-    contentType: 'image/jpeg',
+async function uploadPhoto(bucket: StorageBucket, athleteId: string, name: string): Promise<void> {
+  const contentType = name.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+  const { error } = await storageAdmin(bucket).upload(`${athleteId}/${name}`, Buffer.from('test-image'), {
+    contentType,
     upsert: true,
   });
   if (error !== null) throw new Error(`upload ${name}: ${error.message}`);
@@ -113,8 +115,9 @@ async function purgeAthlete(athleteId: string, userAccountId: string, supabaseUs
   await prisma.deviceToken.deleteMany({ where: { userAccountId } });
   await prisma.auditEvent.deleteMany({ where: { actorUserAccountId: userAccountId } });
   await prisma.userAccount.deleteMany({ where: { id: userAccountId } });
-  const paths = await createSupabaseDeletionExternals().listStorageObjects(`${athleteId}/`);
-  if (paths.length > 0) await storageAdmin().remove(paths);
+  const externals = createSupabaseDeletionExternals();
+  const objects = await externals.listStorageObjects(`${athleteId}/`);
+  if (objects.length > 0) await externals.removeStorageObjects(objects);
   if (supabaseUserId !== undefined) {
     await createSupabaseDeletionExternals().deleteAuthUser(supabaseUserId);
   }
@@ -354,8 +357,9 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
       select: { id: true },
     });
 
-    await uploadPhoto(athleteId, 'original.jpg');
-    await uploadPhoto(athleteId, 'thumb-150.webp');
+    // One object in each bucket (ADR-015 layout).
+    await uploadPhoto('profile-photo-originals', athleteId, '1760400000000.jpg');
+    await uploadPhoto('profile-photos', athleteId, '1760400000000/thumb-150.webp');
 
     const requestId = await createDeletionRequest(athleteId, user.userAccountId);
     return { user, athleteId, requestId, ownTrainerRow, reportedForFriendId: reportedForFriend.id, trainerRow };
@@ -461,7 +465,10 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
       const incomplete = log.lines.find((l) => l.obj['event'] === 'pii_deletion_incomplete');
       expect(incomplete?.level).toBe('error');
       expect(incomplete?.obj['requestId']).toBe('req-residue');
-      expect(incomplete?.obj['residue']).toEqual(['storage profile-photos']);
+      expect(incomplete?.obj['residue']).toEqual([
+        'storage profile-photos',
+        'storage profile-photo-originals',
+      ]);
     } finally {
       await cleanupFriendSide(a.ownTrainerRow);
       await purgeAthlete(a.athleteId, a.user.userAccountId);
