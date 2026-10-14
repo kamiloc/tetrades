@@ -1,16 +1,20 @@
 /**
  * Profile-photo upload flow (ADR-015, AGENTS.md Storage and image rules).
  *
- *   getUploadUrl  → signed upload URL for `{athleteId}/{issuedAtMs}.{ext}` in
- *                   the private originals bucket
+ *   getUploadUrl  → one-shot signed upload URL for
+ *                   `{athleteId}/{issuedAtMs}-{nonce}.{ext}` in the private
+ *                   originals bucket
  *   (client uploads directly to Supabase Storage)
  *   confirmUpload → 15-minute window + object exists → ORIGINAL row QUEUED
- *                   (persisted first) → image-optimization job
+ *                   (persisted first) → image-optimization job; idempotent
+ *                   for an upload that is already queued or processed
  *   getViewUrl    → owner-only signed URL (15 min) for one of their variants
  *
  * Every path is derived from the caller's own athlete; nothing here accepts a
  * client-supplied path.
  */
+import { randomBytes } from 'node:crypto';
+
 import { QUEUE_NAMES } from '@packages/queue';
 import type {
   ConfirmStorageUploadInput,
@@ -41,6 +45,10 @@ const EXTENSION: Record<PhotoContentType, 'jpg' | 'png' | 'webp'> = {
   'image/png': 'png',
   'image/webp': 'webp',
 };
+
+/** Issue time encoded in an upload id (`{issuedAtMs}-{nonce}.{ext}`). */
+export const issuedAtOfUploadId = (uploadId: string): number =>
+  Number(uploadId.slice(0, uploadId.indexOf('-')));
 
 /** Bucket-relative path of an upload in the originals bucket. */
 export const originalPath = (athleteId: string, uploadId: string): string =>
@@ -94,7 +102,10 @@ export async function getUploadUrl(
   input: GetStorageUploadUrlInput,
   now: Date = new Date(),
 ): Promise<StorageUploadUrlOutput> {
-  const uploadId = `${now.getTime()}.${EXTENSION[input.contentType]}`;
+  // The nonce keeps uploads issued in the same millisecond on distinct paths;
+  // the signed URL is one-shot (no upsert), so a path is never overwritten.
+  const nonce = randomBytes(8).toString('hex');
+  const uploadId = `${now.getTime()}-${nonce}.${EXTENSION[input.contentType]}`;
   const path = originalPath(caller.athleteId, uploadId);
   const { signedUrl, token } = await storageCall(
     deps.log,
@@ -111,8 +122,7 @@ export async function confirmUpload(
   input: ConfirmStorageUploadInput,
   now: Date = new Date(),
 ): Promise<ConfirmStorageUploadOutput> {
-  const issuedAt = Number(input.uploadId.slice(0, input.uploadId.indexOf('.')));
-  const age = now.getTime() - issuedAt;
+  const age = now.getTime() - issuedAtOfUploadId(input.uploadId);
   if (age < 0 || age > SIGNED_URL_TTL_SECONDS * 1000) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -126,6 +136,16 @@ export async function confirmUpload(
   );
   if (!uploaded) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Uploaded photo not found' });
+  }
+
+  // Repeat confirmations of the same upload must not reset a READY photo or
+  // queue a second job. Only a FAILED upload is re-queued (client retry).
+  const current = await deps.prisma.profilePhotoAsset.findUnique({
+    where: { athleteId_variant: { athleteId: caller.athleteId, variant: 'ORIGINAL' } },
+    select: { objectPath: true, processingStatus: true },
+  });
+  if (current?.objectPath === path && current.processingStatus !== 'FAILED') {
+    return { processingStatus: current.processingStatus };
   }
 
   // Persist BEFORE enqueue (AGENTS.md Background jobs).

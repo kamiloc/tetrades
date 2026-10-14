@@ -121,8 +121,9 @@ export function createSupabasePhotoStorage(): PhotoStorage {
   return {
     async createSignedUploadUrl(bucket, path) {
       // Supabase fixes upload tokens at 2 hours; confirmUpload enforces the
-      // 15-minute window (ADR-015).
-      const { data, error } = await from(bucket).createSignedUploadUrl(path, { upsert: true });
+      // 15-minute window (ADR-015). No upsert: the token is one-shot, so the
+      // bytes confirmUpload saw are the bytes the worker downloads.
+      const { data, error } = await from(bucket).createSignedUploadUrl(path);
       if (error !== null) throw new Error(`signed upload url failed: ${error.message}`);
       return { signedUrl: data.signedUrl, token: data.token };
     },
@@ -149,6 +150,7 @@ export function createSupabasePhotoStorage(): PhotoStorage {
     async upload(bucket, path, body, contentType) {
       const { error } = await from(bucket).upload(path, body, {
         contentType,
+        // Worker-only writes: a BullMQ retry rewrites its own version folder.
         upsert: true,
         // Variant paths are versioned per upload, so they never change in place.
         cacheControl: '31536000',

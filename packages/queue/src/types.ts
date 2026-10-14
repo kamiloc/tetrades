@@ -36,7 +36,7 @@ export interface ImageOptimizationJobData extends BaseJobData {
   athleteId: string;
   /**
    * Bucket-relative path of the upload in the private `profile-photo-originals`
-   * bucket, `{athleteId}/{issuedAtMs}.{ext}` (L1-INTERNAL — may still contain
+   * bucket, `{athleteId}/{issuedAtMs}-{nonce}.{ext}` (L1-INTERNAL — may still contain
    * EXIF metadata). ADR-015.
    */
   originalPath: string;

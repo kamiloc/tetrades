@@ -4,7 +4,8 @@
  * is persisted before image-optimization is enqueued.
  *
  * Covers, per procedure: success, invalid input (Zod), 401, 404; plus the
- * 15-minute confirmation window, forged and cross-athlete upload ids, and
+ * 15-minute confirmation window, forged and cross-athlete upload ids,
+ * collision-free ids, one-shot upload tokens, idempotent confirmation, and
  * the enqueue-failure path.
  */
 import './helpers/load-env.js';
@@ -55,6 +56,10 @@ async function uploadWithToken(path: string, token: string, body: Buffer): Promi
     .uploadToSignedUrl(path, token, body, { contentType: 'image/jpeg' });
   if (error !== null) throw new Error(`uploadToSignedUrl: ${error.message}`);
 }
+
+/** A well-formed upload id that was never issued. */
+const forgedUploadId = (issuedAtMs: number, ext = 'jpg') =>
+  `${issuedAtMs}-${'0'.repeat(16)}.${ext}`;
 
 const originalRow = (athleteId: string) =>
   prisma.profilePhotoAsset.findUnique({
@@ -112,7 +117,7 @@ describe.skipIf(!authReady)('storage router', () => {
         'UNAUTHORIZED',
       );
       await expectTRPCCode(
-        as().storage.confirmUpload.mutate({ uploadId: `${Date.now()}.jpg` }),
+        as().storage.confirmUpload.mutate({ uploadId: forgedUploadId(Date.now()) }),
         'UNAUTHORIZED',
       );
       await expectTRPCCode(as().storage.getViewUrl.query({ variant: 'ORIGINAL' }), 'UNAUTHORIZED');
@@ -127,7 +132,7 @@ describe.skipIf(!authReady)('storage router', () => {
       );
       await expectTRPCCode(
         client.storage.confirmUpload.mutate({
-          uploadId: `../${athleteIdOf(other)}/1760400000000.jpg`,
+          uploadId: `../${athleteIdOf(other)}/${forgedUploadId(1760400000000)}`,
         }),
         'BAD_REQUEST',
       );
@@ -151,6 +156,8 @@ describe.skipIf(!authReady)('storage router', () => {
 
   describe('upload flow', () => {
     let uploadId: string;
+    let uploadPath: string;
+    let uploadToken: string;
 
     it('getViewUrl is 404 before any upload', async () => {
       await expectTRPCCode(
@@ -161,11 +168,26 @@ describe.skipIf(!authReady)('storage router', () => {
 
     it('issues an upload URL for a server-built path in the caller’s folder', async () => {
       const result = await as(owner).storage.getUploadUrl.mutate({ contentType: 'image/jpeg' });
-      expect(result.uploadId).toMatch(/^\d{13}\.jpg$/);
+      expect(result.uploadId).toMatch(/^\d{13}-[0-9a-f]{16}\.jpg$/);
       expect(result.path).toBe(`${athleteIdOf(owner)}/${result.uploadId}`);
       expect(result.expiresIn).toBe(900);
       await uploadWithToken(result.path, result.token, await jpeg());
       uploadId = result.uploadId;
+      uploadPath = result.path;
+      uploadToken = result.token;
+    });
+
+    it('issues a distinct path for every request, even within one millisecond', async () => {
+      const issued = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          as(owner).storage.getUploadUrl.mutate({ contentType: 'image/jpeg' }),
+        ),
+      );
+      expect(new Set(issued.map((r) => r.path)).size).toBe(issued.length);
+    });
+
+    it('the upload token is one-shot: an uploaded original cannot be overwritten', async () => {
+      await expect(uploadWithToken(uploadPath, uploadToken, await jpeg())).rejects.toThrow();
     });
 
     it('confirmUpload is 404 for another athlete, even with a real upload id', async () => {
@@ -175,13 +197,13 @@ describe.skipIf(!authReady)('storage router', () => {
 
     it('confirmUpload is 404 for an upload id that was never uploaded', async () => {
       await expectTRPCCode(
-        as(owner).storage.confirmUpload.mutate({ uploadId: `${Date.now()}.png` }),
+        as(owner).storage.confirmUpload.mutate({ uploadId: forgedUploadId(Date.now(), 'png') }),
         'NOT_FOUND',
       );
     });
 
     it('confirmUpload rejects an upload older than 15 minutes', async () => {
-      const stale = `${Date.now() - 16 * 60_000}.jpg`;
+      const stale = forgedUploadId(Date.now() - 16 * 60_000);
       await expectTRPCCode(
         as(owner).storage.confirmUpload.mutate({ uploadId: stale }),
         'BAD_REQUEST',
@@ -211,6 +233,52 @@ describe.skipIf(!authReady)('storage router', () => {
         'originalPath',
         'requestId',
       ]);
+    });
+
+    it('confirming the same upload again enqueues nothing and keeps the row', async () => {
+      const before = enqueued.length;
+      expect(await as(owner).storage.confirmUpload.mutate({ uploadId })).toEqual({
+        processingStatus: 'QUEUED',
+      });
+      expect(enqueued).toHaveLength(before);
+    });
+
+    it('a re-confirm never resets a READY upload', async () => {
+      const athleteId = athleteIdOf(owner);
+      const where = { athleteId_variant: { athleteId, variant: 'ORIGINAL' as const } };
+      await prisma.profilePhotoAsset.update({
+        where,
+        data: { processingStatus: 'READY' },
+        select: { id: true },
+      });
+      const before = enqueued.length;
+      try {
+        expect(await as(owner).storage.confirmUpload.mutate({ uploadId })).toEqual({
+          processingStatus: 'READY',
+        });
+        expect(enqueued).toHaveLength(before);
+        expect((await originalRow(athleteId))?.processingStatus).toBe('READY');
+      } finally {
+        await prisma.profilePhotoAsset.update({
+          where,
+          data: { processingStatus: 'QUEUED' },
+          select: { id: true },
+        });
+      }
+    });
+
+    it('re-queues an upload whose processing FAILED', async () => {
+      const athleteId = athleteIdOf(owner);
+      await prisma.profilePhotoAsset.update({
+        where: { athleteId_variant: { athleteId, variant: 'ORIGINAL' } },
+        data: { processingStatus: 'FAILED' },
+        select: { id: true },
+      });
+      const before = enqueued.length;
+      expect(await as(owner).storage.confirmUpload.mutate({ uploadId })).toEqual({
+        processingStatus: 'QUEUED',
+      });
+      expect(enqueued).toHaveLength(before + 1);
     });
 
     it('getViewUrl returns a working 15-minute URL for the owner’s ORIGINAL', async () => {

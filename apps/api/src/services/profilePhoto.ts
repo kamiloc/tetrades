@@ -68,7 +68,7 @@ export async function renderVariants(original: Buffer): Promise<RenderedPhoto> {
 
 export interface ImageOptimizationInput {
   athleteId: string;
-  /** Bucket-relative path in the originals bucket: `{athleteId}/{issuedAtMs}.{ext}`. */
+  /** Bucket-relative path in the originals bucket: `{athleteId}/{issuedAtMs}-{nonce}.{ext}`. */
   originalPath: string;
   requestId: string;
 }
@@ -78,7 +78,7 @@ interface WorkerLogger {
   warn: (obj: Record<string, unknown>, msg?: string) => void;
 }
 
-/** `{athleteId}/{issuedAtMs}` — the version folder for this upload's variants. */
+/** `{athleteId}/{issuedAtMs}-{nonce}` — the version folder for this upload's variants. */
 function versionFolder(originalPath: string): string {
   const dot = originalPath.lastIndexOf('.');
   return dot === -1 ? originalPath : originalPath.slice(0, dot);
@@ -96,14 +96,17 @@ export async function runImageOptimization(
     objectPath: input.originalPath,
   };
 
+  // A READY original is never reprocessed. RUNNING stays claimable so BullMQ
+  // can resume a stalled job after a worker crash; a concurrent run on the
+  // same path writes identical bytes and idempotent upserts.
   const claimed = await prisma.profilePhotoAsset.updateMany({
-    where: currentOriginal,
+    where: { ...currentOriginal, processingStatus: { not: 'READY' } },
     data: { processingStatus: 'RUNNING' },
   });
   if (claimed.count === 0) {
     log.info(
       { event: 'image_optimization_superseded', ...logCtx },
-      'upload was replaced; skipping',
+      'upload was replaced or already processed; skipping',
     );
     return 'SUPERSEDED';
   }
@@ -168,9 +171,9 @@ export async function runImageOptimization(
   }
 }
 
-/** Upload timestamp encoded in `{athleteId}/{issuedAtMs}…`, or null if absent. */
-function issuedAtOf(path: string, athleteId: string): number | null {
-  const match = /^(\d{13})(?:[./]|$)/.exec(path.slice(athleteId.length + 1));
+/** Upload timestamp encoded in `{athleteId}/{issuedAtMs}-{nonce}…`, or null if absent. */
+export function issuedAtOf(path: string, athleteId: string): number | null {
+  const match = /^(\d{13})(?:[-./]|$)/.exec(path.slice(athleteId.length + 1));
   return match?.[1] === undefined ? null : Number(match[1]);
 }
 

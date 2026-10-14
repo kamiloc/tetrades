@@ -5,7 +5,8 @@
  * Proves: three public EXIF-free WebP variants and READY rows; the original's
  * upright size; the avatar points at CARD_400; a re-upload keeps row ids and
  * removes the older version but never a newer, unconfirmed upload; a
- * superseded job is skipped; a corrupt file leaves the row FAILED.
+ * superseded or already-READY job is skipped; a corrupt file leaves the row
+ * FAILED.
  */
 import './helpers/load-env.js';
 
@@ -44,7 +45,9 @@ describe.skipIf(!storageReady)('image optimization (worker logic)', () => {
   let sportId: string;
   let fx: FixtureAthlete;
   let issuedAt = Date.now() - 60_000;
-  const nextUploadPath = (ext = 'jpg') => `${fx.athleteId}/${(issuedAt += 1000)}.${ext}`;
+  let nonce = 0;
+  const nextUploadPath = (ext = 'jpg') =>
+    `${fx.athleteId}/${(issuedAt += 1000)}-${(nonce += 1).toString(16).padStart(16, '0')}.${ext}`;
 
   /** What confirmUpload does: object stored, ORIGINAL row QUEUED. */
   async function confirmed(path: string, body: Buffer): Promise<void> {
@@ -100,6 +103,7 @@ describe.skipIf(!storageReady)('image optimization (worker logic)', () => {
     const all = await rows();
     firstIds = new Map(all.map((r) => [r.variant, r.id]));
     const folder = firstPath.replace(/\.jpg$/, '');
+    expect(folder).toMatch(/\/\d{13}-[0-9a-f]{16}$/);
     expect(
       all.map(({ variant, objectPath, width, height, processingStatus }) => ({
         variant,
@@ -176,6 +180,14 @@ describe.skipIf(!storageReady)('image optimization (worker logic)', () => {
     const variants = await storage.list(VARIANTS_BUCKET, `${fx.athleteId}/`);
     expect(variants).toHaveLength(3);
     for (const p of variants) expect(p.startsWith(`${variantFolder}/`)).toBe(true);
+  });
+
+  it('skips a duplicate job for an upload that is already READY', async () => {
+    const current = (await rows()).find((r) => r.variant === 'ORIGINAL');
+    expect(current?.processingStatus).toBe('READY');
+    const before = await rows();
+    expect(await run(current?.objectPath ?? '')).toBe('SUPERSEDED');
+    expect(await rows()).toEqual(before);
   });
 
   it('skips a job for an upload that has since been replaced', async () => {

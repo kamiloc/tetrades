@@ -6,7 +6,8 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 
-import { renderVariants, VARIANT_SPECS } from './profilePhoto.js';
+import { issuedAtOf, renderVariants, VARIANT_SPECS } from './profilePhoto.js';
+import { issuedAtOfUploadId } from './storage.js';
 
 /** 800×600 JPEG tagged "rotate 90° CW" with GPS and camera EXIF. */
 async function photoWithExif(): Promise<Buffer> {
@@ -76,5 +77,27 @@ describe('renderVariants', () => {
       .toBuffer();
     await expect(renderVariants(gif)).rejects.toThrow('unsupported image format');
     await expect(renderVariants(Buffer.from('not an image'))).rejects.toThrow();
+  });
+});
+
+describe('upload version parsing', () => {
+  const athleteId = 'cathlete0000000000000000';
+
+  it('reads the issue time from an upload id', () => {
+    expect(issuedAtOfUploadId('1760400000000-0123456789abcdef.jpg')).toBe(1760400000000);
+  });
+
+  it('orders originals and variant folders by issue time', () => {
+    expect(issuedAtOf(`${athleteId}/1760400000000-0123456789abcdef.png`, athleteId)).toBe(
+      1760400000000,
+    );
+    expect(
+      issuedAtOf(`${athleteId}/1760400000001-0123456789abcdef/card-400.webp`, athleteId),
+    ).toBe(1760400000001);
+  });
+
+  it('ignores paths that are not versioned uploads', () => {
+    expect(issuedAtOf(`${athleteId}/original.jpg`, athleteId)).toBeNull();
+    expect(issuedAtOf(`${athleteId}/17604000000000-x.jpg`, athleteId)).toBeNull();
   });
 });

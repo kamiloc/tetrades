@@ -529,7 +529,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
 // Bucket-relative paths in the ADR-015 layout. The ORIGINAL lives in the
 // private profile-photo-originals bucket, the variants in public profile-photos;
 // seeding writes rows only, no Storage objects.
-const SEED_PHOTO_VERSION = '1760400000000';
+const SEED_PHOTO_VERSION = '1760400000000-5eed0000c0ffee00';
 const PHOTO_VARIANTS: ReadonlyArray<{
   variant: PhotoVariant;
   width: number;

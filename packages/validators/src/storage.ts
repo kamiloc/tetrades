@@ -15,10 +15,14 @@ export type StorageBucket = z.infer<typeof storageBucketSchema>;
 export const photoContentTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp']);
 export type PhotoContentType = z.infer<typeof photoContentTypeSchema>;
 
-/** `{issuedAtMs}.{ext}` — returned by getUploadUrl, echoed to confirmUpload. */
+/**
+ * `{issuedAtMs}-{nonce}.{ext}` — returned by getUploadUrl, echoed to
+ * confirmUpload. The random nonce keeps two uploads issued in the same
+ * millisecond on distinct paths.
+ */
 export const photoUploadIdSchema = z
   .string()
-  .regex(/^\d{13}\.(jpg|png|webp)$/, 'Invalid upload id');
+  .regex(/^\d{13}-[0-9a-f]{16}\.(jpg|png|webp)$/, 'Invalid upload id');
 export type PhotoUploadId = z.infer<typeof photoUploadIdSchema>;
 
 // ──────────────────────────────────────────────
