@@ -248,6 +248,7 @@ export async function createTestMetricDefinition(svc: SupabaseClient): Promise<s
     key: `rls_metric_${id.slice(0, 8)}`,
     name: 'RLS Sprint 100 m',
     unit: 's',
+    direction: 'LOWER_IS_BETTER',
     is_active: true,
   });
   if (error) throw new Error(`createTestMetricDefinition: ${error.message}`);

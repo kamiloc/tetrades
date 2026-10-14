@@ -14,6 +14,7 @@ erDiagram
     string key UK
     string name
     string unit
+    string direction
     string sport_id FK
     boolean is_active
   }
@@ -35,6 +36,8 @@ erDiagram
     decimal latest_value
     datetime latest_measured_at
     int entry_count
+    decimal best_value
+    datetime best_measured_at
     datetime updated_at
   }
 

@@ -54,7 +54,7 @@ Mobile upload request → `storageRouter` signed upload flow → storage confirm
 
 ### Trainer-reported metric entry
 
-`metric.reportEntry` (`trainerProcedure`: `ClubTrainer` row for the club) → transaction: `ACTIVE` `ClubMembership` check → entry persisted with reporting trainer and authorizing membership → `AthleteMetricSummary` derived → visible to others only as the athlete's visibility settings allow (`services/visibility.ts`, list and detail alike)
+`metric.reportEntry` (`trainerProcedure`: `ClubTrainer` row for the club) → transaction: `ACTIVE` `ClubMembership` check → entry persisted with reporting trainer and authorizing membership → `AthleteMetricSummary` derived (latest value, count, and personal best per the definition's `direction`) → visible to others only as the athlete's visibility settings allow (`services/visibility.ts`, list and detail alike)
 
 ### Club invitation
 

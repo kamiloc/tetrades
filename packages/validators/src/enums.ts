@@ -56,3 +56,7 @@ export type VisibilityAudience = z.infer<typeof visibilityAudienceEnum>;
 
 export const devicePlatformEnum = z.enum(['IOS', 'ANDROID']);
 export type DevicePlatform = z.infer<typeof devicePlatformEnum>;
+
+// Which way a metric improves. NEUTRAL metrics (e.g. body mass) have no personal best.
+export const metricDirectionEnum = z.enum(['HIGHER_IS_BETTER', 'LOWER_IS_BETTER', 'NEUTRAL']);
+export type MetricDirection = z.infer<typeof metricDirectionEnum>;

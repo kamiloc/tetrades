@@ -145,9 +145,46 @@ describe('cursor list inputs', () => {
 
 describe('metric definitions', () => {
   it('accepts snake_case keys and rejects others', () => {
-    const base = { id: ID_A, name: 'Sprint 100 m', unit: 's', sportId: null, isActive: true };
+    const base = {
+      id: ID_A,
+      name: 'Sprint 100 m',
+      unit: 's',
+      direction: 'LOWER_IS_BETTER',
+      sportId: null,
+      isActive: true,
+    };
     expect(metricDefinitionSchema.safeParse({ ...base, key: 'sprint_100m' }).success).toBe(true);
     expect(metricDefinitionSchema.safeParse({ ...base, key: 'Sprint-100m' }).success).toBe(false);
+  });
+
+  it('requires a known direction and exposes it publicly', () => {
+    const base = { id: ID_A, key: 'body_mass', name: 'Masa corporal', unit: 'kg', sportId: null };
+    for (const direction of ['HIGHER_IS_BETTER', 'LOWER_IS_BETTER', 'NEUTRAL']) {
+      expect(metricDefinitionPublicOutput.safeParse({ ...base, direction }).success).toBe(true);
+    }
+    expect(metricDefinitionPublicOutput.safeParse({ ...base, direction: 'UP' }).success).toBe(false);
+    expect(metricDefinitionPublicOutput.safeParse(base).success).toBe(false);
+  });
+});
+
+describe('metric summaries', () => {
+  const base = {
+    metricDefinitionId: ID_C,
+    latestValue: 11.42,
+    latestMeasuredAt: new Date('2026-09-15T10:00:00.000Z'),
+    entryCount: 3,
+  };
+
+  it('accepts a personal best', () => {
+    const best = { bestValue: 11.1, bestMeasuredAt: new Date('2026-08-01T10:00:00.000Z') };
+    expect(athleteMetricSummaryOutput.safeParse({ ...base, ...best }).success).toBe(true);
+  });
+
+  it('accepts a null best for NEUTRAL metrics but requires the fields', () => {
+    expect(
+      athleteMetricSummaryOutput.safeParse({ ...base, bestValue: null, bestMeasuredAt: null }).success,
+    ).toBe(true);
+    expect(athleteMetricSummaryOutput.safeParse(base).success).toBe(false);
   });
 });
 

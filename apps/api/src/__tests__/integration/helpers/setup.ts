@@ -23,6 +23,7 @@ import './load-env.js';
 
 import { randomUUID } from 'node:crypto';
 
+import type { MetricDirection } from '@packages/validators';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createTRPCClient, httpBatchLink, TRPCClientError } from '@trpc/client';
 import superjson from 'superjson';
@@ -427,10 +428,12 @@ export async function createTestMembership(args: {
   return id;
 }
 
-export async function createTestMetricDefinition(): Promise<string> {
+export async function createTestMetricDefinition(
+  direction: MetricDirection = 'HIGHER_IS_BETTER',
+): Promise<string> {
   const marker = randomUUID().slice(0, 8);
   const definition = await prisma.metricDefinition.create({
-    data: { key: `int_metric_${marker}`, name: 'Int Salto vertical', unit: 'cm' },
+    data: { key: `int_metric_${marker}`, name: 'Int Salto vertical', unit: 'cm', direction },
     select: { id: true },
   });
   return definition.id;

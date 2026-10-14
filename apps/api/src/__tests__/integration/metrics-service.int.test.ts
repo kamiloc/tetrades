@@ -4,7 +4,7 @@
  *
  * Writes: ACTIVE accepted; PENDING, COMPLETED, REJECTED, other-club, and
  * non-trainer rejected with nothing stored; summary derivation (count,
- * latest-by-measuredAt, back-dated entries).
+ * latest-by-measuredAt, back-dated entries, personal best by direction).
  * Reads: owner, stranger, connection, active-club trainer, other-club
  * trainer, after-leaving, and the missing-settings default.
  */
@@ -14,7 +14,7 @@ import { TRPCError } from '@trpc/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { requireClubTrainer } from '../../services/membership.js';
-import { getSummaries, listEntries, reportEntry } from '../../services/metrics.js';
+import { getSummaries, listDefinitions, listEntries, reportEntry } from '../../services/metrics.js';
 import { resolveViewer, type Viewer } from '../../services/viewer.js';
 
 import {
@@ -171,6 +171,99 @@ describe.skipIf(!dbReady)('metrics service', () => {
       expect(summary.latestValue.toNumber()).toBe(48.25);
       expect(Math.abs(summary.latestMeasuredAt.getTime() - daysAgo(1).getTime())).toBeLessThan(60_000);
       expect(summary.entryCount).toBe(await countFor(active.athleteId));
+    });
+  });
+
+  describe('personal best', () => {
+    const defs: Record<'HIGHER_IS_BETTER' | 'LOWER_IS_BETTER' | 'NEUTRAL', string> = {
+      HIGHER_IS_BETTER: '',
+      LOWER_IS_BETTER: '',
+      NEUTRAL: '',
+    };
+
+    beforeAll(async () => {
+      for (const direction of Object.keys(defs) as Array<keyof typeof defs>) {
+        defs[direction] = await createTestMetricDefinition(direction);
+      }
+    });
+
+    afterAll(async () => {
+      for (const id of Object.values(defs)) await deleteTestMetricDefinition(id);
+    });
+
+    const reportTo = async (metricDefinitionId: string, value: number, measuredAt: Date) =>
+      reportEntry(prisma, await requireClubTrainer(prisma, viewer('trainerA'), clubA), {
+        athleteId: active.athleteId,
+        metricDefinitionId,
+        value,
+        measuredAt,
+      });
+    const summaryOf = async (metricDefinitionId: string) => {
+      const row = await prisma.athleteMetricSummary.findUniqueOrThrow({
+        where: { athleteId_metricDefinitionId: { athleteId: active.athleteId, metricDefinitionId } },
+        select: { latestValue: true, bestValue: true, bestMeasuredAt: true },
+      });
+      return {
+        latest: row.latestValue.toNumber(),
+        best: row.bestValue === null ? null : row.bestValue.toNumber(),
+        bestMeasuredAt: row.bestMeasuredAt,
+      };
+    };
+
+    it('HIGHER_IS_BETTER keeps the largest value while latest still moves', async () => {
+      const id = defs.HIGHER_IS_BETTER;
+      await reportTo(id, 40, daysAgo(5));
+      await reportTo(id, 46, daysAgo(4));
+      await reportTo(id, 42, daysAgo(3));
+      expect(await summaryOf(id)).toMatchObject({ latest: 42, best: 46 });
+    });
+
+    it('LOWER_IS_BETTER keeps the smallest value while latest still moves', async () => {
+      const id = defs.LOWER_IS_BETTER;
+      await reportTo(id, 11.9, daysAgo(5));
+      await reportTo(id, 11.4, daysAgo(4));
+      await reportTo(id, 11.7, daysAgo(3));
+      expect(await summaryOf(id)).toMatchObject({ latest: 11.7, best: 11.4 });
+    });
+
+    it('NEUTRAL tracks no best', async () => {
+      const id = defs.NEUTRAL;
+      await reportTo(id, 68.2, daysAgo(5));
+      await reportTo(id, 67.5, daysAgo(4));
+      expect(await summaryOf(id)).toEqual({ latest: 67.5, best: null, bestMeasuredAt: null });
+    });
+
+    it('a back-dated better entry sets the best but not the latest', async () => {
+      const id = defs.HIGHER_IS_BETTER;
+      await reportTo(id, 50, daysAgo(20));
+      const summary = await summaryOf(id);
+      expect(summary).toMatchObject({ latest: 42, best: 50 });
+      expect(Math.abs((summary.bestMeasuredAt?.getTime() ?? 0) - daysAgo(20).getTime())).toBeLessThan(60_000);
+    });
+
+    it('a tie keeps the first recorded best', async () => {
+      const id = defs.HIGHER_IS_BETTER;
+      await reportTo(id, 50, daysAgo(1));
+      const summary = await summaryOf(id);
+      expect(summary.best).toBe(50);
+      expect(Math.abs((summary.bestMeasuredAt?.getTime() ?? 0) - daysAgo(20).getTime())).toBeLessThan(60_000);
+    });
+
+    it('getSummaries returns the best fields', async () => {
+      const rows = await getSummaries(prisma, viewer('active'), active.athleteId);
+      const byId = new Map(rows.map((r) => [r.metricDefinitionId, r]));
+      expect(byId.get(defs.LOWER_IS_BETTER)?.bestValue).toBe(11.4);
+      expect(byId.get(defs.NEUTRAL)).toMatchObject({ bestValue: null, bestMeasuredAt: null });
+    });
+
+    it('listDefinitions returns the direction', async () => {
+      await prisma.metricDefinition.update({
+        where: { id: defs.LOWER_IS_BETTER },
+        data: { sportId },
+        select: { id: true },
+      });
+      const page = await listDefinitions(prisma, { sportId, take: 20 });
+      expect(page.items.find((d) => d.id === defs.LOWER_IS_BETTER)?.direction).toBe('LOWER_IS_BETTER');
     });
   });
 

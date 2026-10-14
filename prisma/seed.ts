@@ -22,6 +22,7 @@ import {
   ConnectionStatus,
   DataLifecycleStatus,
   DataLifecycleType,
+  MetricDirection,
   OnboardingStatus,
   PhotoVariant,
   PrismaClient,
@@ -599,6 +600,7 @@ async function seedClubsAndMetrics(
   }
 
   const metricIds = new Map<string, string>();
+  const metricDirections = new Map<string, MetricDirection>();
   for (const metric of METRICS) {
     const sportId = metric.sportName === null ? null : sportRecords.get(metric.sportName);
     if (sportId === undefined) throw new Error(`Sport "${metric.sportName}" was not seeded.`);
@@ -607,12 +609,14 @@ async function seedClubsAndMetrics(
         key: metric.key,
         name: metric.name,
         unit: metric.unit,
+        direction: metric.direction,
         sportId,
         isActive: metric.isActive ?? true,
       },
       select: { id: true },
     });
     metricIds.set(metric.key, created.id);
+    metricDirections.set(created.id, metric.direction);
   }
 
   console.log('Seed: creating memberships (all four states) and metric series...');
@@ -625,6 +629,8 @@ async function seedClubsAndMetrics(
       latestValue: number;
       latestMeasuredAt: Date;
       entryCount: number;
+      bestValue: number | null;
+      bestMeasuredAt: Date | null;
     }
   >();
   const now = new Date();
@@ -704,6 +710,8 @@ async function seedClubsAndMetrics(
         });
 
         const key = `${aid}:${metricDefinitionId}`;
+        const direction = metricDirections.get(metricDefinitionId);
+        const tracksBest = direction !== undefined && direction !== MetricDirection.NEUTRAL;
         const current = summaries.get(key);
         if (current === undefined) {
           summaries.set(key, {
@@ -712,12 +720,24 @@ async function seedClubsAndMetrics(
             latestValue: value,
             latestMeasuredAt: measuredAt,
             entryCount: 1,
+            bestValue: tracksBest ? value : null,
+            bestMeasuredAt: tracksBest ? measuredAt : null,
           });
         } else {
           current.entryCount += 1;
           if (measuredAt >= current.latestMeasuredAt) {
             current.latestValue = value;
             current.latestMeasuredAt = measuredAt;
+          }
+          // Strictly better only, so the first recorded value keeps a tie.
+          const better =
+            current.bestValue === null ||
+            (direction === MetricDirection.HIGHER_IS_BETTER
+              ? value > current.bestValue
+              : value < current.bestValue);
+          if (tracksBest && better) {
+            current.bestValue = value;
+            current.bestMeasuredAt = measuredAt;
           }
         }
       }
