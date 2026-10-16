@@ -17,6 +17,12 @@
  *   (e) non-owner cannot UPDATE another athlete's achievement
  *   (f) owner can DELETE their own achievement
  *   (g) non-owner cannot DELETE another athlete's achievement
+ * Integrity trigger (supabase/constraints/achievement_verification_integrity.sql):
+ *   (h) owner cannot INSERT an achievement as VERIFIED or with a source
+ *   (i) owner cannot UPDATE verification_status or verification_source
+ *   (j) editing the title / organization / date of a VERIFIED row keeps the
+ *       edit and resets the row to UNVERIFIED
+ *   (k) service_role (the API's certification flow) can still set VERIFIED
  */
 
 import { randomUUID } from 'node:crypto';
@@ -25,6 +31,7 @@ import {
   addClubTrainer,
   cleanupTestClub,
   cleanupTestUser,
+  createTestAchievement,
   createTestClub,
   createTestMembership,
   createTestSport,
@@ -230,5 +237,77 @@ describe.skipIf(!envReady)('athlete_achievements RLS', () => {
 
     expect(error).toBeNull();
     expect(count).toBe(0);
+  });
+  // ── (h)–(k) verification integrity trigger ─────────────────────────────────
+
+  const statusOf = async (id: string) => {
+    const { data } = await svc
+      .from('athlete_achievements')
+      .select('verification_status, verification_source, title')
+      .eq('id', id)
+      .single();
+    return data as {
+      verification_status: string;
+      verification_source: string | null;
+      title: string;
+    };
+  };
+
+  it('(h) rejects an owner INSERT that starts VERIFIED or carries a source', async () => {
+    const extras = [
+      { verification_status: 'VERIFIED' },
+      { verification_status: 'PENDING' },
+      { verification_source: 'Planilla oficial' },
+    ];
+    for (const extra of extras) {
+      const { error } = await user1.client.from('athlete_achievements').insert({
+        id: randomUUID(),
+        athlete_id: user1.athleteId,
+        title: 'Self-verified medal',
+        organization: 'Test Org',
+        achieved_on: '2024-03-01',
+        ...extra,
+      });
+      expect(error).not.toBeNull();
+    }
+  });
+
+  it('(i) rejects an owner UPDATE of verification_status or verification_source', async () => {
+    const id = await createTestAchievement(svc, user1.athleteId);
+    const changes = [{ verification_status: 'VERIFIED' }, { verification_source: 'Planilla oficial' }];
+    for (const change of changes) {
+      const { error } = await user1.client.from('athlete_achievements').update(change).eq('id', id);
+      expect(error).not.toBeNull();
+    }
+    expect(await statusOf(id)).toMatchObject({
+      verification_status: 'UNVERIFIED',
+      verification_source: null,
+    });
+    await svc.from('athlete_achievements').delete().eq('id', id);
+  });
+
+  it('(j) keeps an edit to a VERIFIED achievement and resets it to UNVERIFIED', async () => {
+    const id = await createTestAchievement(svc, user1.athleteId, 'VERIFIED');
+    const { error } = await user1.client
+      .from('athlete_achievements')
+      .update({ title: 'Campeonato Nacional (editado)' })
+      .eq('id', id);
+    expect(error).toBeNull();
+    expect(await statusOf(id)).toMatchObject({
+      title: 'Campeonato Nacional (editado)',
+      verification_status: 'UNVERIFIED',
+    });
+    await svc.from('athlete_achievements').delete().eq('id', id);
+  });
+
+  it('(k) lets service_role set VERIFIED (the API certification flow)', async () => {
+    const id = await createTestAchievement(svc, user1.athleteId);
+    const { error } = await svc
+      .from('athlete_achievements')
+      .update({ verification_status: 'VERIFIED' })
+      .eq('id', id);
+    expect(error).toBeNull();
+    expect((await statusOf(id)).verification_status).toBe('VERIFIED');
+    await svc.from('athlete_achievements').delete().eq('id', id);
   });
 });

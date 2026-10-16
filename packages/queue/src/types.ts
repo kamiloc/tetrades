@@ -57,7 +57,12 @@ export interface NotificationJobData extends BaseJobData {
   /** Recipient UserAccount id — the worker resolves device tokens itself. */
   userAccountId: string;
   /** Template key; the worker owns copy so no free text sits in Redis. */
-  notificationType: 'CONNECTION_REQUEST' | 'CONNECTION_ACCEPTED' | 'CLUB_INVITATION';
+  notificationType:
+    | 'CONNECTION_REQUEST'
+    | 'CONNECTION_ACCEPTED'
+    | 'CLUB_INVITATION'
+    | 'CERTIFICATION_REQUESTED'
+    | 'CERTIFICATION_DECIDED';
   /** Row the notification is about (e.g. connection id). */
   subjectId: string;
 }

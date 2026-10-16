@@ -248,6 +248,9 @@ async function deleteAthleteRows(
   await prisma.$transaction(async (tx) => {
     const where = { athleteId };
 
+    // Certification requests reference both the athlete's achievements and
+    // memberships, so they go before either (add-achievement-certification).
+    await tx.achievementCertificationRequest.deleteMany({ where: { achievement: { athleteId } } });
     await tx.athleteMetricEntry.deleteMany({ where });
     await tx.athleteMetricSummary.deleteMany({ where });
     await tx.clubMembership.deleteMany({ where });
@@ -309,6 +312,9 @@ export async function verifyDeletion(
   const where = { athleteId };
 
   const counts: Record<string, number> = {
+    achievement_certification_requests: await prisma.achievementCertificationRequest.count({
+      where: { achievement: { athleteId } },
+    }),
     athlete_metric_entries: await prisma.athleteMetricEntry.count({ where }),
     athlete_metric_summaries: await prisma.athleteMetricSummary.count({ where }),
     club_memberships: await prisma.clubMembership.count({ where }),

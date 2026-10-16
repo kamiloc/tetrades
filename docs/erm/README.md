@@ -12,5 +12,6 @@
 | `sport-metrics.mmd` | built | MetricDefinition, AthleteMetricEntry, AthleteMetricSummary | Athlete, Sport, ClubTrainer, ClubMembership |
 | `visibility.mmd` | built | AthleteVisibilitySettings | Athlete |
 | `notifications.mmd` | built | DeviceToken | UserAccount |
+| `achievement-certification.mmd` | built | AchievementCertificationRequest | AthleteAchievement, Club, ClubMembership, ClubTrainer |
 
 The clubs, metrics, and visibility fragments follow the capabilities of openspec change `add-clubs-metrics-visibility-model`; ADR-013's open items (trainer role model, membership states) were closed by that change.

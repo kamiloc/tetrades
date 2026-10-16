@@ -10,13 +10,14 @@ import {
   apiClient,
   authReady,
   cleanupAuthedUser,
+  cleanupTestClub,
   createAuthedUser,
+  createTestClub,
   createTestSport,
   dbReady,
   deleteTestSport,
   expectTRPCCode,
   invalidateAuthUser,
-  prisma,
   startServer,
   type AuthedUser,
   type TestServer,
@@ -88,33 +89,21 @@ describe.skipIf(!authReady)('auth boundary — real Supabase JWTs', () => {
       await cleanupAuthedUser(doomed);
     }
   });
-
-  it('verifyAchievement returns FORBIDDEN for a non-admin user', async () => {
-    if (user.athleteId === null) throw new Error('fixture invariant');
-    // A real PENDING achievement proves the role gate fires even for a
-    // verifiable record (the gate runs before the lookup).
-    const achievement = await prisma.athleteAchievement.create({
-      data: {
-        athleteId: user.athleteId,
-        title: 'Subcampeón Válida Nacional',
-        organization: 'Federación Colombiana de Ciclismo',
-        achievedOn: new Date('2024-05-19'),
-        verificationStatus: 'PENDING',
-      },
-      select: { id: true },
-    });
-
-    await expectTRPCCode(
-      apiClient(server.url, user.accessToken).achievement.verifyAchievement.mutate({
-        achievementId: achievement.id,
-      }),
-      'FORBIDDEN',
-    );
-
-    const untouched = await prisma.athleteAchievement.findUniqueOrThrow({
-      where: { id: achievement.id },
-      select: { verificationStatus: true },
-    });
-    expect(untouched.verificationStatus).toBe('PENDING');
+  it('trainerProcedure returns FORBIDDEN for a signed-in user who trains no club', async () => {
+    // Replaces the removed SYSTEM-only verifyAchievement gate: verification is
+    // now decided by club trainers only (add-achievement-certification).
+    const clubId = await createTestClub('auth-boundary');
+    try {
+      await expectTRPCCode(
+        apiClient(server.url, user.accessToken).achievement.decideCertification.mutate({
+          clubId,
+          requestId: 'cunknownid000000000000000',
+          decision: 'APPROVE',
+        }),
+        'FORBIDDEN',
+      );
+    } finally {
+      await cleanupTestClub(clubId);
+    }
   });
 });

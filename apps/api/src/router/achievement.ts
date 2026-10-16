@@ -1,15 +1,29 @@
 import {
   athleteAchievementPublicListOutput,
   athleteAchievementSchema,
+  certificationMutationOutput,
   createAchievementInput,
+  decideCertificationInput,
   listAchievementsInput,
-  verifyAchievementInput,
+  listMyCertificationRequestsInput,
+  listPendingCertificationsInput,
+  myCertificationRequestListOutput,
+  pendingCertificationListOutput,
+  requestCertificationInput,
+  withdrawCertificationInput,
 } from '@packages/validators';
 import { TRPCError } from '@trpc/server';
 
 import { listAchievements } from '../services/achievements.js';
-import { resolveViewer } from '../services/viewer.js';
-import { protectedProcedure, publicProcedure, router } from '../trpc.js';
+import {
+  decideCertification,
+  listMyRequests,
+  listPendingForClub,
+  requestCertification,
+  withdrawCertification,
+} from '../services/certification.js';
+import { requireViewerAthlete, resolveViewer } from '../services/viewer.js';
+import { protectedProcedure, publicProcedure, router, trainerProcedure } from '../trpc.js';
 
 const achievementSelect = {
   id: true,
@@ -43,7 +57,8 @@ export const achievementRouter = router({
           title: input.title,
           organization: input.organization,
           achievedOn: new Date(input.achievedOn),
-          verificationStatus: 'PENDING',
+          // Only the certification flow changes this (add-achievement-certification).
+          verificationStatus: 'UNVERIFIED',
         },
         select: achievementSelect,
       });
@@ -60,44 +75,48 @@ export const achievementRouter = router({
       listAchievements(ctx.prisma, await resolveViewer(ctx.prisma, ctx.userId), input),
     ),
 
-  verifyAchievement: protectedProcedure
-    .input(verifyAchievementInput)
-    .output(athleteAchievementSchema)
-    .mutation(async ({ ctx, input }) => {
-      const userAccount = await ctx.prisma.userAccount.findUnique({
-        where: { supabaseUserId: ctx.userId },
-        select: { role: true },
-      });
+  // ── Certification by club trainers (achievement-certification spec) ────────
+  // Verification status changes only here; the athlete asks a club where they
+  // are ACTIVE, and a trainer of that club decides.
 
-      if (userAccount?.role !== 'SYSTEM') {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Only administrators can verify achievements',
-        });
-      }
+  requestCertification: protectedProcedure
+    .input(requestCertificationInput)
+    .output(certificationMutationOutput)
+    .mutation(async ({ ctx, input }) =>
+      requestCertification(ctx.prisma, await requireViewerAthlete(ctx.prisma, ctx.userId), input, {
+        jobs: ctx.jobs,
+        requestId: ctx.requestId,
+        log: ctx.log,
+      }),
+    ),
 
-      const achievement = await ctx.prisma.athleteAchievement.findUnique({
-        where: { id: input.achievementId },
-        select: achievementSelect,
-      });
+  withdrawCertification: protectedProcedure
+    .input(withdrawCertificationInput)
+    .output(certificationMutationOutput)
+    .mutation(async ({ ctx, input }) =>
+      withdrawCertification(ctx.prisma, await requireViewerAthlete(ctx.prisma, ctx.userId), input),
+    ),
 
-      if (!achievement) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Achievement not found' });
-      }
+  listMyCertificationRequests: protectedProcedure
+    .input(listMyCertificationRequestsInput)
+    .output(myCertificationRequestListOutput)
+    .query(async ({ ctx, input }) =>
+      listMyRequests(ctx.prisma, await requireViewerAthlete(ctx.prisma, ctx.userId), input),
+    ),
 
-      if (achievement.verificationStatus === 'VERIFIED') {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Achievement is already verified',
-        });
-      }
+  listPendingCertifications: trainerProcedure
+    .input(listPendingCertificationsInput)
+    .output(pendingCertificationListOutput)
+    .query(({ ctx, input }) => listPendingForClub(ctx.prisma, ctx.clubTrainer, input)),
 
-      const updated = await ctx.prisma.athleteAchievement.update({
-        where: { id: input.achievementId },
-        data: { verificationStatus: 'VERIFIED' },
-        select: achievementSelect,
-      });
-
-      return updated;
-    }),
+  decideCertification: trainerProcedure
+    .input(decideCertificationInput)
+    .output(certificationMutationOutput)
+    .mutation(({ ctx, input }) =>
+      decideCertification(ctx.prisma, ctx.clubTrainer, input, {
+        jobs: ctx.jobs,
+        requestId: ctx.requestId,
+        log: ctx.log,
+      }),
+    ),
 });

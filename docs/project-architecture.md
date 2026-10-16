@@ -56,6 +56,10 @@ Next.js Server Component → tRPC `createCallerFactory` → explicit Prisma `sel
 
 `metric.reportEntry` (`trainerProcedure`: `ClubTrainer` row for the club) → transaction: `ACTIVE` `ClubMembership` check → entry persisted with reporting trainer and authorizing membership → `AthleteMetricSummary` derived (latest value, count, and personal best per the definition's `direction`) → visible to others only as the athlete's visibility settings allow (`services/visibility.ts`, list and detail alike)
 
+### Trainer certification of an achievement
+
+`achievement.requestCertification` (athlete; club with an `ACTIVE` membership) → transaction: `PENDING` request persisted, achievement `PENDING` → BullMQ `notifications` jobs to the club's trainers (`CERTIFICATION_REQUESTED`, ids only) → `achievement.decideCertification` (`trainerProcedure`; `ACTIVE` membership re-checked) → request `APPROVED` / `REJECTED` (with reason) and achievement `VERIFIED` / `REJECTED` in one transaction → athlete notified (`CERTIFICATION_DECIDED`) → public reads show the certifying club only when the club-memberships audience allows ([ADR-016](adr/016-achievement-certification-by-club-trainers.md))
+
 ### Club invitation
 
 `club.inviteAthlete` → `PENDING_ATHLETE_CONFIRMATION` membership persisted → BullMQ `notifications` job (`CLUB_INVITATION`, ids only) → push via Expo HTTP API → athlete accepts or rejects through `club.respondToInvitation`

@@ -19,7 +19,11 @@ export { useSports } from './hooks/sport';
 export {
   useAddAchievement,
   useListAchievements,
-  useVerifyAchievement,
+  useRequestCertification,
+  useWithdrawCertification,
+  useMyCertificationRequests,
+  usePendingCertifications,
+  useDecideCertification,
 } from './hooks/achievement';
 
 export {
