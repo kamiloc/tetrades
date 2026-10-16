@@ -60,3 +60,13 @@ export type DevicePlatform = z.infer<typeof devicePlatformEnum>;
 // Which way a metric improves. NEUTRAL metrics (e.g. body mass) have no personal best.
 export const metricDirectionEnum = z.enum(['HIGHER_IS_BETTER', 'LOWER_IS_BETTER', 'NEUTRAL']);
 export type MetricDirection = z.infer<typeof metricDirectionEnum>;
+
+// Achievement certification requests (add-achievement-certification). Only
+// PENDING is open; the other three are terminal.
+export const certificationRequestStatusEnum = z.enum([
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+]);
+export type CertificationRequestStatus = z.infer<typeof certificationRequestStatusEnum>;

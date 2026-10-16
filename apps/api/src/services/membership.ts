@@ -171,22 +171,53 @@ async function transitionMembership(
   }
 
   const now = new Date();
-  const { count } = await prisma.clubMembership.updateMany({
-    where: { id: membershipId, status: membership.status },
-    data: {
-      status: to,
-      ...(membership.status === 'PENDING_ATHLETE_CONFIRMATION' ? { respondedAt: now } : {}),
-      ...(to === 'COMPLETED' ? { endedAt: now } : {}),
-    },
-  });
-  if (count === 0) {
-    // Another request changed the status between the read and the update.
-    throw new TRPCError({
-      code: 'CONFLICT',
-      message: 'This membership was changed by another request',
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.clubMembership.updateMany({
+      where: { id: membershipId, status: membership.status },
+      data: {
+        status: to,
+        ...(membership.status === 'PENDING_ATHLETE_CONFIRMATION' ? { respondedAt: now } : {}),
+        ...(to === 'COMPLETED' ? { endedAt: now } : {}),
+      },
     });
-  }
+    if (count === 0) {
+      // Another request changed the status between the read and the update.
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'This membership was changed by another request',
+      });
+    }
+    if (to === 'COMPLETED') {
+      await cancelOpenCertifications(tx, membershipId);
+    }
+  });
   return { id: membershipId, status: to };
+}
+
+/**
+ * Leaving a club cancels its open certification requests in the same
+ * transaction (achievement-certification spec, design D4). Each achievement
+ * has at most one PENDING request, so cancelling it returns the achievement
+ * to UNVERIFIED. APPROVED requests are untouched: certifications outlive the
+ * membership.
+ */
+async function cancelOpenCertifications(
+  tx: Prisma.TransactionClient,
+  membershipId: string,
+): Promise<void> {
+  const open = await tx.achievementCertificationRequest.findMany({
+    where: { clubMembershipId: membershipId, status: 'PENDING' },
+    select: { achievementId: true },
+  });
+  if (open.length === 0) return;
+  await tx.achievementCertificationRequest.updateMany({
+    where: { clubMembershipId: membershipId, status: 'PENDING' },
+    data: { status: 'CANCELLED' },
+  });
+  await tx.athleteAchievement.updateMany({
+    where: { id: { in: open.map((r) => r.achievementId) } },
+    data: { verificationStatus: 'UNVERIFIED' },
+  });
 }
 
 export function respondToInvitation(

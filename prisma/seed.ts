@@ -32,7 +32,13 @@ import {
   VerificationStatus,
 } from '@prisma/client';
 
-import { CLUBS, MEMBERSHIPS, METRICS, VISIBILITY } from './seed-data/clubs-metrics.js';
+import {
+  CERTIFICATIONS,
+  CLUBS,
+  MEMBERSHIPS,
+  METRICS,
+  VISIBILITY,
+} from './seed-data/clubs-metrics.js';
 
 const prisma = new PrismaClient();
 
@@ -198,7 +204,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Plata Campeonato Suramericano Adulto',
         organization: 'Confederación Suramericana de Boxeo',
         achievedOn: '2023-08-22',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
     ],
@@ -351,7 +357,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Campeón Nacional Sub-18 con la selección Bolívar',
         organization: 'Federación Colombiana de Béisbol',
         achievedOn: '2024-10-06',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.REJECTED,
         verificationSource: null,
       },
       {
@@ -390,7 +396,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Mejor opuesta — Liga Colombiana de Voleibol 2025',
         organization: 'Federación Colombiana de Voleibol',
         achievedOn: '2025-09-27',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
     ],
@@ -415,7 +421,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Subcampeón Liga Profesional de Baloncesto 2025',
         organization: 'Federación Colombiana de Baloncesto',
         achievedOn: '2025-12-13',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
       {
@@ -447,7 +453,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Campeón Nacional de Tejo por parejas',
         organization: 'Federación Colombiana de Tejo',
         achievedOn: '2024-12-07',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
       {
@@ -486,7 +492,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Oro 50 m libre — Campeonato Nacional Interligas',
         organization: 'Federación Colombiana de Natación',
         achievedOn: '2025-04-27',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
     ],
@@ -511,7 +517,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Campeona Liga Femenina de Fútbol de Salón de Bogotá 2025',
         organization: 'Federación Colombiana de Fútbol de Salón',
         achievedOn: '2025-11-30',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
       {
@@ -566,6 +572,8 @@ async function wipe(): Promise<void> {
   // avatar FK is satisfied because we delete the profile before the photo.
   // Clubs & metrics (ADR-013): entries reference memberships and trainers.
   await prisma.deviceToken.deleteMany();
+  // Certification requests reference achievements, memberships, and trainers.
+  await prisma.achievementCertificationRequest.deleteMany();
   await prisma.athleteMetricEntry.deleteMany();
   await prisma.athleteMetricSummary.deleteMany();
   await prisma.athleteVisibilitySettings.deleteMany();
@@ -658,6 +666,8 @@ async function seedClubsAndMetrics(
     }
   >();
   const now = new Date();
+  // `${athleteSlug}@${clubSlug}` → membership id, for memberships left ACTIVE.
+  const activeMemberships = new Map<string, string>();
 
   for (const seed of MEMBERSHIPS) {
     const club = clubs.get(seed.clubSlug);
@@ -700,6 +710,9 @@ async function seedClubsAndMetrics(
       data: { status: ClubMembershipStatus.ACTIVE, respondedAt },
       select: { id: true },
     });
+    if (seed.status === ClubMembershipStatus.ACTIVE) {
+      activeMemberships.set(`${seed.athleteSlug}@${seed.clubSlug}`, membership.id);
+    }
 
     const activeFrom = respondedAt ?? new Date(seed.invitedAt);
     const activeUntil = seed.endedAt === null ? now : new Date(seed.endedAt);
@@ -781,6 +794,65 @@ async function seedClubsAndMetrics(
 
   for (const summary of summaries.values()) {
     await prisma.athleteMetricSummary.create({ data: summary, select: { athleteId: true } });
+  }
+
+  console.log('Seed: creating achievement certification requests...');
+  // The seeded achievement status is the summary of its request (design D1).
+  const SUMMARY_FOR = {
+    APPROVED: VerificationStatus.VERIFIED,
+    REJECTED: VerificationStatus.REJECTED,
+    PENDING: VerificationStatus.PENDING,
+    CANCELLED: VerificationStatus.UNVERIFIED,
+  } as const;
+  for (const cert of CERTIFICATIONS) {
+    const label = `${cert.athleteSlug} "${cert.achievementTitle}"`;
+    const club = clubs.get(cert.clubSlug);
+    const membershipId = activeMemberships.get(`${cert.athleteSlug}@${cert.clubSlug}`);
+    if (club === undefined || membershipId === undefined) {
+      throw new Error(`${label}: needs an ACTIVE membership with ${cert.clubSlug}.`);
+    }
+    const achievement = await prisma.athleteAchievement.findFirst({
+      where: { athleteId: athleteId(cert.athleteSlug), title: cert.achievementTitle },
+      select: { id: true, verificationStatus: true },
+    });
+    if (achievement === null) throw new Error(`${label}: achievement was not seeded.`);
+    if (achievement.verificationStatus !== SUMMARY_FOR[cert.status]) {
+      throw new Error(`${label}: seeded as ${achievement.verificationStatus}, request is ${cert.status}.`);
+    }
+
+    // The transitions trigger only accepts PENDING on insert.
+    const request = await prisma.achievementCertificationRequest.create({
+      data: {
+        achievementId: achievement.id,
+        clubId: club.clubId,
+        clubMembershipId: membershipId,
+        requestedAt: new Date(cert.requestedAt),
+      },
+      select: { id: true },
+    });
+    if (cert.status === 'PENDING') continue;
+    if (cert.status === 'CANCELLED') {
+      await prisma.achievementCertificationRequest.update({
+        where: { id: request.id },
+        data: { status: 'CANCELLED' },
+        select: { id: true },
+      });
+      continue;
+    }
+    const decidedBy = club.trainerIds[cert.trainer ?? 0];
+    if (decidedBy === undefined || cert.decidedAt === undefined) {
+      throw new Error(`${label}: a decision needs a trainer and decidedAt.`);
+    }
+    await prisma.achievementCertificationRequest.update({
+      where: { id: request.id },
+      data: {
+        status: cert.status,
+        decidedByClubTrainerId: decidedBy,
+        decidedAt: new Date(cert.decidedAt),
+        rejectionReason: cert.status === 'REJECTED' ? (cert.rejectionReason ?? null) : null,
+      },
+      select: { id: true },
+    });
   }
 
   console.log('Seed: creating visibility settings...');
@@ -1179,6 +1251,7 @@ async function main(): Promise<void> {
     metricEntries: await prisma.athleteMetricEntry.count(),
     metricSummaries: await prisma.athleteMetricSummary.count(),
     visibilitySettings: await prisma.athleteVisibilitySettings.count(),
+    certificationRequests: await prisma.achievementCertificationRequest.count(),
   };
   console.log('Seed: complete. Row counts:', counts);
 }

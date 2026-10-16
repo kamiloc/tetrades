@@ -212,6 +212,9 @@ const ATHLETE_DELETE_ATTEMPTS = 5;
 const ATHLETE_DELETE_RETRY_DELAY_MS = 200;
 
 export async function cleanupAthleteRows(athleteId: string): Promise<void> {
+  await prisma.achievementCertificationRequest.deleteMany({
+    where: { achievement: { athleteId } },
+  });
   await prisma.athleteMetricEntry.deleteMany({ where: { athleteId } });
   await prisma.athleteMetricSummary.deleteMany({ where: { athleteId } });
   await prisma.athleteVisibilitySettings.deleteMany({ where: { athleteId } });
@@ -457,6 +460,7 @@ export async function deleteTestMetricDefinition(id: string): Promise<void> {
 
 /** Removes a club and everything hanging off it, in FK order. */
 export async function cleanupTestClub(clubId: string): Promise<void> {
+  await prisma.achievementCertificationRequest.deleteMany({ where: { clubId } });
   await prisma.athleteMetricEntry.deleteMany({ where: { clubMembership: { clubId } } });
   await prisma.clubMembership.deleteMany({ where: { clubId } });
   await prisma.clubTrainer.deleteMany({ where: { clubId } });

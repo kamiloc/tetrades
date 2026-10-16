@@ -7,6 +7,7 @@ export * from './common.js';
 // Models (alphabetical)
 export * from './athlete.js';
 export * from './athlete-achievement.js';
+export * from './achievement-certification.js';
 export * from './athlete-connection.js';
 export * from './athlete-metric-entry.js';
 export * from './athlete-metric-summary.js';

@@ -286,6 +286,28 @@ describe.skipIf(!authReady)('notifications', () => {
       expect((await tokensOf(owner)).map((t) => t.token)).toEqual([live]);
     });
 
+    it('delivers the fixed certification-decision copy with only the type and request id', async () => {
+      await prisma.deviceToken.deleteMany({ where: { userAccountId: owner.userAccountId } });
+      await prisma.deviceToken.create({
+        data: { userAccountId: owner.userAccountId, token: pushToken(), platform: 'IOS' },
+      });
+      const calls: Call[] = [];
+      await sendPushNotification(
+        {
+          prisma,
+          fetch: fakeFetch(calls, (messages) =>
+            Response.json({ data: messages.map(() => ({ status: 'ok', id: randomUUID() })) }),
+          ),
+          log: silent,
+        },
+        { ...job(owner.userAccountId), notificationType: 'CERTIFICATION_DECIDED', subjectId: 'ccertrequest0000000000000' },
+      );
+      const [message] = calls[0]?.body as Record<string, unknown>[];
+      expect(message?.['title']).toBe(PUSH_COPY.CERTIFICATION_DECIDED.title);
+      expect(message?.['body']).toBe(PUSH_COPY.CERTIFICATION_DECIDED.body);
+      expect(message?.['data']).toEqual({ type: 'CERTIFICATION_DECIDED', subjectId: 'ccertrequest0000000000000' });
+    });
+
     it('throws on a non-2xx response so the job is retried', async () => {
       await prisma.deviceToken.deleteMany({ where: { userAccountId: owner.userAccountId } });
       await prisma.deviceToken.create({

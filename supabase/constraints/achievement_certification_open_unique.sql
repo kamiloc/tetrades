@@ -1,0 +1,14 @@
+-- At most one PENDING certification request per achievement
+-- (add-achievement-certification, design D2). Decided and cancelled rows stay
+-- as history; a new request after a rejection or cancellation inserts a new row.
+--
+-- NOT applied from this file. Prisma tracks indexes, so an index created
+-- outside its migration history would show up as drift on the next
+-- `prisma migrate dev`. The partial unique index therefore lives in the
+-- hand-edited migration prisma/migrations/
+-- 20261015033436_add_achievement_certification/migration.sql. This file documents it next to the other constraints;
+-- the definition below must stay identical to that migration.
+--
+--   CREATE UNIQUE INDEX achievement_certification_requests_open_unique
+--     ON achievement_certification_requests (achievement_id)
+--     WHERE status = 'PENDING';

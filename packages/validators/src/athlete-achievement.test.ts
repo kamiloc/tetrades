@@ -15,6 +15,7 @@ describe('athleteAchievementPublicListOutput', () => {
     organization: 'Federación Colombiana de Ciclismo',
     achievedOn: new Date('2025-06-29'),
     verificationStatus: 'VERIFIED' as const,
+    certifyingClub: { name: 'Liga de Ciclismo de Boyacá' },
   };
 
   it('accepts a page of public rows', () => {
@@ -41,6 +42,34 @@ describe('athleteAchievementPublicListOutput', () => {
     expect(parsed).not.toHaveProperty('createdAt');
     expect(parsed).not.toHaveProperty('verificationSource');
     expect(parsed).not.toHaveProperty('athleteId');
+  });
+
+  it('accepts a verified row with no certifying club (legacy or hidden)', () => {
+    expect(
+      athleteAchievementPublicListOutput.safeParse({
+        items: [{ ...publicRow, certifyingClub: null }],
+        nextCursor: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('never exposes the certifying club id, deciding trainer, or rejection reason', () => {
+    const {
+      items: [parsed],
+    } = athleteAchievementPublicListOutput.parse({
+      items: [
+        {
+          ...publicRow,
+          certifyingClub: { id: 'cm1club000000000000000001', name: 'Liga de Ciclismo de Boyacá' },
+          decidedByClubTrainerId: 'cm1trainer00000000000001',
+          rejectionReason: 'No aplica',
+        },
+      ],
+      nextCursor: null,
+    });
+    expect(parsed?.certifyingClub).toStrictEqual({ name: 'Liga de Ciclismo de Boyacá' });
+    expect(parsed).not.toHaveProperty('decidedByClubTrainerId');
+    expect(parsed).not.toHaveProperty('rejectionReason');
   });
 });
 

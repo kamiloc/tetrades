@@ -20,6 +20,7 @@ Examples:
 - club names and club-level public information: `Club` (except `createdAt`, L1)
 - metric catalog: `MetricDefinition`
 - the club a membership belongs to (`ClubMembership.clubId`)
+- the club a certification request is made to (`AchievementCertificationRequest.clubId`); its name is shown on a certified achievement only when the athlete's club-memberships audience allows it
 
 ## 2) L1-INTERNAL
 
@@ -34,6 +35,7 @@ Examples:
 - trainer assignments: `ClubTrainer`
 - athlete metric entries and summaries: `AthleteMetricEntry`, `AthleteMetricSummary`. Not inherently sensitive; exposure is controlled by visibility rules, not by classification.
 - visibility preferences: `AthleteVisibilitySettings`
+- achievement certification requests: `AchievementCertificationRequest` (all fields except `clubId`), including a trainer's rejection reason, which only the athlete reads ([ADR-016](adr/016-achievement-certification-by-club-trainers.md))
 - push tokens: `DeviceToken` (never placed in job payloads)
 
 ## 3) L2-CONFIDENTIAL
