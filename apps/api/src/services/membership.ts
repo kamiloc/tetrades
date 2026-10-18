@@ -27,6 +27,7 @@ import { TRPCError } from '@trpc/server';
 import type { JobEnqueuer } from '../lib/jobs.js';
 import { cursorArgs, toPage, type Page } from '../lib/pagination.js';
 
+import { lockAchievements } from './certification.js';
 import type { Viewer } from './viewer.js';
 
 const UNIQUE_VIOLATION = 'P2002';
@@ -200,6 +201,11 @@ async function transitionMembership(
  * has at most one PENDING request, so cancelling it returns the achievement
  * to UNVERIFIED. APPROVED requests are untouched: certifications outlive the
  * membership.
+ *
+ * The membership row is already locked by the status update, so no new
+ * request can appear. The achievements are locked before the requests (the
+ * order every certification writer uses) and the open set is re-read, since
+ * a withdrawal or decision may have committed in between.
  */
 async function cancelOpenCertifications(
   tx: Prisma.TransactionClient,
@@ -210,12 +216,21 @@ async function cancelOpenCertifications(
     select: { achievementId: true },
   });
   if (open.length === 0) return;
+  await lockAchievements(
+    tx,
+    open.map((r) => r.achievementId),
+  );
+  const stillOpen = await tx.achievementCertificationRequest.findMany({
+    where: { clubMembershipId: membershipId, status: 'PENDING' },
+    select: { achievementId: true },
+  });
+  if (stillOpen.length === 0) return;
   await tx.achievementCertificationRequest.updateMany({
     where: { clubMembershipId: membershipId, status: 'PENDING' },
     data: { status: 'CANCELLED' },
   });
   await tx.athleteAchievement.updateMany({
-    where: { id: { in: open.map((r) => r.achievementId) } },
+    where: { id: { in: stillOpen.map((r) => r.achievementId) } },
     data: { verificationStatus: 'UNVERIFIED' },
   });
 }

@@ -639,4 +639,62 @@ describe.skipIf(!authReady)('achievement certification', () => {
     expect((await requestRow(requestId)).status).toBe('APPROVED');
     await expectSummaryMatchesHistory(achievementId);
   });
+
+  // ── Concurrent writers (row locks) ───────────────────────────────────────
+
+  describe('concurrency', () => {
+    const raceClubs: string[] = [];
+
+    afterAll(async () => {
+      for (const clubId of raceClubs) await cleanupTestClub(clubId);
+    });
+
+    it('a request racing club.leave never leaves a PENDING request on an ended membership', async () => {
+      for (let round = 0; round < 3; round++) {
+        const clubId = await createTestClub(`cert-race-${round}`);
+        raceClubs.push(clubId);
+        const row = await addClubTrainer(clubId, trainerB.userAccountId);
+        const membershipId = await createTestMembership({
+          clubId,
+          athleteId: athleteIdOf(athlete),
+          clubTrainerId: row,
+          status: 'ACTIVE',
+        });
+        const achievementId = await newAchievement(athlete, `Podio Válida Nacional ${round}`);
+
+        await Promise.allSettled([
+          as(athlete).achievement.requestCertification.mutate({ achievementId, clubId }),
+          as(athlete).club.leave.mutate({ membershipId }),
+        ]);
+
+        const open = await prisma.achievementCertificationRequest.count({
+          where: { clubMembershipId: membershipId, status: 'PENDING' },
+        });
+        expect(open).toBe(0);
+        await expectSummaryMatchesHistory(achievementId);
+      }
+    });
+
+    it('a new request racing an approval never turns a VERIFIED achievement back to PENDING', async () => {
+      const achievementId = await newAchievement(athlete, 'Oro Juegos Departamentales');
+      const { id: requestId } = await as(athlete).achievement.requestCertification.mutate({
+        achievementId,
+        clubId: clubs.A,
+      });
+
+      const [, second] = await Promise.allSettled([
+        as(trainerA).achievement.decideCertification.mutate({
+          clubId: clubs.A,
+          requestId,
+          decision: 'APPROVE',
+        }),
+        as(athlete).achievement.requestCertification.mutate({ achievementId, clubId: clubs.B }),
+      ]);
+
+      expect(second.status).toBe('rejected');
+      expect((await requestRow(requestId)).status).toBe('APPROVED');
+      expect(await statusOf(achievementId)).toBe('VERIFIED');
+      await expectSummaryMatchesHistory(achievementId);
+    });
+  });
 });

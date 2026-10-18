@@ -378,7 +378,9 @@ model AchievementCertificationRequest {
   /// L1-INTERNAL — required when REJECTED; shown only to the athlete
   rejectionReason        String?                    @map("rejection_reason")
 
-  achievement    AthleteAchievement @relation(fields: [achievementId], references: [id], onDelete: Restrict)
+  /// Cascade: request history means nothing without its achievement, and the
+  /// owner may delete their achievements (athlete_achievements_delete_own).
+  achievement    AthleteAchievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
   club           Club               @relation(fields: [clubId], references: [id], onDelete: Restrict)
   clubMembership ClubMembership     @relation(fields: [clubMembershipId], references: [id], onDelete: Restrict)
   decidedBy      ClubTrainer?       @relation(fields: [decidedByClubTrainerId], references: [id], onDelete: Restrict)

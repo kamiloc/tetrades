@@ -60,7 +60,9 @@ These rules are enforced in the database, not only in the API.
 - **End-user writes.** A second trigger, `supabase/constraints/achievement_verification_integrity.sql`, applies to end users (`anon`, `authenticated`):
   - an inserted achievement must be `UNVERIFIED`;
   - nobody can change verification status or source directly;
-  - editing the title, organization, or date of a `VERIFIED` achievement resets it to `UNVERIFIED`.
+  - editing the title, organization, or date of a `VERIFIED` achievement resets it to `UNVERIFIED`;
+  - those facts cannot be edited while the achievement is `PENDING`, so a trainer never approves facts they did not review. The athlete withdraws the request first.
+- **Concurrency.** Every writer locks rows in one order: membership, then achievement, then request. A request or decision locks the `ACTIVE` membership (`FOR SHARE`), so a concurrent `leaveClub` either waits or wins and makes the check fail. A request locks the achievement, so it never misses a concurrent approval.
 - **Writes to the request table.** It has no write policies: every write goes through the API.
 
 ### Trainer access (supersedes the ADR-014 clause)
@@ -90,5 +92,6 @@ Push notifications carry identifiers only and fixed copy that names no athlete, 
 
 - Every new `VERIFIED` achievement can be traced to a club and a trainer.
 - Deleting an athlete (`deletePII`) removes their certification requests and checks that none remain.
+- Deleting an achievement deletes its request history with it (`ON DELETE CASCADE`).
 - The trainer portal (Change 5) and the athlete screens (Change 8) can build on these procedures: `requestCertification`, `withdrawCertification`, `listMyCertificationRequests`, `listPendingCertifications`, and `decideCertification`.
 - An API procedure for editing achievements doesn't exist yet. When one is added, it must warn the athlete before an edit removes a verification.

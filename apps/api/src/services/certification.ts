@@ -9,6 +9,11 @@
  * for every writer (supabase/constraints/achievement_certification_transitions.sql)
  * and one open request per achievement (partial unique index).
  *
+ * Concurrent writers serialize on row locks taken in one global order —
+ * membership, then achievement, then request — so a racing leaveClub,
+ * decision, withdrawal, or second request can neither slip past a check nor
+ * deadlock (see lockActiveMembership / lockAchievements).
+ *
  * Error order follows metrics.reportEntry: NOT_FOUND, then FORBIDDEN, then
  * state checks. Notifications are enqueued after commit and never fail the
  * operation (membership-notifications spec).
@@ -47,6 +52,44 @@ export interface CertificationNotifier {
 }
 
 const NOT_PENDING = 'This certification request is no longer pending';
+
+/**
+ * Locks the athlete's ACTIVE membership with the club FOR SHARE and returns
+ * its id, or null when there is none. leaveClub's status UPDATE waits for the
+ * lock, and a leave that committed first makes the re-checked row fail the
+ * ACTIVE filter, so no request can be created or decided against a membership
+ * that is ending. Prisma cannot express row locks; this is the approved raw SQL.
+ */
+async function lockActiveMembership(
+  tx: Prisma.TransactionClient,
+  clubId: string,
+  athleteId: string,
+): Promise<string | null> {
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM club_memberships
+    WHERE club_id = ${clubId} AND athlete_id = ${athleteId} AND status = 'ACTIVE'
+    FOR SHARE`;
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * Locks achievements FOR UPDATE in id order and returns their current
+ * verification status. Every writer of a request locks its achievement first,
+ * so a status read here cannot be overtaken by a concurrent decision.
+ */
+export async function lockAchievements(
+  tx: Prisma.TransactionClient,
+  achievementIds: string[],
+): Promise<Map<string, string>> {
+  if (achievementIds.length === 0) return new Map();
+  const rows = await tx.$queryRaw<{ id: string; verification_status: string }[]>`
+    SELECT id, verification_status::text AS verification_status
+    FROM athlete_achievements
+    WHERE id IN (${Prisma.join(achievementIds)})
+    ORDER BY id
+    FOR UPDATE`;
+  return new Map(rows.map((r) => [r.id, r.verification_status]));
+}
 
 async function notify(
   notifier: CertificationNotifier | undefined,
@@ -108,22 +151,17 @@ export async function requestCertification(
   let request: CertificationMutationOutput;
   try {
     request = await prisma.$transaction(async (tx) => {
-      const membership = await tx.clubMembership.findFirst({
-        where: { clubId: input.clubId, athleteId: caller.athleteId, status: 'ACTIVE' },
-        select: { id: true },
-      });
-      if (membership === null) {
+      const membershipId = await lockActiveMembership(tx, input.clubId, caller.athleteId);
+      if (membershipId === null) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'You can only request certification from a club you are an active member of',
         });
       }
-      // Re-read under the transaction so a concurrent approval is seen.
-      const current = await tx.athleteAchievement.findUniqueOrThrow({
-        where: { id: input.achievementId },
-        select: { verificationStatus: true },
-      });
-      if (current.verificationStatus === 'VERIFIED') {
+      // Locked re-read: a concurrent approval has either committed (and is
+      // seen here) or waits for this transaction.
+      const status = (await lockAchievements(tx, [input.achievementId])).get(input.achievementId);
+      if (status === 'VERIFIED') {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'This achievement is already verified',
@@ -133,7 +171,7 @@ export async function requestCertification(
         data: {
           achievementId: input.achievementId,
           clubId: input.clubId,
-          clubMembershipId: membership.id,
+          clubMembershipId: membershipId,
           status: 'PENDING',
         },
         select: { id: true, status: true },
@@ -192,6 +230,7 @@ export async function withdrawCertification(
   }
 
   return prisma.$transaction(async (tx) => {
+    await lockAchievements(tx, [request.achievementId]);
     const { count } = await tx.achievementCertificationRequest.updateMany({
       where: { id: input.requestId, status: 'PENDING' },
       data: { status: 'CANCELLED' },
@@ -296,16 +335,18 @@ export async function decideCertification(
   const status = input.decision === 'APPROVE' ? ('APPROVED' as const) : ('REJECTED' as const);
   const result = await prisma.$transaction(async (tx) => {
     // ADR-013: club authority over the athlete exists only while ACTIVE.
-    const membership = await tx.clubMembership.findFirst({
-      where: { clubId: trainer.clubId, athleteId: request.achievement.athleteId, status: 'ACTIVE' },
-      select: { id: true },
-    });
-    if (membership === null) {
+    const membershipId = await lockActiveMembership(
+      tx,
+      trainer.clubId,
+      request.achievement.athleteId,
+    );
+    if (membershipId === null) {
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: 'This athlete no longer has an active membership with your club',
       });
     }
+    await lockAchievements(tx, [request.achievementId]);
     const { count } = await tx.achievementCertificationRequest.updateMany({
       where: { id: input.requestId, status: 'PENDING' },
       data: {

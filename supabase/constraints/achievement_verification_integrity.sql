@@ -10,7 +10,9 @@
 --   INSERT → verification_status must be UNVERIFIED, verification_source NULL
 --   UPDATE → verification_status / verification_source cannot change, except
 --            that editing title, organization, or achieved_on of a VERIFIED
---            row resets it to UNVERIFIED (the edit is kept).
+--            row resets it to UNVERIFIED (the edit is kept). Those facts
+--            cannot be edited while the row is PENDING: a trainer is
+--            reviewing them, so the athlete must withdraw the request first.
 -- The API connects through Prisma without a JWT (auth.role() is NULL), so the
 -- certification service can still write the status; keying on the JWT role
 -- avoids a "trusted writer" flag a client could spoof.
@@ -32,6 +34,14 @@ BEGIN
 
   IF NEW.verification_source IS DISTINCT FROM OLD.verification_source THEN
     RAISE EXCEPTION 'Verification source can only be changed by the certification flow';
+  END IF;
+
+  IF OLD.verification_status = 'PENDING'
+     AND (NEW.title IS DISTINCT FROM OLD.title
+          OR NEW.organization IS DISTINCT FROM OLD.organization
+          OR NEW.achieved_on IS DISTINCT FROM OLD.achieved_on) THEN
+    -- A trainer must never approve facts they did not review.
+    RAISE EXCEPTION 'Withdraw the certification request before editing this achievement';
   END IF;
 
   IF OLD.verification_status = 'VERIFIED'

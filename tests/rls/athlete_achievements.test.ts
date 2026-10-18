@@ -17,12 +17,16 @@
  *   (e) non-owner cannot UPDATE another athlete's achievement
  *   (f) owner can DELETE their own achievement
  *   (g) non-owner cannot DELETE another athlete's achievement
+ *   (g2) owner can DELETE an achievement with certification history; its
+ *        requests are removed with it (ON DELETE CASCADE)
  * Integrity trigger (supabase/constraints/achievement_verification_integrity.sql):
  *   (h) owner cannot INSERT an achievement as VERIFIED or with a source
  *   (i) owner cannot UPDATE verification_status or verification_source
  *   (j) editing the title / organization / date of a VERIFIED row keeps the
  *       edit and resets the row to UNVERIFIED
  *   (k) service_role (the API's certification flow) can still set VERIFIED
+ *   (l) the title / organization / date of a PENDING row (under trainer
+ *       review) cannot be edited by the owner
  */
 
 import { randomUUID } from 'node:crypto';
@@ -32,6 +36,7 @@ import {
   cleanupTestClub,
   cleanupTestUser,
   createTestAchievement,
+  createTestCertificationRequest,
   createTestClub,
   createTestMembership,
   createTestSport,
@@ -51,6 +56,8 @@ describe.skipIf(!envReady)('athlete_achievements RLS', () => {
   let friend: TestUser;
   let trainer: TestUser;
   let clubId: string;
+  let clubTrainerId: string;
+  let membershipId: string;
   let achievementUser1Id: string;
   let verifiedUser1Id: string;
 
@@ -72,8 +79,8 @@ describe.skipIf(!envReady)('athlete_achievements RLS', () => {
     if (connErr) throw new Error(`connection fixture: ${connErr.message}`);
 
     clubId = await createTestClub(svc, 'ach-club');
-    const clubTrainerId = await addClubTrainer(svc, clubId, trainer);
-    await createTestMembership(svc, {
+    clubTrainerId = await addClubTrainer(svc, clubId, trainer);
+    membershipId = await createTestMembership(svc, {
       clubId,
       athleteId: user1.athleteId,
       clubTrainerId,
@@ -238,7 +245,34 @@ describe.skipIf(!envReady)('athlete_achievements RLS', () => {
     expect(error).toBeNull();
     expect(count).toBe(0);
   });
-  // ── (h)–(k) verification integrity trigger ─────────────────────────────────
+
+  // ── (g2) DELETE with certification history ─────────────────────────────────
+
+  it('(g2) lets the owner DELETE an achievement whose request was rejected', async () => {
+    const id = await createTestAchievement(svc, user1.athleteId);
+    const requestId = await createTestCertificationRequest(svc, {
+      achievementId: id,
+      clubId,
+      clubMembershipId: membershipId,
+      status: 'REJECTED',
+      deciderRowId: clubTrainerId,
+    });
+
+    const { count, error } = await user1.client
+      .from('athlete_achievements')
+      .delete({ count: 'exact' })
+      .eq('id', id);
+    expect(error).toBeNull();
+    expect(count).toBe(1);
+
+    const { data } = await svc
+      .from('achievement_certification_requests')
+      .select('id')
+      .eq('id', requestId);
+    expect(data).toEqual([]);
+  });
+
+  // ── (h)–(l) verification integrity trigger ─────────────────────────────────
 
   const statusOf = async (id: string) => {
     const { data } = await svc
@@ -274,7 +308,10 @@ describe.skipIf(!envReady)('athlete_achievements RLS', () => {
 
   it('(i) rejects an owner UPDATE of verification_status or verification_source', async () => {
     const id = await createTestAchievement(svc, user1.athleteId);
-    const changes = [{ verification_status: 'VERIFIED' }, { verification_source: 'Planilla oficial' }];
+    const changes = [
+      { verification_status: 'VERIFIED' },
+      { verification_source: 'Planilla oficial' },
+    ];
     for (const change of changes) {
       const { error } = await user1.client.from('athlete_achievements').update(change).eq('id', id);
       expect(error).not.toBeNull();
@@ -308,6 +345,25 @@ describe.skipIf(!envReady)('athlete_achievements RLS', () => {
       .eq('id', id);
     expect(error).toBeNull();
     expect((await statusOf(id)).verification_status).toBe('VERIFIED');
+    await svc.from('athlete_achievements').delete().eq('id', id);
+  });
+
+  it('(l) rejects an owner edit of a PENDING achievement under review', async () => {
+    const id = await createTestAchievement(svc, user1.athleteId, 'PENDING');
+    const { title } = await statusOf(id);
+    const edits = [
+      { title: 'Oro Suramericano' },
+      { organization: 'Otra Federación' },
+      { achieved_on: '2023-01-01' },
+    ];
+    for (const edit of edits) {
+      const { error } = await user1.client.from('athlete_achievements').update(edit).eq('id', id);
+      expect(error).not.toBeNull();
+    }
+    expect(await statusOf(id)).toMatchObject({
+      title,
+      verification_status: 'PENDING',
+    });
     await svc.from('athlete_achievements').delete().eq('id', id);
   });
 });
