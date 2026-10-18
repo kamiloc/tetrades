@@ -12,6 +12,7 @@
 - signed upload/download URLs and profile photo originals
 - RLS policies
 - audit logs
+- achievement verification state and its attribution to a club and trainer
 
 ## Trust boundaries
 
@@ -38,6 +39,7 @@
 10. **unwanted data association:** a club or trainer invites an athlete the athlete never agreed to join, so the club's name and data become associated with them
 11. **visibility bypass:** a stranger reads data through an unfiltered list, search, or roster endpoint when the detail endpoint applies the athlete's visibility settings
 12. **trainer privilege creep:** a trainer or club role gaining access to `AthletePrivateProfile` or other L2 data, directly or through a joined query
+13. **self-verification:** an athlete marks their own achievement `VERIFIED` by writing `verification_status` directly through the database (owner RLS cannot restrict columns), or a trainer certifies for a club they do not train
 
 ## Primary mitigations
 
@@ -53,3 +55,4 @@
 - visibility rules are applied in a shared service used by every list and detail procedure; RLS on club and metric tables grants only the athlete and active-club trainers, which is stricter than any audience; missing settings resolve to most restrictive (risk 11)
 - no trainer or club role, procedure, or policy touches L2 data; covered by deny-tests (risk 12)
 - list-vs-detail consistency tests (risk 11)
+- verification status is written only by the API certification service; a DB trigger rejects end-user writes to `verification_status` / `verification_source` and resets edited `VERIFIED` rows; certification requests have no client write policies, their lifecycle is enforced by a trigger, and decisions require the trainer's own club plus an `ACTIVE` membership at decision time (risk 13, ADR-016)

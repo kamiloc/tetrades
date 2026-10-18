@@ -32,11 +32,12 @@ export interface BaseJobData {
 
 /** image-optimization — generate EXIF-stripped WebP variants (4.6). */
 export interface ImageOptimizationJobData extends BaseJobData {
-  /** Owning athlete — storage prefix `profile-photos/{athleteId}/`. */
+  /** Owning athlete — storage prefix `{athleteId}/` in both photo buckets. */
   athleteId: string;
   /**
-   * Path of the original upload inside the profile-photos bucket
-   * (L1-INTERNAL — may still contain EXIF metadata).
+   * Bucket-relative path of the upload in the private `profile-photo-originals`
+   * bucket, `{athleteId}/{issuedAtMs}-{nonce}.{ext}` (L1-INTERNAL — may still contain
+   * EXIF metadata). ADR-015.
    */
   originalPath: string;
 }
@@ -56,7 +57,12 @@ export interface NotificationJobData extends BaseJobData {
   /** Recipient UserAccount id — the worker resolves device tokens itself. */
   userAccountId: string;
   /** Template key; the worker owns copy so no free text sits in Redis. */
-  notificationType: 'CONNECTION_REQUEST' | 'CONNECTION_ACCEPTED' | 'CLUB_INVITATION';
+  notificationType:
+    | 'CONNECTION_REQUEST'
+    | 'CONNECTION_ACCEPTED'
+    | 'CLUB_INVITATION'
+    | 'CERTIFICATION_REQUESTED'
+    | 'CERTIFICATION_DECIDED';
   /** Row the notification is about (e.g. connection id). */
   subjectId: string;
 }

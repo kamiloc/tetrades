@@ -154,6 +154,7 @@ export async function cleanupTestUser(svc: SupabaseClient, user: TestUser): Prom
     .update({ avatar_asset_id: null })
     .eq('athlete_id', user.athleteId);
 
+  await deleteCertificationRequestsForAthlete(svc, user.athleteId);
   await svc.from('athlete_metric_entries').delete().eq('athlete_id', user.athleteId);
   await svc.from('athlete_metric_summaries').delete().eq('athlete_id', user.athleteId);
   await svc.from('athlete_visibility_settings').delete().eq('athlete_id', user.athleteId);
@@ -248,6 +249,7 @@ export async function createTestMetricDefinition(svc: SupabaseClient): Promise<s
     key: `rls_metric_${id.slice(0, 8)}`,
     name: 'RLS Sprint 100 m',
     unit: 's',
+    direction: 'LOWER_IS_BETTER',
     is_active: true,
   });
   if (error) throw new Error(`createTestMetricDefinition: ${error.message}`);
@@ -264,10 +266,94 @@ export async function deleteTestMetricDefinition(svc: SupabaseClient, id: string
 export async function cleanupTestClub(svc: SupabaseClient, clubId: string): Promise<void> {
   const { data } = await svc.from('club_memberships').select('id').eq('club_id', clubId);
   const membershipIds = (data ?? []).map((r: { id: string }) => r.id);
+  await svc.from('achievement_certification_requests').delete().eq('club_id', clubId);
   if (membershipIds.length > 0) {
     await svc.from('athlete_metric_entries').delete().in('club_membership_id', membershipIds);
   }
   await svc.from('club_memberships').delete().eq('club_id', clubId);
   await svc.from('club_trainers').delete().eq('club_id', clubId);
   await svc.from('clubs').delete().eq('id', clubId);
+}
+
+// ── Achievement certification (add-achievement-certification) ───────────────
+
+export type CertificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+/** Inserts an achievement as service_role (the integrity trigger exempts it). */
+export async function createTestAchievement(
+  svc: SupabaseClient,
+  athleteId: string,
+  verificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED' = 'UNVERIFIED',
+): Promise<string> {
+  const id = randomUUID();
+  const { error } = await svc.from('athlete_achievements').insert({
+    id,
+    athlete_id: athleteId,
+    title: `Campeonato Departamental ${id.slice(0, 6)}`,
+    organization: 'Liga Antioqueña de Fútbol',
+    achieved_on: '2025-08-17',
+    verification_status: verificationStatus,
+  });
+  if (error) throw new Error(`createTestAchievement: ${error.message}`);
+  return id;
+}
+
+/**
+ * Creates a certification request and walks it to `status` (the transition
+ * trigger only accepts PENDING on insert). APPROVED / REJECTED are signed by
+ * `deciderRowId`, a club_trainers.id of the request's club.
+ */
+export async function createTestCertificationRequest(
+  svc: SupabaseClient,
+  args: {
+    achievementId: string;
+    clubId: string;
+    clubMembershipId: string;
+    status: CertificationStatus;
+    deciderRowId?: string;
+  },
+): Promise<string> {
+  const id = randomUUID();
+  const { error } = await svc.from('achievement_certification_requests').insert({
+    id,
+    achievement_id: args.achievementId,
+    club_id: args.clubId,
+    club_membership_id: args.clubMembershipId,
+    status: 'PENDING',
+  });
+  if (error) throw new Error(`createTestCertificationRequest[insert]: ${error.message}`);
+  if (args.status === 'PENDING') return id;
+
+  const decided = {
+    decided_by_club_trainer_id: args.deciderRowId,
+    decided_at: new Date().toISOString(),
+  };
+  const update =
+    args.status === 'APPROVED'
+      ? { status: 'APPROVED', ...decided }
+      : args.status === 'REJECTED'
+        ? {
+            status: 'REJECTED',
+            ...decided,
+            rejection_reason: 'La planilla no coincide con la fecha.',
+          }
+        : { status: 'CANCELLED' };
+  const { error: upErr } = await svc
+    .from('achievement_certification_requests')
+    .update(update)
+    .eq('id', id);
+  if (upErr) throw new Error(`createTestCertificationRequest[${args.status}]: ${upErr.message}`);
+  return id;
+}
+
+/** Removes every certification request for an athlete's achievements. */
+export async function deleteCertificationRequestsForAthlete(
+  svc: SupabaseClient,
+  athleteId: string,
+): Promise<void> {
+  const { data } = await svc.from('athlete_achievements').select('id').eq('athlete_id', athleteId);
+  const ids = (data ?? []).map((r: { id: string }) => r.id);
+  if (ids.length > 0) {
+    await svc.from('achievement_certification_requests').delete().in('achievement_id', ids);
+  }
 }

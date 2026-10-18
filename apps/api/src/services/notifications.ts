@@ -31,6 +31,14 @@ export const PUSH_COPY: Readonly<Record<NotificationType, { title: string; body:
     title: 'Invitación de club',
     body: 'Un club te invitó a unirte. Abre la app para aceptar o rechazar.',
   },
+  CERTIFICATION_REQUESTED: {
+    title: 'Nueva solicitud de certificación',
+    body: 'Un atleta pidió certificar un logro. Abre la app para revisarlo.',
+  },
+  CERTIFICATION_DECIDED: {
+    title: 'Solicitud de certificación respondida',
+    body: 'Tu solicitud de certificación fue revisada. Abre la app para ver el resultado.',
+  },
 };
 
 export interface PushLogger {

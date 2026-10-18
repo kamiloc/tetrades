@@ -71,7 +71,7 @@ export async function listDefinitions(
     },
     orderBy: [{ name: 'asc' }, { id: 'asc' }],
     ...cursorArgs(input),
-    select: { id: true, key: true, name: true, unit: true, sportId: true },
+    select: { id: true, key: true, name: true, unit: true, direction: true, sportId: true },
   });
   return toPage(rows, input.take, (r) => r.id);
 }
@@ -88,7 +88,7 @@ export async function reportEntry(
 
   const definition = await prisma.metricDefinition.findUnique({
     where: { id: input.metricDefinitionId },
-    select: { isActive: true },
+    select: { isActive: true, direction: true },
   });
   if (definition === null || !definition.isActive) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Metric not found' });
@@ -119,6 +119,7 @@ export async function reportEntry(
     });
 
     const key = { athleteId: input.athleteId, metricDefinitionId: input.metricDefinitionId };
+    const tracksBest = definition.direction !== 'NEUTRAL';
     // Native ON CONFLICT upsert: concurrent first entries cannot both insert.
     await tx.athleteMetricSummary.upsert({
       where: { athleteId_metricDefinitionId: key },
@@ -127,6 +128,8 @@ export async function reportEntry(
         latestValue: input.value,
         latestMeasuredAt: input.measuredAt,
         entryCount: 1,
+        bestValue: tracksBest ? input.value : null,
+        bestMeasuredAt: tracksBest ? input.measuredAt : null,
       },
       update: { entryCount: { increment: 1 } },
       select: { athleteId: true },
@@ -138,6 +141,18 @@ export async function reportEntry(
       where: { ...key, latestMeasuredAt: { lte: input.measuredAt } },
       data: { latestValue: input.value, latestMeasuredAt: input.measuredAt },
     });
+    // "Best" follows the definition's direction regardless of measuredAt, so a
+    // back-dated entry can set it. Strict comparison: the first recorded value
+    // keeps a tie. Same row-lock re-check as above.
+    if (tracksBest) {
+      // Matches rows whose stored best is worse than the new value.
+      const worse =
+        definition.direction === 'HIGHER_IS_BETTER' ? { lt: input.value } : { gt: input.value };
+      await tx.athleteMetricSummary.updateMany({
+        where: { ...key, OR: [{ bestValue: null }, { bestValue: worse }] },
+        data: { bestValue: input.value, bestMeasuredAt: input.measuredAt },
+      });
+    }
 
     return toEntryOutput(entry);
   });
@@ -199,7 +214,13 @@ export async function getSummaries(
       latestValue: true,
       latestMeasuredAt: true,
       entryCount: true,
+      bestValue: true,
+      bestMeasuredAt: true,
     },
   });
-  return rows.map((r) => ({ ...r, latestValue: r.latestValue.toNumber() }));
+  return rows.map((r) => ({
+    ...r,
+    latestValue: r.latestValue.toNumber(),
+    bestValue: r.bestValue === null ? null : r.bestValue.toNumber(),
+  }));
 }

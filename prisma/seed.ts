@@ -22,6 +22,7 @@ import {
   ConnectionStatus,
   DataLifecycleStatus,
   DataLifecycleType,
+  MetricDirection,
   OnboardingStatus,
   PhotoVariant,
   PrismaClient,
@@ -31,7 +32,13 @@ import {
   VerificationStatus,
 } from '@prisma/client';
 
-import { CLUBS, MEMBERSHIPS, METRICS, VISIBILITY } from './seed-data/clubs-metrics.js';
+import {
+  CERTIFICATIONS,
+  CLUBS,
+  MEMBERSHIPS,
+  METRICS,
+  VISIBILITY,
+} from './seed-data/clubs-metrics.js';
 
 const prisma = new PrismaClient();
 
@@ -197,7 +204,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Plata Campeonato Suramericano Adulto',
         organization: 'Confederación Suramericana de Boxeo',
         achievedOn: '2023-08-22',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
     ],
@@ -350,7 +357,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Campeón Nacional Sub-18 con la selección Bolívar',
         organization: 'Federación Colombiana de Béisbol',
         achievedOn: '2024-10-06',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.REJECTED,
         verificationSource: null,
       },
       {
@@ -389,7 +396,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Mejor opuesta — Liga Colombiana de Voleibol 2025',
         organization: 'Federación Colombiana de Voleibol',
         achievedOn: '2025-09-27',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
     ],
@@ -414,7 +421,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Subcampeón Liga Profesional de Baloncesto 2025',
         organization: 'Federación Colombiana de Baloncesto',
         achievedOn: '2025-12-13',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
       {
@@ -446,7 +453,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Campeón Nacional de Tejo por parejas',
         organization: 'Federación Colombiana de Tejo',
         achievedOn: '2024-12-07',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
       {
@@ -485,7 +492,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Oro 50 m libre — Campeonato Nacional Interligas',
         organization: 'Federación Colombiana de Natación',
         achievedOn: '2025-04-27',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
     ],
@@ -510,7 +517,7 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
         title: 'Campeona Liga Femenina de Fútbol de Salón de Bogotá 2025',
         organization: 'Federación Colombiana de Fútbol de Salón',
         achievedOn: '2025-11-30',
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.UNVERIFIED,
         verificationSource: null,
       },
       {
@@ -525,11 +532,35 @@ const ATHLETES: ReadonlyArray<AthleteSeed> = [
 ];
 
 // Photo variant pixel dimensions (mirror image-optimization rules).
-const PHOTO_VARIANTS: ReadonlyArray<{ variant: PhotoVariant; width: number; height: number }> = [
-  { variant: PhotoVariant.ORIGINAL, width: 2400, height: 2400 },
-  { variant: PhotoVariant.FULL_1200, width: 1200, height: 1200 },
-  { variant: PhotoVariant.CARD_400, width: 400, height: 400 },
-  { variant: PhotoVariant.THUMB_150, width: 150, height: 150 },
+// Bucket-relative paths in the ADR-015 layout. The ORIGINAL lives in the
+// private profile-photo-originals bucket, the variants in public profile-photos;
+// seeding writes rows only, no Storage objects.
+const SEED_PHOTO_VERSION = '1760400000000-5eed0000c0ffee00';
+const PHOTO_VARIANTS: ReadonlyArray<{
+  variant: PhotoVariant;
+  width: number;
+  height: number;
+  file: string;
+}> = [
+  { variant: PhotoVariant.ORIGINAL, width: 2400, height: 2400, file: `${SEED_PHOTO_VERSION}.jpg` },
+  {
+    variant: PhotoVariant.FULL_1200,
+    width: 1200,
+    height: 1200,
+    file: `${SEED_PHOTO_VERSION}/full-1200.webp`,
+  },
+  {
+    variant: PhotoVariant.CARD_400,
+    width: 400,
+    height: 400,
+    file: `${SEED_PHOTO_VERSION}/card-400.webp`,
+  },
+  {
+    variant: PhotoVariant.THUMB_150,
+    width: 150,
+    height: 150,
+    file: `${SEED_PHOTO_VERSION}/thumb-150.webp`,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -541,6 +572,8 @@ async function wipe(): Promise<void> {
   // avatar FK is satisfied because we delete the profile before the photo.
   // Clubs & metrics (ADR-013): entries reference memberships and trainers.
   await prisma.deviceToken.deleteMany();
+  // Certification requests reference achievements, memberships, and trainers.
+  await prisma.achievementCertificationRequest.deleteMany();
   await prisma.athleteMetricEntry.deleteMany();
   await prisma.athleteMetricSummary.deleteMany();
   await prisma.athleteVisibilitySettings.deleteMany();
@@ -599,6 +632,7 @@ async function seedClubsAndMetrics(
   }
 
   const metricIds = new Map<string, string>();
+  const metricDirections = new Map<string, MetricDirection>();
   for (const metric of METRICS) {
     const sportId = metric.sportName === null ? null : sportRecords.get(metric.sportName);
     if (sportId === undefined) throw new Error(`Sport "${metric.sportName}" was not seeded.`);
@@ -607,12 +641,14 @@ async function seedClubsAndMetrics(
         key: metric.key,
         name: metric.name,
         unit: metric.unit,
+        direction: metric.direction,
         sportId,
         isActive: metric.isActive ?? true,
       },
       select: { id: true },
     });
     metricIds.set(metric.key, created.id);
+    metricDirections.set(created.id, metric.direction);
   }
 
   console.log('Seed: creating memberships (all four states) and metric series...');
@@ -625,9 +661,13 @@ async function seedClubsAndMetrics(
       latestValue: number;
       latestMeasuredAt: Date;
       entryCount: number;
+      bestValue: number | null;
+      bestMeasuredAt: Date | null;
     }
   >();
   const now = new Date();
+  // `${athleteSlug}@${clubSlug}` → membership id, for memberships left ACTIVE.
+  const activeMemberships = new Map<string, string>();
 
   for (const seed of MEMBERSHIPS) {
     const club = clubs.get(seed.clubSlug);
@@ -670,6 +710,9 @@ async function seedClubsAndMetrics(
       data: { status: ClubMembershipStatus.ACTIVE, respondedAt },
       select: { id: true },
     });
+    if (seed.status === ClubMembershipStatus.ACTIVE) {
+      activeMemberships.set(`${seed.athleteSlug}@${seed.clubSlug}`, membership.id);
+    }
 
     const activeFrom = respondedAt ?? new Date(seed.invitedAt);
     const activeUntil = seed.endedAt === null ? now : new Date(seed.endedAt);
@@ -704,6 +747,8 @@ async function seedClubsAndMetrics(
         });
 
         const key = `${aid}:${metricDefinitionId}`;
+        const direction = metricDirections.get(metricDefinitionId);
+        const tracksBest = direction !== undefined && direction !== MetricDirection.NEUTRAL;
         const current = summaries.get(key);
         if (current === undefined) {
           summaries.set(key, {
@@ -712,12 +757,24 @@ async function seedClubsAndMetrics(
             latestValue: value,
             latestMeasuredAt: measuredAt,
             entryCount: 1,
+            bestValue: tracksBest ? value : null,
+            bestMeasuredAt: tracksBest ? measuredAt : null,
           });
         } else {
           current.entryCount += 1;
           if (measuredAt >= current.latestMeasuredAt) {
             current.latestValue = value;
             current.latestMeasuredAt = measuredAt;
+          }
+          // Strictly better only, so the first recorded value keeps a tie.
+          const better =
+            current.bestValue === null ||
+            (direction === MetricDirection.HIGHER_IS_BETTER
+              ? value > current.bestValue
+              : value < current.bestValue);
+          if (tracksBest && better) {
+            current.bestValue = value;
+            current.bestMeasuredAt = measuredAt;
           }
         }
       }
@@ -737,6 +794,65 @@ async function seedClubsAndMetrics(
 
   for (const summary of summaries.values()) {
     await prisma.athleteMetricSummary.create({ data: summary, select: { athleteId: true } });
+  }
+
+  console.log('Seed: creating achievement certification requests...');
+  // The seeded achievement status is the summary of its request (design D1).
+  const SUMMARY_FOR = {
+    APPROVED: VerificationStatus.VERIFIED,
+    REJECTED: VerificationStatus.REJECTED,
+    PENDING: VerificationStatus.PENDING,
+    CANCELLED: VerificationStatus.UNVERIFIED,
+  } as const;
+  for (const cert of CERTIFICATIONS) {
+    const label = `${cert.athleteSlug} "${cert.achievementTitle}"`;
+    const club = clubs.get(cert.clubSlug);
+    const membershipId = activeMemberships.get(`${cert.athleteSlug}@${cert.clubSlug}`);
+    if (club === undefined || membershipId === undefined) {
+      throw new Error(`${label}: needs an ACTIVE membership with ${cert.clubSlug}.`);
+    }
+    const achievement = await prisma.athleteAchievement.findFirst({
+      where: { athleteId: athleteId(cert.athleteSlug), title: cert.achievementTitle },
+      select: { id: true, verificationStatus: true },
+    });
+    if (achievement === null) throw new Error(`${label}: achievement was not seeded.`);
+    if (achievement.verificationStatus !== SUMMARY_FOR[cert.status]) {
+      throw new Error(`${label}: seeded as ${achievement.verificationStatus}, request is ${cert.status}.`);
+    }
+
+    // The transitions trigger only accepts PENDING on insert.
+    const request = await prisma.achievementCertificationRequest.create({
+      data: {
+        achievementId: achievement.id,
+        clubId: club.clubId,
+        clubMembershipId: membershipId,
+        requestedAt: new Date(cert.requestedAt),
+      },
+      select: { id: true },
+    });
+    if (cert.status === 'PENDING') continue;
+    if (cert.status === 'CANCELLED') {
+      await prisma.achievementCertificationRequest.update({
+        where: { id: request.id },
+        data: { status: 'CANCELLED' },
+        select: { id: true },
+      });
+      continue;
+    }
+    const decidedBy = club.trainerIds[cert.trainer ?? 0];
+    if (decidedBy === undefined || cert.decidedAt === undefined) {
+      throw new Error(`${label}: a decision needs a trainer and decidedAt.`);
+    }
+    await prisma.achievementCertificationRequest.update({
+      where: { id: request.id },
+      data: {
+        status: cert.status,
+        decidedByClubTrainerId: decidedBy,
+        decidedAt: new Date(cert.decidedAt),
+        rejectionReason: cert.status === 'REJECTED' ? (cert.rejectionReason ?? null) : null,
+      },
+      select: { id: true },
+    });
   }
 
   console.log('Seed: creating visibility settings...');
@@ -830,9 +946,7 @@ async function main(): Promise<void> {
         data: {
           athleteId: athlete.id,
           variant: variant.variant,
-          objectPath: `profile-photos/${athlete.id}/${variant.variant.toLowerCase()}.${
-            variant.variant === PhotoVariant.ORIGINAL ? 'jpg' : 'webp'
-          }`,
+          objectPath: `${athlete.id}/${variant.file}`,
           width: variant.width,
           height: variant.height,
           processingStatus: ProcessingStatus.READY,
@@ -1137,6 +1251,7 @@ async function main(): Promise<void> {
     metricEntries: await prisma.athleteMetricEntry.count(),
     metricSummaries: await prisma.athleteMetricSummary.count(),
     visibilitySettings: await prisma.athleteVisibilitySettings.count(),
+    certificationRequests: await prisma.achievementCertificationRequest.count(),
   };
   console.log('Seed: complete. Row counts:', counts);
 }

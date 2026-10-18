@@ -183,8 +183,8 @@ export async function runPiiDeletion(
   try {
     await deleteAthleteRows(prisma, input.athleteId, athlete.userAccountId, input.dataLifecycleRequestId);
 
-    const paths = await deps.externals.listStorageObjects(`${input.athleteId}/`);
-    if (paths.length > 0) await deps.externals.removeStorageObjects(paths);
+    const objects = await deps.externals.listStorageObjects(`${input.athleteId}/`);
+    if (objects.length > 0) await deps.externals.removeStorageObjects(objects);
 
     // Only while the account still carries the real id (idempotent on retry).
     const supabaseUserId = athlete.userAccount.supabaseUserId;
@@ -248,6 +248,9 @@ async function deleteAthleteRows(
   await prisma.$transaction(async (tx) => {
     const where = { athleteId };
 
+    // Certification requests reference both the athlete's achievements and
+    // memberships, so they go before either (add-achievement-certification).
+    await tx.achievementCertificationRequest.deleteMany({ where: { achievement: { athleteId } } });
     await tx.athleteMetricEntry.deleteMany({ where });
     await tx.athleteMetricSummary.deleteMany({ where });
     await tx.clubMembership.deleteMany({ where });
@@ -309,6 +312,9 @@ export async function verifyDeletion(
   const where = { athleteId };
 
   const counts: Record<string, number> = {
+    achievement_certification_requests: await prisma.achievementCertificationRequest.count({
+      where: { achievement: { athleteId } },
+    }),
     athlete_metric_entries: await prisma.athleteMetricEntry.count({ where }),
     athlete_metric_summaries: await prisma.athleteMetricSummary.count({ where }),
     club_memberships: await prisma.clubMembership.count({ where }),
@@ -349,8 +355,9 @@ export async function verifyDeletion(
     residue.push('user_accounts (not anonymized)');
   }
 
-  if ((await deps.externals.listStorageObjects(`${athleteId}/`)).length > 0) {
-    residue.push('storage profile-photos');
+  const leftovers = await deps.externals.listStorageObjects(`${athleteId}/`);
+  for (const bucket of new Set(leftovers.map((o) => o.bucket))) {
+    residue.push(`storage ${bucket}`);
   }
   return residue;
 }

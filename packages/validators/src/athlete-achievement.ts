@@ -50,6 +50,9 @@ export const athleteAchievementPublicOutput = z.object({
   organization: z.string(),
   achievedOn: datetimeSchema,
   verificationStatus: verificationStatusEnum,
+  // The club whose trainer approved it. null when there is none (legacy) or
+  // when the athlete's club-memberships audience hides it from the caller.
+  certifyingClub: z.object({ name: z.string() }).nullable(), /// L0-PUBLIC
 });
 export type AthleteAchievementPublicOutput = z.infer<typeof athleteAchievementPublicOutput>;
 
@@ -57,9 +60,7 @@ export type AthleteAchievementPublicOutput = z.infer<typeof athleteAchievementPu
 // no L1 fields and no internal ids, so it is safe for anonymous reads.
 // Cursor-paginated (AGENTS.md Performance rules) because the procedure is public.
 export const athleteAchievementPublicListOutput = paginatedOutput(athleteAchievementPublicOutput);
-export type AthleteAchievementPublicListOutput = z.infer<
-  typeof athleteAchievementPublicListOutput
->;
+export type AthleteAchievementPublicListOutput = z.infer<typeof athleteAchievementPublicListOutput>;
 
 export const athleteAchievementOwnerOutput = athleteAchievementSchema;
 export type AthleteAchievementOwnerOutput = z.infer<typeof athleteAchievementOwnerOutput>;
@@ -71,8 +72,3 @@ export const listAchievementsInput = paginationInput.extend({
   athleteId: cuidSchema,
 });
 export type ListAchievementsInput = z.infer<typeof listAchievementsInput>;
-
-export const verifyAchievementInput = z.object({
-  achievementId: cuidSchema,
-});
-export type VerifyAchievementInput = z.infer<typeof verifyAchievementInput>;

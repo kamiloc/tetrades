@@ -102,6 +102,18 @@ erDiagram
     datetime responded_at
   }
 
+  ACHIEVEMENT_CERTIFICATION_REQUEST {
+    string id PK
+    string achievement_id FK
+    string club_id FK
+    string club_membership_id FK
+    string status "PENDING | APPROVED | REJECTED | CANCELLED"
+    datetime requested_at
+    string decided_by_club_trainer_id FK
+    datetime decided_at
+    string rejection_reason
+  }
+
   ATHLETE ||--o{ ATHLETE_ACHIEVEMENT : "earns"
   ATHLETE ||--o{ ATHLETE_CONNECTION : "initiates_or_receives"
 
@@ -138,6 +150,7 @@ erDiagram
     string key UK
     string name
     string unit
+    string direction
     string sport_id FK
     boolean is_active
   }
@@ -159,6 +172,8 @@ erDiagram
     decimal latest_value
     datetime latest_measured_at
     int entry_count
+    decimal best_value
+    datetime best_measured_at
     datetime updated_at
   }
 
@@ -239,3 +254,7 @@ erDiagram
   USER_ACCOUNT ||--o{ DATA_LIFECYCLE_REQUEST : "submits_request"
   ATHLETE ||--o{ DATA_LIFECYCLE_REQUEST : "data_subject"
   
+  ATHLETE_ACHIEVEMENT ||--o{ ACHIEVEMENT_CERTIFICATION_REQUEST : "certified_through"
+  CLUB ||--o{ ACHIEVEMENT_CERTIFICATION_REQUEST : "asked_to_certify"
+  CLUB_MEMBERSHIP ||--o{ ACHIEVEMENT_CERTIFICATION_REQUEST : "authorizes"
+  CLUB_TRAINER |o--o{ ACHIEVEMENT_CERTIFICATION_REQUEST : "decides"

@@ -1,0 +1,48 @@
+---
+config:
+  theme: dark
+  layout: dagre
+---
+
+%% Fragment: achievement-certification. Canonical entities are complete; REFERENCE ONLY entities show just the fields touched by relationships.
+%% Composite: docs/erm.mmd
+%% Rules: ADR-016 and openspec change add-achievement-certification.
+
+erDiagram
+  ACHIEVEMENT_CERTIFICATION_REQUEST {
+    string id PK
+    string achievement_id FK
+    string club_id FK
+    string club_membership_id FK
+    string status "PENDING | APPROVED | REJECTED | CANCELLED"
+    datetime requested_at
+    string decided_by_club_trainer_id FK
+    datetime decided_at
+    string rejection_reason
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in athlete-profile-core.mmd
+  ATHLETE_ACHIEVEMENT {
+    string id PK
+    string verification_status "UNVERIFIED | PENDING | VERIFIED | REJECTED (summary of its requests)"
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in clubs.mmd
+  CLUB {
+    string id PK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in clubs.mmd
+  CLUB_MEMBERSHIP {
+    string id PK
+  }
+
+  %% REFERENCE ONLY — canonical definition lives in clubs.mmd
+  CLUB_TRAINER {
+    string id PK
+  }
+
+  ATHLETE_ACHIEVEMENT ||--o{ ACHIEVEMENT_CERTIFICATION_REQUEST : "certified_through"
+  CLUB ||--o{ ACHIEVEMENT_CERTIFICATION_REQUEST : "asked_to_certify"
+  CLUB_MEMBERSHIP ||--o{ ACHIEVEMENT_CERTIFICATION_REQUEST : "authorizes"
+  CLUB_TRAINER |o--o{ ACHIEVEMENT_CERTIFICATION_REQUEST : "decides"

@@ -7,11 +7,15 @@ Provides a catalog of sport metrics and attributable, trainer-reported entries f
 ## Requirements
 
 ### Requirement: Metric catalog is public reference data
-The system SHALL maintain a catalog of metric definitions readable by any authenticated or anonymous caller and writable only through service-role access.
+The system SHALL maintain a catalog of metric definitions readable by any authenticated or anonymous caller and writable only through service-role access. Every definition SHALL declare a direction: `HIGHER_IS_BETTER`, `LOWER_IS_BETTER`, or `NEUTRAL`.
 
 #### Scenario: Reading the catalog
 - **WHEN** any caller lists metric definitions
 - **THEN** active definitions are returned with no athlete data
+
+#### Scenario: Definition direction
+- **WHEN** any caller lists metric definitions
+- **THEN** each definition includes its direction
 
 #### Scenario: Writing the catalog from the API
 - **WHEN** an authenticated user attempts to create or edit a metric definition through the API
@@ -53,6 +57,19 @@ The system SHALL maintain an athlete metric summary per athlete and metric deriv
 #### Scenario: Summary after new entry
 - **WHEN** a valid entry is stored
 - **THEN** the athlete's summary for that metric reflects the new latest value and increased entry count in the same transaction
+
+#### Scenario: Personal best for a directional metric
+- **WHEN** a valid entry is stored for a `HIGHER_IS_BETTER` or `LOWER_IS_BETTER` metric
+- **THEN** the summary's best value and its measured time change only if the new value is strictly better in that direction, in the same transaction
+- **AND** an equal value keeps the first recorded best
+
+#### Scenario: Back-dated entry with a better value
+- **WHEN** a valid entry is stored with a measured time earlier than the summary's latest
+- **THEN** the latest value is unchanged and the best value still updates if the entry is better
+
+#### Scenario: Neutral metric
+- **WHEN** a valid entry is stored for a `NEUTRAL` metric
+- **THEN** the summary's best value and best measured time stay empty
 
 #### Scenario: Client writes a summary
 - **WHEN** any client attempts to create or modify a summary directly

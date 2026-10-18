@@ -21,6 +21,7 @@
 
 import type { ClubMembershipStatusValue } from '@packages/shared-logic';
 import type {
+  AchievementCertificationRequest,
   Athlete,
   AthleteAchievement,
   AthleteMetricEntry,
@@ -38,6 +39,7 @@ import type {
   UserAccount,
 } from '@packages/validators';
 import type {
+  AchievementCertificationRequest as PrismaAchievementCertificationRequest,
   Athlete as PrismaAthlete,
   AthleteAchievement as PrismaAthleteAchievement,
   AthleteMetricEntry as PrismaAthleteMetricEntry,
@@ -100,7 +102,7 @@ type EntryBridgeKeys = Exclude<keyof AthleteMetricEntry, 'value'>;
 type _metricEntry_ok = Assert<
   IsAssignable<Pick<PrismaAthleteMetricEntry, EntryBridgeKeys>, Pick<AthleteMetricEntry, EntryBridgeKeys>>
 >;
-type SummaryBridgeKeys = Exclude<keyof AthleteMetricSummary, 'latestValue'>;
+type SummaryBridgeKeys = Exclude<keyof AthleteMetricSummary, 'latestValue' | 'bestValue'>;
 type _metricSummary_ok = Assert<
   IsAssignable<
     Pick<PrismaAthleteMetricSummary, SummaryBridgeKeys>,
@@ -108,6 +110,10 @@ type _metricSummary_ok = Assert<
   >
 >;
 type _deviceToken_ok = Assert<IsAssignable<PrismaDeviceToken, DeviceToken>>;
+// Achievement certification (add-achievement-certification).
+type _certificationRequest_ok = Assert<
+  IsAssignable<PrismaAchievementCertificationRequest, AchievementCertificationRequest>
+>;
 // @packages/shared-logic cannot import Zod, so its transition-table literals
 // are checked against the Zod enum in both directions here.
 type _membershipStatus_ok = Assert<IsAssignable<ClubMembershipStatusValue, ClubMembershipStatus>>;

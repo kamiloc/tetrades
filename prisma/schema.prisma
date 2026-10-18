@@ -125,6 +125,27 @@ enum VisibilityAudience {
   @@map("visibility_audience")
 }
 
+/// Certification request lifecycle (add-achievement-certification). Only
+/// PENDING is open; APPROVED, REJECTED, and CANCELLED are terminal. Enforced
+/// for every writer by supabase/constraints/achievement_certification_transitions.sql.
+enum CertificationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+
+  @@map("certification_request_status")
+}
+
+/// Which way a metric improves. NEUTRAL metrics get no personal best.
+enum MetricDirection {
+  HIGHER_IS_BETTER
+  LOWER_IS_BETTER
+  NEUTRAL
+
+  @@map("metric_direction")
+}
+
 enum DevicePlatform {
   IOS
   ANDROID
@@ -324,10 +345,50 @@ model AthleteAchievement {
   /// L1-INTERNAL
   createdAt          DateTime           @default(now()) @map("created_at")
 
-  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  athlete               Athlete                           @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  certificationRequests AchievementCertificationRequest[]
 
   @@index([athleteId, verificationStatus])
   @@map("athlete_achievements")
+}
+
+/// An athlete's request that one club certify one achievement
+/// (add-achievement-certification, ADR-016). Written only by the API; the
+/// athlete reads their own rows and the club's trainers read PENDING rows for
+/// their club (supabase/policies/achievement_certification_requests.sql).
+/// At most one PENDING row per achievement (partial unique index,
+/// supabase/constraints/achievement_certification_open_unique.sql).
+model AchievementCertificationRequest {
+  /// L1-INTERNAL
+  id                     String                     @id @default(cuid())
+  /// L1-INTERNAL
+  achievementId          String                     @map("achievement_id")
+  /// L0-PUBLIC
+  clubId                 String                     @map("club_id")
+  /// L1-INTERNAL — the ACTIVE membership that authorized the request
+  clubMembershipId       String                     @map("club_membership_id")
+  /// L1-INTERNAL
+  status                 CertificationRequestStatus @default(PENDING)
+  /// L1-INTERNAL
+  requestedAt            DateTime                   @default(now()) @map("requested_at")
+  /// L1-INTERNAL — set when APPROVED or REJECTED
+  decidedByClubTrainerId String?                    @map("decided_by_club_trainer_id")
+  /// L1-INTERNAL
+  decidedAt              DateTime?                  @map("decided_at")
+  /// L1-INTERNAL — required when REJECTED; shown only to the athlete
+  rejectionReason        String?                    @map("rejection_reason")
+
+  /// Cascade: request history means nothing without its achievement, and the
+  /// owner may delete their achievements (athlete_achievements_delete_own).
+  achievement    AthleteAchievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  club           Club               @relation(fields: [clubId], references: [id], onDelete: Restrict)
+  clubMembership ClubMembership     @relation(fields: [clubMembershipId], references: [id], onDelete: Restrict)
+  decidedBy      ClubTrainer?       @relation(fields: [decidedByClubTrainerId], references: [id], onDelete: Restrict)
+
+  @@index([clubId, status, requestedAt])
+  @@index([clubMembershipId, status])
+  @@index([achievementId])
+  @@map("achievement_certification_requests")
 }
 
 model AthleteConnection {
@@ -461,8 +522,9 @@ model Club {
   /// L1-INTERNAL
   createdAt   DateTime @default(now()) @map("created_at")
 
-  trainers    ClubTrainer[]
-  memberships ClubMembership[]
+  trainers              ClubTrainer[]
+  memberships           ClubMembership[]
+  certificationRequests AchievementCertificationRequest[]
 
   @@map("clubs")
 }
@@ -478,10 +540,11 @@ model ClubTrainer {
   /// L1-INTERNAL
   createdAt     DateTime @default(now()) @map("created_at")
 
-  club            Club                 @relation(fields: [clubId], references: [id], onDelete: Restrict)
-  userAccount     UserAccount          @relation(fields: [userAccountId], references: [id], onDelete: Restrict)
-  sentInvitations ClubMembership[]
-  reportedEntries AthleteMetricEntry[]
+  club                  Club                              @relation(fields: [clubId], references: [id], onDelete: Restrict)
+  userAccount           UserAccount                       @relation(fields: [userAccountId], references: [id], onDelete: Restrict)
+  sentInvitations       ClubMembership[]
+  reportedEntries       AthleteMetricEntry[]
+  decidedCertifications AchievementCertificationRequest[]
 
   @@unique([clubId, userAccountId])
   @@index([userAccountId])
@@ -508,10 +571,11 @@ model ClubMembership {
   /// L1-INTERNAL
   endedAt                DateTime?            @map("ended_at")
 
-  club          Club                 @relation(fields: [clubId], references: [id], onDelete: Restrict)
-  athlete       Athlete              @relation(fields: [athleteId], references: [id], onDelete: Restrict)
-  invitedBy     ClubTrainer          @relation(fields: [invitedByClubTrainerId], references: [id], onDelete: Restrict)
-  metricEntries AthleteMetricEntry[]
+  club                  Club                              @relation(fields: [clubId], references: [id], onDelete: Restrict)
+  athlete               Athlete                           @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  invitedBy             ClubTrainer                       @relation(fields: [invitedByClubTrainerId], references: [id], onDelete: Restrict)
+  metricEntries         AthleteMetricEntry[]
+  certificationRequests AchievementCertificationRequest[]
 
   @@index([clubId, athleteId, status])
   @@index([athleteId, status])
@@ -520,17 +584,20 @@ model ClubMembership {
 
 model MetricDefinition {
   /// L0-PUBLIC
-  id       String  @id @default(cuid())
+  id        String          @id @default(cuid())
   /// L0-PUBLIC
-  key      String  @unique
+  key       String          @unique
   /// L0-PUBLIC
-  name     String
+  name      String
   /// L0-PUBLIC
-  unit     String
+  unit      String
   /// L0-PUBLIC
-  sportId  String? @map("sport_id")
+  /// Changing it later requires recomputing AthleteMetricSummary best values.
+  direction MetricDirection
   /// L0-PUBLIC
-  isActive Boolean @default(true) @map("is_active")
+  sportId   String?         @map("sport_id")
+  /// L0-PUBLIC
+  isActive  Boolean         @default(true) @map("is_active")
 
   sport     Sport?                 @relation(fields: [sportId], references: [id], onDelete: Restrict)
   entries   AthleteMetricEntry[]
@@ -572,17 +639,22 @@ model AthleteMetricEntry {
 /// Derived from entries in the reportEntry transaction; never written by clients.
 model AthleteMetricSummary {
   /// L1-INTERNAL
-  athleteId          String   @map("athlete_id")
+  athleteId          String    @map("athlete_id")
   /// L1-INTERNAL
-  metricDefinitionId String   @map("metric_definition_id")
+  metricDefinitionId String    @map("metric_definition_id")
   /// L1-INTERNAL
-  latestValue        Decimal  @map("latest_value") @db.Decimal(12, 4)
+  latestValue        Decimal   @map("latest_value") @db.Decimal(12, 4)
   /// L1-INTERNAL
-  latestMeasuredAt   DateTime @map("latest_measured_at")
+  latestMeasuredAt   DateTime  @map("latest_measured_at")
   /// L1-INTERNAL
-  entryCount         Int      @map("entry_count")
+  entryCount         Int       @map("entry_count")
   /// L1-INTERNAL
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  /// Personal best per the definition's direction; null for NEUTRAL metrics.
+  bestValue          Decimal?  @map("best_value") @db.Decimal(12, 4)
+  /// L1-INTERNAL
+  bestMeasuredAt     DateTime? @map("best_measured_at")
+  /// L1-INTERNAL
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
   athlete          Athlete          @relation(fields: [athleteId], references: [id], onDelete: Restrict)
   metricDefinition MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { cuidSchema, paginatedOutput, paginationInput } from './common.js';
+import { metricDirectionEnum } from './enums.js';
 
 // ──────────────────────────────────────────────
 // BASE SCHEMA — mirrors Prisma model 1:1
@@ -18,6 +19,7 @@ export const metricDefinitionSchema = z.object({
   key: metricKeySchema, /// L0-PUBLIC
   name: z.string().min(2).max(100), /// L0-PUBLIC
   unit: z.string().min(1).max(20), /// L0-PUBLIC
+  direction: metricDirectionEnum, /// L0-PUBLIC
   sportId: cuidSchema.nullable(), /// L0-PUBLIC
   isActive: z.boolean(), /// L0-PUBLIC
 });

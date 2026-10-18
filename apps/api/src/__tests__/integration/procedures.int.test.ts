@@ -133,7 +133,9 @@ describe.skipIf(!authReady)('achievement correctness', () => {
     await server.close();
   });
 
-  it('addAchievement always creates PENDING, even when the input claims VERIFIED', async () => {
+  // achievement-certification spec: a new achievement starts UNVERIFIED; only
+  // the certification flow changes it.
+  it('addAchievement always creates UNVERIFIED, even when the input claims VERIFIED', async () => {
     if (owner.athleteId === null) throw new Error('fixture invariant');
     const title = `Campeonato Nacional ${randomUUID().slice(0, 8)}`;
     // Zod strips the unknown key — the server decides the status.
@@ -146,13 +148,13 @@ describe.skipIf(!authReady)('achievement correctness', () => {
 
     const created = await apiClient(server.url, owner.accessToken)
       .achievement.addAchievement.mutate(inputClaimingVerified);
-    expect(created.verificationStatus).toBe('PENDING');
+    expect(created.verificationStatus).toBe('UNVERIFIED');
 
     const inDb = await prisma.athleteAchievement.findUniqueOrThrow({
       where: { id: created.id },
       select: { verificationStatus: true },
     });
-    expect(inDb.verificationStatus).toBe('PENDING');
+    expect(inDb.verificationStatus).toBe('UNVERIFIED');
   });
 
   // athlete-visibility spec: achievements are filtered by the athlete's
@@ -220,6 +222,9 @@ describe.skipIf(!authReady)('achievement correctness', () => {
     });
 
     afterAll(async () => {
+      await prisma.achievementCertificationRequest.deleteMany({
+        where: { achievement: { athleteId: ownerAthleteId() } },
+      });
       await prisma.clubMembership.deleteMany({ where: { athleteId: ownerAthleteId() } });
       await cleanupTestClub(clubId);
       await cleanupAuthedUser(friend);
@@ -270,10 +275,137 @@ describe.skipIf(!authReady)('achievement correctness', () => {
       for (const caller of [owner, undefined]) {
         for (const achievement of await read(caller)) {
           expect(Object.keys(achievement).sort()).toEqual(
-            ['achievedOn', 'id', 'organization', 'title', 'verificationStatus'],
+            ['achievedOn', 'certifyingClub', 'id', 'organization', 'title', 'verificationStatus'],
           );
         }
       }
+    });
+
+    // athlete-visibility spec: "Certifying club follows the club-memberships
+    // audience" and the legacy / trainer scenarios (add-achievement-certification).
+    describe('certifying club', () => {
+      let certifiedId: string;
+      let underReviewId: string;
+      const CLUB_NAME = 'Int Club achclub';
+
+      const setAudiences = (
+        achievementsAudience: 'PRIVATE' | 'CONNECTIONS' | 'PUBLIC',
+        clubMembershipsAudience: 'PRIVATE' | 'CONNECTIONS' | 'PUBLIC',
+      ) =>
+        apiClient(server.url, owner.accessToken).visibility.update.mutate({
+          achievementsAudience,
+          clubMembershipsAudience,
+        });
+      const clubOf = async (id: string, user?: AuthedUser) =>
+        (await read(user)).find((a) => a.id === id)?.certifyingClub;
+
+      beforeAll(async () => {
+        const membership = await prisma.clubMembership.findFirstOrThrow({
+          where: { clubId, athleteId: ownerAthleteId(), status: 'ACTIVE' },
+          select: { id: true },
+        });
+        const decider = await prisma.clubTrainer.findFirstOrThrow({
+          where: { clubId },
+          select: { id: true },
+        });
+        const make = (title: string) =>
+          prisma.athleteAchievement.create({
+            data: {
+              athleteId: ownerAthleteId(),
+              title,
+              organization: 'Liga Vallecaucana de Atletismo',
+              achievedOn: new Date('2025-04-12'),
+            },
+            select: { id: true },
+          });
+        certifiedId = (await make('Campeona Departamental 400 m')).id;
+        underReviewId = (await make('Récord Juegos Intercolegiados')).id;
+
+        // What the certification service writes for an approval.
+        const approved = await prisma.achievementCertificationRequest.create({
+          data: { achievementId: certifiedId, clubId, clubMembershipId: membership.id },
+          select: { id: true },
+        });
+        await prisma.achievementCertificationRequest.update({
+          where: { id: approved.id },
+          data: { status: 'APPROVED', decidedByClubTrainerId: decider.id, decidedAt: new Date() },
+          select: { id: true },
+        });
+        await prisma.athleteAchievement.update({
+          where: { id: certifiedId },
+          data: { verificationStatus: 'VERIFIED' },
+          select: { id: true },
+        });
+        await prisma.achievementCertificationRequest.create({
+          data: { achievementId: underReviewId, clubId, clubMembershipId: membership.id },
+          select: { id: true },
+        });
+        await prisma.athleteAchievement.update({
+          where: { id: underReviewId },
+          data: { verificationStatus: 'PENDING' },
+          select: { id: true },
+        });
+        const club = await prisma.club.findUniqueOrThrow({ where: { id: clubId }, select: { name: true } });
+        expect(club.name).toBe(CLUB_NAME);
+      });
+
+      it('hides the club from a stranger when club memberships are PRIVATE', async () => {
+        await setAudiences('PUBLIC', 'PRIVATE');
+        expect(await clubOf(certifiedId, visitor)).toBeNull();
+        expect(await clubOf(certifiedId)).toBeNull();
+      });
+
+      it('shows the club to an anonymous caller when both audiences are PUBLIC', async () => {
+        await setAudiences('PUBLIC', 'PUBLIC');
+        expect(await clubOf(certifiedId)).toEqual({ name: CLUB_NAME });
+      });
+
+      it('CONNECTIONS club audience: a connection sees the club, a stranger does not', async () => {
+        await setAudiences('PUBLIC', 'CONNECTIONS');
+        expect(await clubOf(certifiedId, friend)).toEqual({ name: CLUB_NAME });
+        expect(await clubOf(certifiedId, visitor)).toBeNull();
+      });
+
+      it('the owner always sees the club', async () => {
+        await setAudiences('PRIVATE', 'PRIVATE');
+        expect(await clubOf(certifiedId, owner)).toEqual({ name: CLUB_NAME });
+      });
+
+      it('a legacy VERIFIED achievement has no certifying club', async () => {
+        await setAudiences('PUBLIC', 'PUBLIC');
+        expect(await clubOf(verifiedId)).toBeNull();
+        expect(await clubOf(verifiedId, owner)).toBeNull();
+      });
+
+      it('a trainer with a pending request to review still gets an empty list under PRIVATE', async () => {
+        await setAudiences('PRIVATE', 'PUBLIC');
+        expect(await read(trainer)).toEqual([]);
+        expect((await read(owner)).find((a) => a.id === underReviewId)?.verificationStatus).toBe(
+          'PENDING',
+        );
+      });
+
+      it('every read path agrees on the certifying club (page-by-page and whole list)', async () => {
+        for (const [ach, clubs, caller] of [
+          ['PUBLIC', 'PUBLIC', undefined],
+          ['PUBLIC', 'PRIVATE', visitor],
+          ['PUBLIC', 'CONNECTIONS', friend],
+          ['PRIVATE', 'PRIVATE', owner],
+        ] as const) {
+          await setAudiences(ach, clubs);
+          const whole = new Map(
+            (await page(caller, { take: 50 })).items.map((a) => [a.id, a.certifyingClub]),
+          );
+          const walked = new Map<string, { name: string } | null>();
+          let cursor: string | undefined;
+          do {
+            const next = await page(caller, { take: 1, ...(cursor === undefined ? {} : { cursor }) });
+            for (const a of next.items) walked.set(a.id, a.certifyingClub);
+            cursor = next.nextCursor ?? undefined;
+          } while (cursor !== undefined);
+          expect(walked).toEqual(whole);
+        }
+      });
     });
 
     it('paginates with a cursor, without repeats, for owner and public callers', async () => {

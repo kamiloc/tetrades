@@ -15,11 +15,12 @@ Examples:
 - sport
 - public bio, city, position, height, weight
 - verified achievements
-- public profile photo variants
+- public profile photo variants (`profile-photos` bucket)
 - connection count
 - club names and club-level public information: `Club` (except `createdAt`, L1)
 - metric catalog: `MetricDefinition`
 - the club a membership belongs to (`ClubMembership.clubId`)
+- the club a certification request is made to (`AchievementCertificationRequest.clubId`); its name is shown on a certified achievement only when the athlete's club-memberships audience allows it
 
 ## 2) L1-INTERNAL
 
@@ -28,12 +29,13 @@ Examples:
 
 - email address, account timestamps, device tokens
 - queue status metadata and request ids
-- profile photo originals (EXIF may contain GPS and device info)
+- profile photo originals (EXIF may contain GPS and device info), stored only in the private `profile-photo-originals` bucket ([ADR-015](adr/015-profile-photo-storage-split-buckets-and-upload-window.md))
 - consent, audit, and data-lifecycle records
 - club membership state and timestamps: `ClubMembership` (all fields except `clubId`)
 - trainer assignments: `ClubTrainer`
 - athlete metric entries and summaries: `AthleteMetricEntry`, `AthleteMetricSummary`. Not inherently sensitive; exposure is controlled by visibility rules, not by classification.
 - visibility preferences: `AthleteVisibilitySettings`
+- achievement certification requests: `AchievementCertificationRequest` (all fields except `clubId`), including a trainer's rejection reason, which only the athlete reads ([ADR-016](adr/016-achievement-certification-by-club-trainers.md))
 - push tokens: `DeviceToken` (never placed in job payloads)
 
 ## 3) L2-CONFIDENTIAL

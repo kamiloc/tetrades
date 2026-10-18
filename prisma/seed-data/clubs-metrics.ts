@@ -20,7 +20,11 @@
  *   - tejo: mano 1, mecha 3, embocinada 6, moñona 9; matches to 27 points
  * Every athlete, club, and trainer here is fictional.
  */
-import { ClubMembershipStatus, VisibilityAudience } from '@prisma/client';
+import { ClubMembershipStatus, MetricDirection, VisibilityAudience } from '@prisma/client';
+
+const HIGHER = MetricDirection.HIGHER_IS_BETTER;
+const LOWER = MetricDirection.LOWER_IS_BETTER;
+const NEUTRAL = MetricDirection.NEUTRAL;
 
 export type ClubSeed = {
   readonly slug: string;
@@ -133,6 +137,8 @@ export type MetricSeed = {
   readonly key: string;
   readonly name: string;
   readonly unit: string;
+  /** Drives the personal best on AthleteMetricSummary; NEUTRAL has none. */
+  readonly direction: MetricDirection;
   /** null = applies to every sport. */
   readonly sportName: string | null;
   readonly isActive?: boolean;
@@ -140,20 +146,34 @@ export type MetricSeed = {
 
 export const METRICS: ReadonlyArray<MetricSeed> = [
   // General (any sport)
-  { key: 'vertical_jump', name: 'Salto vertical (CMJ)', unit: 'cm', sportName: null },
+  {
+    key: 'vertical_jump',
+    name: 'Salto vertical (CMJ)',
+    unit: 'cm',
+    direction: HIGHER,
+    sportName: null,
+  },
   {
     key: 'resting_heart_rate',
     name: 'Frecuencia cardíaca en reposo',
     unit: 'lpm',
+    direction: LOWER,
     sportName: null,
   },
-  { key: 'vo2max', name: 'VO₂ máx', unit: 'ml/kg/min', sportName: null },
-  { key: 'body_mass', name: 'Masa corporal', unit: 'kg', sportName: null },
-  { key: 'body_fat_pct', name: 'Porcentaje de grasa corporal', unit: '%', sportName: null },
+  { key: 'vo2max', name: 'VO₂ máx', unit: 'ml/kg/min', direction: HIGHER, sportName: null },
+  { key: 'body_mass', name: 'Masa corporal', unit: 'kg', direction: NEUTRAL, sportName: null },
+  {
+    key: 'body_fat_pct',
+    name: 'Porcentaje de grasa corporal',
+    unit: '%',
+    direction: NEUTRAL,
+    sportName: null,
+  },
   {
     key: 'yo_yo_ir1_distance',
     name: 'Yo-Yo Intermittent Recovery Nivel 1',
     unit: 'm',
+    direction: HIGHER,
     sportName: null,
   },
   // Retired from the battery; kept so historical entries stay meaningful.
@@ -161,151 +181,265 @@ export const METRICS: ReadonlyArray<MetricSeed> = [
     key: 'course_navette_level',
     name: 'Course Navette (retirada)',
     unit: 'nivel',
+    direction: HIGHER,
     sportName: null,
     isActive: false,
   },
 
   // Fútbol
-  { key: 'sprint_10m', name: 'Sprint 10 m', unit: 's', sportName: 'Fútbol' },
-  { key: 'sprint_30m', name: 'Sprint 30 m', unit: 's', sportName: 'Fútbol' },
+  { key: 'sprint_10m', name: 'Sprint 10 m', unit: 's', direction: LOWER, sportName: 'Fútbol' },
+  { key: 'sprint_30m', name: 'Sprint 30 m', unit: 's', direction: LOWER, sportName: 'Fútbol' },
   {
     key: 'rsa_mean_time',
     name: 'Sprints repetidos 6×30 m — tiempo medio',
     unit: 's',
+    direction: LOWER,
     sportName: 'Fútbol',
   },
   {
     key: 'match_distance_covered',
     name: 'Distancia total por partido (GPS)',
     unit: 'km',
+    direction: HIGHER,
     sportName: 'Fútbol',
   },
   {
     key: 'high_speed_running_distance',
     name: 'Distancia a alta velocidad (>19,8 km/h)',
     unit: 'm',
+    direction: HIGHER,
     sportName: 'Fútbol',
   },
 
   // Ciclismo de Ruta
-  { key: 'ftp_w_per_kg', name: 'FTP relativo', unit: 'W/kg', sportName: 'Ciclismo de Ruta' },
-  { key: 'ftp_watts', name: 'FTP absoluto', unit: 'W', sportName: 'Ciclismo de Ruta' },
+  {
+    key: 'ftp_w_per_kg',
+    name: 'FTP relativo',
+    unit: 'W/kg',
+    direction: HIGHER,
+    sportName: 'Ciclismo de Ruta',
+  },
+  {
+    key: 'ftp_watts',
+    name: 'FTP absoluto',
+    unit: 'W',
+    direction: HIGHER,
+    sportName: 'Ciclismo de Ruta',
+  },
   {
     key: 'power_5min_w_per_kg',
     name: 'Potencia máxima 5 min',
     unit: 'W/kg',
+    direction: HIGHER,
     sportName: 'Ciclismo de Ruta',
   },
 
   // Ciclismo BMX
-  { key: 'bmx_lap_time', name: 'Tiempo de vuelta BMX', unit: 's', sportName: 'Ciclismo BMX' },
+  {
+    key: 'bmx_lap_time',
+    name: 'Tiempo de vuelta BMX',
+    unit: 's',
+    direction: LOWER,
+    sportName: 'Ciclismo BMX',
+  },
   {
     key: 'bmx_gate_start_5m',
     name: 'Partida desde rampa — primeros 5 m',
     unit: 's',
+    direction: LOWER,
     sportName: 'Ciclismo BMX',
   },
-  { key: 'bmx_peak_power', name: 'Potencia pico de sprint', unit: 'W', sportName: 'Ciclismo BMX' },
+  {
+    key: 'bmx_peak_power',
+    name: 'Potencia pico de sprint',
+    unit: 'W',
+    direction: HIGHER,
+    sportName: 'Ciclismo BMX',
+  },
 
   // Patinaje de Velocidad
   {
     key: 'skating_200m_time_trial',
     name: '200 m contrarreloj (meta contra meta)',
     unit: 's',
+    direction: LOWER,
     sportName: 'Patinaje de Velocidad',
   },
   {
     key: 'skating_500m_sprint',
     name: '500 m sprint',
     unit: 's',
+    direction: LOWER,
     sportName: 'Patinaje de Velocidad',
   },
-  { key: 'skating_1000m', name: '1.000 m', unit: 's', sportName: 'Patinaje de Velocidad' },
+  {
+    key: 'skating_1000m',
+    name: '1.000 m',
+    unit: 's',
+    direction: LOWER,
+    sportName: 'Patinaje de Velocidad',
+  },
 
   // Atletismo
-  { key: 'sprint_100m', name: '100 m planos', unit: 's', sportName: 'Atletismo' },
-  { key: 'run_400m', name: '400 m planos', unit: 's', sportName: 'Atletismo' },
-  { key: 'run_400m_hurdles', name: '400 m con vallas', unit: 's', sportName: 'Atletismo' },
-  { key: 'triple_jump', name: 'Salto triple', unit: 'm', sportName: 'Atletismo' },
+  { key: 'sprint_100m', name: '100 m planos', unit: 's', direction: LOWER, sportName: 'Atletismo' },
+  { key: 'run_400m', name: '400 m planos', unit: 's', direction: LOWER, sportName: 'Atletismo' },
+  {
+    key: 'run_400m_hurdles',
+    name: '400 m con vallas',
+    unit: 's',
+    direction: LOWER,
+    sportName: 'Atletismo',
+  },
+  {
+    key: 'triple_jump',
+    name: 'Salto triple',
+    unit: 'm',
+    direction: HIGHER,
+    sportName: 'Atletismo',
+  },
 
   // Levantamiento de Pesas
-  { key: 'snatch_max', name: 'Arranque máximo', unit: 'kg', sportName: 'Levantamiento de Pesas' },
+  {
+    key: 'snatch_max',
+    name: 'Arranque máximo',
+    unit: 'kg',
+    direction: HIGHER,
+    sportName: 'Levantamiento de Pesas',
+  },
   {
     key: 'clean_and_jerk_max',
     name: 'Envión máximo',
     unit: 'kg',
+    direction: HIGHER,
     sportName: 'Levantamiento de Pesas',
   },
   {
     key: 'weightlifting_total',
     name: 'Total olímpico (arranque + envión)',
     unit: 'kg',
+    direction: HIGHER,
     sportName: 'Levantamiento de Pesas',
   },
 
   // Boxeo
-  { key: 'punch_rate', name: 'Golpes por minuto (saco)', unit: 'golpes/min', sportName: 'Boxeo' },
+  {
+    key: 'punch_rate',
+    name: 'Golpes por minuto (saco)',
+    unit: 'golpes/min',
+    direction: HIGHER,
+    sportName: 'Boxeo',
+  },
   {
     key: 'rear_cross_peak_force',
     name: 'Fuerza pico — recto de atrás',
     unit: 'N',
+    direction: HIGHER,
     sportName: 'Boxeo',
   },
-  { key: 'lead_jab_peak_force', name: 'Fuerza pico — jab', unit: 'N', sportName: 'Boxeo' },
+  {
+    key: 'lead_jab_peak_force',
+    name: 'Fuerza pico — jab',
+    unit: 'N',
+    direction: HIGHER,
+    sportName: 'Boxeo',
+  },
 
   // Béisbol
   {
     key: 'pitch_velocity_max',
     name: 'Velocidad máxima de lanzamiento',
     unit: 'mph',
+    direction: HIGHER,
     sportName: 'Béisbol',
   },
   {
     key: 'fastball_spin_rate',
     name: 'Tasa de giro de la recta',
     unit: 'rpm',
+    direction: HIGHER,
     sportName: 'Béisbol',
   },
   {
     key: 'exit_velocity_max',
     name: 'Velocidad de salida del bate',
     unit: 'mph',
+    direction: HIGHER,
     sportName: 'Béisbol',
   },
-  { key: 'sixty_yard_dash', name: 'Carrera de 60 yardas', unit: 's', sportName: 'Béisbol' },
-  { key: 'catcher_pop_time', name: 'Pop time del receptor', unit: 's', sportName: 'Béisbol' },
+  {
+    key: 'sixty_yard_dash',
+    name: 'Carrera de 60 yardas',
+    unit: 's',
+    direction: LOWER,
+    sportName: 'Béisbol',
+  },
+  {
+    key: 'catcher_pop_time',
+    name: 'Pop time del receptor',
+    unit: 's',
+    direction: LOWER,
+    sportName: 'Béisbol',
+  },
 
   // Baloncesto
-  { key: 'lane_agility', name: 'Agilidad en la pintura', unit: 's', sportName: 'Baloncesto' },
+  {
+    key: 'lane_agility',
+    name: 'Agilidad en la pintura',
+    unit: 's',
+    direction: LOWER,
+    sportName: 'Baloncesto',
+  },
   {
     key: 'free_throw_pct',
     name: 'Efectividad en tiros libres',
     unit: '%',
+    direction: HIGHER,
     sportName: 'Baloncesto',
   },
   {
     key: 'basketball_points_per_game',
     name: 'Puntos por partido',
     unit: 'pts',
+    direction: HIGHER,
     sportName: 'Baloncesto',
   },
 
   // Voleibol
-  { key: 'spike_reach', name: 'Alcance de ataque', unit: 'cm', sportName: 'Voleibol' },
-  { key: 'block_reach', name: 'Alcance de bloqueo', unit: 'cm', sportName: 'Voleibol' },
+  {
+    key: 'spike_reach',
+    name: 'Alcance de ataque',
+    unit: 'cm',
+    direction: HIGHER,
+    sportName: 'Voleibol',
+  },
+  {
+    key: 'block_reach',
+    name: 'Alcance de bloqueo',
+    unit: 'cm',
+    direction: HIGHER,
+    sportName: 'Voleibol',
+  },
   {
     key: 'volleyball_serve_speed',
     name: 'Velocidad de saque en salto',
     unit: 'km/h',
+    direction: HIGHER,
     sportName: 'Voleibol',
   },
 
   // Fútbol de Salón
-  { key: 'futsal_sprint_20m', name: 'Sprint 20 m', unit: 's', sportName: 'Fútbol de Salón' },
+  {
+    key: 'futsal_sprint_20m',
+    name: 'Sprint 20 m',
+    unit: 's',
+    direction: LOWER,
+    sportName: 'Fútbol de Salón',
+  },
   {
     key: 'futsal_goals_per_match',
     name: 'Goles por partido',
     unit: 'goles',
+    direction: HIGHER,
     sportName: 'Fútbol de Salón',
   },
 
@@ -314,13 +448,21 @@ export const METRICS: ReadonlyArray<MetricSeed> = [
     key: 'tejo_points_per_match',
     name: 'Puntos por partido (a 27)',
     unit: 'puntos',
+    direction: HIGHER,
     sportName: 'Tejo',
   },
-  { key: 'tejo_mecha_rate', name: 'Efectividad de mecha', unit: '%', sportName: 'Tejo' },
+  {
+    key: 'tejo_mecha_rate',
+    name: 'Efectividad de mecha',
+    unit: '%',
+    direction: HIGHER,
+    sportName: 'Tejo',
+  },
   {
     key: 'tejo_embocinadas_per_match',
     name: 'Embocinadas por partido',
     unit: 'embocinadas',
+    direction: HIGHER,
     sportName: 'Tejo',
   },
 
@@ -329,12 +471,14 @@ export const METRICS: ReadonlyArray<MetricSeed> = [
     key: 'swim_50m_freestyle',
     name: '50 m libre (piscina larga)',
     unit: 's',
+    direction: LOWER,
     sportName: 'Natación',
   },
   {
     key: 'swim_100m_freestyle',
     name: '100 m libre (piscina larga)',
     unit: 's',
+    direction: LOWER,
     sportName: 'Natación',
   },
 
@@ -343,12 +487,14 @@ export const METRICS: ReadonlyArray<MetricSeed> = [
     key: 'tennis_first_serve_speed',
     name: 'Velocidad del primer servicio',
     unit: 'km/h',
+    direction: HIGHER,
     sportName: 'Tenis',
   },
   {
     key: 'tennis_first_serve_pct',
     name: 'Porcentaje de primeros servicios',
     unit: '%',
+    direction: HIGHER,
     sportName: 'Tenis',
   },
 ];
@@ -1093,6 +1239,73 @@ export const MEMBERSHIPS: ReadonlyArray<MembershipSeed> = [
 
 // A missing row means each category's default (PRIVATE for club memberships and
 // metrics, PUBLIC for achievements — ADR-014); Valentina and Daniela deliberately have none.
+/**
+ * Achievement certification requests (add-achievement-certification). Each
+ * goes to a club where the athlete's seeded membership is ACTIVE, and the
+ * athlete's seeded achievement status must equal the outcome below (the seed
+ * checks it): APPROVED → VERIFIED, REJECTED → REJECTED, PENDING → PENDING,
+ * CANCELLED → UNVERIFIED.
+ */
+export type CertificationSeed = {
+  readonly athleteSlug: string;
+  /** Exact title of one of the athlete's seeded achievements. */
+  readonly achievementTitle: string;
+  readonly clubSlug: string;
+  readonly status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  readonly requestedAt: string;
+  /** Deciding trainer (index into the club's trainers) for APPROVED / REJECTED. */
+  readonly trainer?: number;
+  readonly decidedAt?: string;
+  readonly rejectionReason?: string;
+};
+
+export const CERTIFICATIONS: ReadonlyArray<CertificationSeed> = [
+  // Patinaje: the Tolima league certifies a national title it witnessed.
+  {
+    athleteSlug: 'laura-sofia-gomez-ospina',
+    achievementTitle: 'Oro 200 m contrarreloj — Campeonato Nacional de Velocidad',
+    clubSlug: 'liga-patinaje-tolima',
+    status: 'APPROVED',
+    requestedAt: '2025-11-03T14:20:00Z',
+    decidedAt: '2025-11-05T16:45:00Z',
+  },
+  // Béisbol: the Bolívar league cannot find the tournament record.
+  {
+    athleteSlug: 'kevin-andres-palacios-mosquera',
+    achievementTitle: 'Campeón Nacional Sub-18 con la selección Bolívar',
+    clubSlug: 'liga-beisbol-bolivar',
+    status: 'REJECTED',
+    requestedAt: '2025-10-20T21:05:00Z',
+    decidedAt: '2025-10-24T13:10:00Z',
+    rejectionReason:
+      'No encontramos el acta final del campeonato en los registros de la liga. Adjunta la planilla oficial y vuelve a solicitarla.',
+  },
+  // Fútbol: Nacional's academy has not reviewed it yet.
+  {
+    athleteSlug: 'daniel-mendoza-restrepo',
+    achievementTitle: 'Mejor mediocampista Torneo Apertura Sub-20',
+    clubSlug: 'atletico-nacional-formativas',
+    status: 'PENDING',
+    requestedAt: '2026-09-28T19:30:00Z',
+  },
+  // Ciclismo de ruta: waiting on the Boyacá league.
+  {
+    athleteSlug: 'juan-esteban-moreno-patino',
+    achievementTitle: 'Top 5 clasificación general — Vuelta de la Juventud',
+    clubSlug: 'liga-ciclismo-boyaca',
+    status: 'PENDING',
+    requestedAt: '2026-10-02T12:15:00Z',
+  },
+  // Voleibol: withdrawn by the athlete to resubmit with the league's acta.
+  {
+    athleteSlug: 'maria-jose-benavides-ortiz',
+    achievementTitle: 'Mejor opuesta — Liga Colombiana de Voleibol 2025',
+    clubSlug: 'liga-voleibol-valle',
+    status: 'CANCELLED',
+    requestedAt: '2026-01-14T15:00:00Z',
+  },
+];
+
 export const VISIBILITY: ReadonlyArray<{
   readonly athleteSlug: string;
   readonly clubMembershipsAudience: VisibilityAudience;
