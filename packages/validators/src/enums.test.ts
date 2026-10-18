@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { clubMembershipStatusEnum, visibilityAudienceEnum } from './enums.js';
+import {
+  certificationRequestStatusEnum,
+  clubMembershipStatusEnum,
+  visibilityAudienceEnum,
+} from './enums.js';
 
 describe('clubMembershipStatusEnum', () => {
   it('has exactly the four ADR-013 statuses', () => {
@@ -24,5 +28,20 @@ describe('visibilityAudienceEnum', () => {
 
   it('rejects unknown audiences', () => {
     expect(visibilityAudienceEnum.safeParse('FRIENDS').success).toBe(false);
+  });
+});
+
+describe('certificationRequestStatusEnum', () => {
+  it('has exactly the four request statuses', () => {
+    expect(certificationRequestStatusEnum.options).toEqual([
+      'PENDING',
+      'APPROVED',
+      'REJECTED',
+      'CANCELLED',
+    ]);
+  });
+
+  it('rejects achievement verification statuses that are not request statuses', () => {
+    expect(certificationRequestStatusEnum.safeParse('VERIFIED').success).toBe(false);
   });
 });

@@ -73,9 +73,12 @@ CREATE POLICY "athlete_achievements_insert_own"
 -- Command:     UPDATE
 -- Role:        authenticated
 -- Purpose:     An athlete can edit their own achievements.
---              verificationStatus / verificationSource transitions to
---              VERIFIED are service_role flows (federation evidence). The
---              row remains owner-editable for other fields.
+--              verification_status / verification_source are NOT
+--              owner-editable: RLS cannot restrict columns, so the trigger in
+--              supabase/constraints/achievement_verification_integrity.sql
+--              rejects end-user changes to them (and resets a VERIFIED row
+--              to UNVERIFIED when its title, organization, or date is
+--              edited). Only the API's certification flow changes them.
 -- NULL safety: athlete_id is NOT NULL.
 -- Composition: ONLY UPDATE policy on this table.
 -- USING vs WITH CHECK: Identical predicate prevents re-parenting on UPDATE.

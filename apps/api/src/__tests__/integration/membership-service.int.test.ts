@@ -12,6 +12,7 @@ import { CLUB_MEMBERSHIP_STATUSES, canTransitionClubMembership } from '@packages
 import { TRPCError } from '@trpc/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { decideCertification, requestCertification } from '../../services/certification.js';
 import {
   inviteAthlete,
   leaveClub,
@@ -247,6 +248,98 @@ describe.skipIf(!dbReady)('membership service', () => {
       const winner = fulfilled[0];
       const final = await statusOf(id);
       expect(winner?.status === 'fulfilled' && winner.value.status).toBe(final);
+    });
+  });
+  // achievement-certification spec: "Leaving a club cancels its open
+  // requests" and "Certifications outlive the membership" (design D4).
+  describe('leaving a club and certification requests', () => {
+    let clubC: string;
+    let clubD: string;
+    let trainerCRow: string;
+
+    beforeAll(async () => {
+      clubC = await createTestClub('ms-cert-c');
+      clubD = await createTestClub('ms-cert-d');
+      trainerCRow = await addClubTrainer(clubC, trainerA.userAccountId);
+      await addClubTrainer(clubD, trainerB.userAccountId);
+    });
+
+    afterAll(async () => {
+      await cleanupTestClub(clubC);
+      await cleanupTestClub(clubD);
+    });
+
+    const achievement = async (title: string) =>
+      (
+        await prisma.athleteAchievement.create({
+          data: {
+            athleteId: athlete.athleteId,
+            title,
+            organization: 'Liga de Fútbol de Bogotá',
+            achievedOn: new Date('2025-09-07'),
+          },
+          select: { id: true },
+        })
+      ).id;
+    const summary = async (id: string) =>
+      (
+        await prisma.athleteAchievement.findUniqueOrThrow({
+          where: { id },
+          select: { verificationStatus: true },
+        })
+      ).verificationStatus;
+    const requestStatus = async (id: string) =>
+      (
+        await prisma.achievementCertificationRequest.findUniqueOrThrow({
+          where: { id },
+          select: { status: true },
+        })
+      ).status;
+
+    it('cancels open requests to that club, keeps its certifications, and leaves other clubs alone', async () => {
+      const membershipC = await createTestMembership({
+        clubId: clubC,
+        athleteId: athlete.athleteId,
+        clubTrainerId: trainerCRow,
+        status: 'ACTIVE',
+      });
+      const trainerDRow = await prisma.clubTrainer.findFirstOrThrow({
+        where: { clubId: clubD },
+        select: { id: true },
+      });
+      await createTestMembership({
+        clubId: clubD,
+        athleteId: athlete.athleteId,
+        clubTrainerId: trainerDRow.id,
+        status: 'ACTIVE',
+      });
+      const caller = { athleteId: athlete.athleteId };
+
+      const openAtC = await achievement('Campeón Copa Bogotá Sub-16');
+      const certifiedByC = await achievement('Goleador Liga Distrital 2025');
+      const openAtD = await achievement('Subcampeón Torneo Interclubes');
+
+      const pendingC = await requestCertification(prisma, caller, { achievementId: openAtC, clubId: clubC });
+      const approvedC = await requestCertification(prisma, caller, {
+        achievementId: certifiedByC,
+        clubId: clubC,
+      });
+      await decideCertification(
+        prisma,
+        { id: trainerCRow, clubId: clubC },
+        { clubId: clubC, requestId: approvedC.id, decision: 'APPROVE' },
+      );
+      const pendingD = await requestCertification(prisma, caller, { achievementId: openAtD, clubId: clubD });
+
+      await leaveClub(prisma, vAthlete, { membershipId: membershipC });
+
+      expect(await statusOf(membershipC)).toBe('COMPLETED');
+      expect(await requestStatus(pendingC.id)).toBe('CANCELLED');
+      expect(await summary(openAtC)).toBe('UNVERIFIED');
+      expect(await requestStatus(approvedC.id)).toBe('APPROVED');
+      expect(await summary(certifiedByC)).toBe('VERIFIED');
+      expect(await requestStatus(pendingD.id)).toBe('PENDING');
+      expect(await summary(openAtD)).toBe('PENDING');
     });
   });
 });

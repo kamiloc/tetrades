@@ -1239,6 +1239,73 @@ export const MEMBERSHIPS: ReadonlyArray<MembershipSeed> = [
 
 // A missing row means each category's default (PRIVATE for club memberships and
 // metrics, PUBLIC for achievements — ADR-014); Valentina and Daniela deliberately have none.
+/**
+ * Achievement certification requests (add-achievement-certification). Each
+ * goes to a club where the athlete's seeded membership is ACTIVE, and the
+ * athlete's seeded achievement status must equal the outcome below (the seed
+ * checks it): APPROVED → VERIFIED, REJECTED → REJECTED, PENDING → PENDING,
+ * CANCELLED → UNVERIFIED.
+ */
+export type CertificationSeed = {
+  readonly athleteSlug: string;
+  /** Exact title of one of the athlete's seeded achievements. */
+  readonly achievementTitle: string;
+  readonly clubSlug: string;
+  readonly status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  readonly requestedAt: string;
+  /** Deciding trainer (index into the club's trainers) for APPROVED / REJECTED. */
+  readonly trainer?: number;
+  readonly decidedAt?: string;
+  readonly rejectionReason?: string;
+};
+
+export const CERTIFICATIONS: ReadonlyArray<CertificationSeed> = [
+  // Patinaje: the Tolima league certifies a national title it witnessed.
+  {
+    athleteSlug: 'laura-sofia-gomez-ospina',
+    achievementTitle: 'Oro 200 m contrarreloj — Campeonato Nacional de Velocidad',
+    clubSlug: 'liga-patinaje-tolima',
+    status: 'APPROVED',
+    requestedAt: '2025-11-03T14:20:00Z',
+    decidedAt: '2025-11-05T16:45:00Z',
+  },
+  // Béisbol: the Bolívar league cannot find the tournament record.
+  {
+    athleteSlug: 'kevin-andres-palacios-mosquera',
+    achievementTitle: 'Campeón Nacional Sub-18 con la selección Bolívar',
+    clubSlug: 'liga-beisbol-bolivar',
+    status: 'REJECTED',
+    requestedAt: '2025-10-20T21:05:00Z',
+    decidedAt: '2025-10-24T13:10:00Z',
+    rejectionReason:
+      'No encontramos el acta final del campeonato en los registros de la liga. Adjunta la planilla oficial y vuelve a solicitarla.',
+  },
+  // Fútbol: Nacional's academy has not reviewed it yet.
+  {
+    athleteSlug: 'daniel-mendoza-restrepo',
+    achievementTitle: 'Mejor mediocampista Torneo Apertura Sub-20',
+    clubSlug: 'atletico-nacional-formativas',
+    status: 'PENDING',
+    requestedAt: '2026-09-28T19:30:00Z',
+  },
+  // Ciclismo de ruta: waiting on the Boyacá league.
+  {
+    athleteSlug: 'juan-esteban-moreno-patino',
+    achievementTitle: 'Top 5 clasificación general — Vuelta de la Juventud',
+    clubSlug: 'liga-ciclismo-boyaca',
+    status: 'PENDING',
+    requestedAt: '2026-10-02T12:15:00Z',
+  },
+  // Voleibol: withdrawn by the athlete to resubmit with the league's acta.
+  {
+    athleteSlug: 'maria-jose-benavides-ortiz',
+    achievementTitle: 'Mejor opuesta — Liga Colombiana de Voleibol 2025',
+    clubSlug: 'liga-voleibol-valle',
+    status: 'CANCELLED',
+    requestedAt: '2026-01-14T15:00:00Z',
+  },
+];
+
 export const VISIBILITY: ReadonlyArray<{
   readonly athleteSlug: string;
   readonly clubMembershipsAudience: VisibilityAudience;

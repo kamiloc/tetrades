@@ -27,6 +27,7 @@ import { TRPCError } from '@trpc/server';
 import type { JobEnqueuer } from '../lib/jobs.js';
 import { cursorArgs, toPage, type Page } from '../lib/pagination.js';
 
+import { lockAchievements } from './certification.js';
 import type { Viewer } from './viewer.js';
 
 const UNIQUE_VIOLATION = 'P2002';
@@ -171,22 +172,67 @@ async function transitionMembership(
   }
 
   const now = new Date();
-  const { count } = await prisma.clubMembership.updateMany({
-    where: { id: membershipId, status: membership.status },
-    data: {
-      status: to,
-      ...(membership.status === 'PENDING_ATHLETE_CONFIRMATION' ? { respondedAt: now } : {}),
-      ...(to === 'COMPLETED' ? { endedAt: now } : {}),
-    },
-  });
-  if (count === 0) {
-    // Another request changed the status between the read and the update.
-    throw new TRPCError({
-      code: 'CONFLICT',
-      message: 'This membership was changed by another request',
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.clubMembership.updateMany({
+      where: { id: membershipId, status: membership.status },
+      data: {
+        status: to,
+        ...(membership.status === 'PENDING_ATHLETE_CONFIRMATION' ? { respondedAt: now } : {}),
+        ...(to === 'COMPLETED' ? { endedAt: now } : {}),
+      },
     });
-  }
+    if (count === 0) {
+      // Another request changed the status between the read and the update.
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'This membership was changed by another request',
+      });
+    }
+    if (to === 'COMPLETED') {
+      await cancelOpenCertifications(tx, membershipId);
+    }
+  });
   return { id: membershipId, status: to };
+}
+
+/**
+ * Leaving a club cancels its open certification requests in the same
+ * transaction (achievement-certification spec, design D4). Each achievement
+ * has at most one PENDING request, so cancelling it returns the achievement
+ * to UNVERIFIED. APPROVED requests are untouched: certifications outlive the
+ * membership.
+ *
+ * The membership row is already locked by the status update, so no new
+ * request can appear. The achievements are locked before the requests (the
+ * order every certification writer uses) and the open set is re-read, since
+ * a withdrawal or decision may have committed in between.
+ */
+async function cancelOpenCertifications(
+  tx: Prisma.TransactionClient,
+  membershipId: string,
+): Promise<void> {
+  const open = await tx.achievementCertificationRequest.findMany({
+    where: { clubMembershipId: membershipId, status: 'PENDING' },
+    select: { achievementId: true },
+  });
+  if (open.length === 0) return;
+  await lockAchievements(
+    tx,
+    open.map((r) => r.achievementId),
+  );
+  const stillOpen = await tx.achievementCertificationRequest.findMany({
+    where: { clubMembershipId: membershipId, status: 'PENDING' },
+    select: { achievementId: true },
+  });
+  if (stillOpen.length === 0) return;
+  await tx.achievementCertificationRequest.updateMany({
+    where: { clubMembershipId: membershipId, status: 'PENDING' },
+    data: { status: 'CANCELLED' },
+  });
+  await tx.athleteAchievement.updateMany({
+    where: { id: { in: stillOpen.map((r) => r.achievementId) } },
+    data: { verificationStatus: 'UNVERIFIED' },
+  });
 }
 
 export function respondToInvitation(

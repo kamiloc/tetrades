@@ -341,6 +341,24 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
       select: { athleteId: true },
     });
     await prisma.athleteVisibilitySettings.create({ data: { athleteId, metricsAudience: 'PUBLIC' }, select: { athleteId: true } });
+    // Certification requests to that club: one approved, one still pending.
+    for (const status of ['APPROVED', 'PENDING'] as const) {
+      const { id: achievementId } = await prisma.athleteAchievement.create({
+        data: { athleteId, title: `Campeonato Regional ${status}`, organization: 'Liga de Atletismo de Antioquia', achievedOn: new Date('2025-05-04') },
+        select: { id: true },
+      });
+      const { id: certId } = await prisma.achievementCertificationRequest.create({
+        data: { achievementId, clubId, clubMembershipId: membershipId },
+        select: { id: true },
+      });
+      if (status === 'APPROVED') {
+        await prisma.achievementCertificationRequest.update({
+          where: { id: certId },
+          data: { status: 'APPROVED', decidedByClubTrainerId: trainerRow, decidedAt: new Date() },
+          select: { id: true },
+        });
+      }
+    }
 
     // As trainer: the deleted athlete coaches `friend` in their own club.
     const ownTrainerRow = await addClubTrainer(ownClubId, user.userAccountId);
@@ -382,6 +400,9 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
 
       const where = { athleteId: a.athleteId };
       expect({
+        certificationRequests: await prisma.achievementCertificationRequest.count({
+          where: { achievement: { athleteId: a.athleteId } },
+        }),
         entries: await prisma.athleteMetricEntry.count({ where }),
         summaries: await prisma.athleteMetricSummary.count({ where }),
         memberships: await prisma.clubMembership.count({ where }),
@@ -396,6 +417,7 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
         otherRequests: await prisma.dataLifecycleRequest.count({ where: { ...where, id: { not: a.requestId } } }),
         deviceTokens: await prisma.deviceToken.count({ where: { userAccountId: a.user.userAccountId } }),
       }).toEqual({
+        certificationRequests: 0,
         entries: 0, summaries: 0, memberships: 0, visibility: 0, connections: 0, achievements: 0,
         publicProfile: 0, privateProfile: 0, photos: 0, otherRequests: 0, deviceTokens: 0,
       });
@@ -493,7 +515,13 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
       expect(warning?.obj['requestId']).toBe('req-hold');
 
       // Nothing deleted, nothing anonymized.
-      expect(await prisma.athleteAchievement.count({ where: { athleteId: a.athleteId } })).toBe(1);
+      // The original achievement plus the two with certification requests.
+      expect(await prisma.athleteAchievement.count({ where: { athleteId: a.athleteId } })).toBe(3);
+      expect(
+        await prisma.achievementCertificationRequest.count({
+          where: { achievement: { athleteId: a.athleteId } },
+        }),
+      ).toBe(2);
       expect(await prisma.athleteMetricEntry.count({ where: { athleteId: a.athleteId } })).toBe(1);
       expect((await real.listStorageObjects(`${a.athleteId}/`)).length).toBe(2);
       expect(await authUserExists(a.user.supabaseUserId)).toBe(true);
