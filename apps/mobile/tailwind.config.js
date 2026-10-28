@@ -1,4 +1,32 @@
 /** @type {import('tailwindcss').Config} */
+// Colors, radii, and text presets come from lib/tokens.js (the design-handoff
+// tokens), so NativeWind classes and lib/theme.ts never drift apart.
+const { colors, radius, textPresets } = require('./lib/tokens.js');
+
+const kebab = (key) => key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+
+const colorClasses = Object.fromEntries(
+  Object.entries(colors).map(([key, value]) => [kebab(key), value]),
+);
+
+const radiusClasses = Object.fromEntries(
+  Object.entries(radius).map(([key, value]) => [key, `${value}px`]),
+);
+
+const presetClasses = Object.fromEntries(
+  Object.entries(textPresets).map(([name, [size, lineHeight, letterSpacing, fontWeight]]) => [
+    name,
+    [
+      `${size}px`,
+      {
+        ...(lineHeight === undefined ? {} : { lineHeight: `${lineHeight}px` }),
+        letterSpacing: `${letterSpacing}px`,
+        fontWeight,
+      },
+    ],
+  ]),
+);
+
 module.exports = {
   content: [
     './app/**/*.{js,jsx,ts,tsx}',
@@ -8,54 +36,23 @@ module.exports = {
   presets: [require('nativewind/preset')],
   theme: {
     extend: {
-      colors: {
-        // Surfaces
-        ink:    '#0B1220',
-        ink2:   '#131B2E',
-        paper:  '#FFFFFF',
-        canvas: '#F4F6FA',
-        line:   '#E5E8EE',
-
-        // Text
-        text:           '#0F172A',
-        muted:          '#6B7280',
-        subtle:         '#9AA3B2',
-        'on-ink':       '#FFFFFF',
-        'on-ink-muted': 'rgba(255,255,255,0.55)',
-
-        // Brand / Accent
-        blue:       '#1A6BFF',
-        'blue-tint': '#E8F0FF',
-        'blue-line': '#D8E4FB',
-
-        // Status
-        pending:      '#B5651D',
-        'pending-tint': '#FFF3E0',
-
-        // Tab bar
-        'tab-active':    '#1A6BFF',
-        'tab-inactive':  '#8A93A4',
-        'tab-bar-bg':    '#FFFFFF',
-        'tab-bar-border':'#E5E8EE',
-
-        // Translucent on dark header
-        'header-chip-bg':     'rgba(255,255,255,0.08)',
-        'header-chip-border': 'rgba(255,255,255,0.12)',
-        'header-hairline':    'rgba(255,255,255,0.06)',
-      },
+      colors: colorClasses,
 
       fontSize: {
-        badge:    '10px',
-        caption:  '11px',
-        small:    '12px',
+        // Raw scale (kept for existing screens)
+        badge: '10px',
+        caption: '11px',
+        small: '12px',
         footnote: '13px',
-        body:     '14px',
-        'body-lg':'15px',
-        callout:  '17px',
-        title3:   '19px',
-        title2:   '22px',
-        title1:   '26px',
-        display:  '34px',
+        body: '14px',
+        'body-lg': '15px',
+        callout: '17px',
+        title3: '19px',
+        title2: '22px',
+        title1: '26px',
+        display: '34px',
+        // Role presets from the design handoff (text.* in tokens/typography.ts)
+        ...presetClasses,
       },
 
       fontWeight: {
@@ -67,15 +64,7 @@ module.exports = {
       // (xs=4→p-1, sm=8→p-2, md=12→p-3, lg=16→p-4, xl=20→p-5,
       //  2xl=24→p-6, 3xl=32→p-8) — no custom spacing needed.
 
-      borderRadius: {
-        xs:    '4px',
-        sm:    '6px',
-        md:    '9px',
-        lg:    '12px',
-        xl:    '16px',
-        '2xl': '18px',
-        pill:  '999px',
-      },
+      borderRadius: radiusClasses,
     },
   },
   plugins: [],

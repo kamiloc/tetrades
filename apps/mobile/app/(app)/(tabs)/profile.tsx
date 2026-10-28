@@ -1,350 +1,250 @@
-import { trpc, useMyAthlete, useMyPublicProfile } from '@packages/api-client';
-import FullScreenSpinner from 'apps/mobile/components/spinner';
-import { type ErrorBoundaryProps, router } from 'expo-router';
-import { useMemo } from 'react';
+import {
+  useConnections,
+  useListAchievements,
+  useMyAthlete,
+  useMyClubMemberships,
+  useMyPublicProfile,
+} from '@packages/api-client';
+import { useSignOut } from '@packages/auth';
+import { TAB_STATES, selectViewState } from '@packages/shared-logic';
+import { router } from 'expo-router';
+import { useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Catches render-phase errors (including "Couldn't find a navigation context")
-// and surfaces the full stack so we can pinpoint the throwing component.
-// Remove once the root cause is resolved.
-export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+import { AchievementRow } from '../../../components/AchievementRow';
+import { Avatar } from '../../../components/Avatar';
+import { Card } from '../../../components/Card';
+import { EmptyRow } from '../../../components/EmptyRow';
+import { PillButton } from '../../../components/PillButton';
+import { ScreenHeader } from '../../../components/ScreenHeader';
+import { SectionTitle } from '../../../components/SectionTitle';
+import { TabSkeleton } from '../../../components/Skeleton';
+import { StatePanel } from '../../../components/StatePanel';
+import { Tag } from '../../../components/Tag';
+import { Feather } from '../../../lib/icons';
+import { isBusy, isFailed } from '../../../lib/query-state';
+import { colors } from '../../../lib/theme';
+
+const ACHIEVEMENT_PREVIEW_COUNT = 3;
+const copy = TAB_STATES.profile;
+
+function Stat({ label, value, divider = false, accent = false }: { label: string; value: string; divider?: boolean; accent?: boolean }): ReactElement {
   return (
-    <View className="flex-1 bg-canvas items-center justify-center px-4">
-      <Text className="text-body font-bold text-red-600 mb-2">Error capturado</Text>
-      <Text className="text-caption text-text mb-1">{error.message}</Text>
-      <Text
-        className="text-caption text-muted mb-6"
-        selectable
-        numberOfLines={20}
-      >
-        {error.stack}
-      </Text>
-      <Pressable
-        onPress={retry}
-        className="bg-blue px-6 py-3 rounded-lg"
-      >
-        <Text className="text-paper font-semibold text-body">Reintentar</Text>
-      </Pressable>
+    <View className={`flex-1 ${divider ? 'border-l border-line pl-3.5' : ''}`}>
+      <Text className={`text-stat-value ${accent ? 'text-blue' : 'text-text'}`}>{value}</Text>
+      <Text className="mt-0.5 text-stat-label uppercase text-muted">{label}</Text>
     </View>
   );
 }
 
-function getInitials(name: string | null): string {
-  if (!name) return '?';
-  const words = name.trim().split(/\s+/);
-  const first = words[0]?.[0] ?? '';
-  const second = words.length > 1 ? (words[1]?.[0] ?? '') : '';
-  const result = (first + second).toUpperCase();
-  return result.length > 0 ? result : '?';
+function ProfileStateShell({ state, onRetry, onSignOut }: { state: 'loading' | 'error'; onRetry: () => void; onSignOut: () => void }): ReactElement {
+  return (
+    <View className="flex-1 bg-canvas">
+      <ScreenHeader title="Profile" subtitle={state === 'error' ? copy.sub.error : copy.sub.empty} />
+      {state === 'loading' ? (
+        <TabSkeleton variant="profile" />
+      ) : (
+        <View className="px-4 pt-4">
+          <StatePanel
+            tone="danger"
+            icon="alert-circle"
+            title={copy.error.title}
+            body={copy.error.body}
+            primary={{ label: copy.error.primary, onPress: onRetry }}
+            secondary={{ label: copy.error.secondary, onPress: onSignOut }}
+          />
+        </View>
+      )}
+    </View>
+  );
 }
 
-const ACHIEVEMENT_PREVIEW_COUNT = 3;
+// Resolves the signed-in athlete first, so every data hook below receives a
+// real athleteId (the api-client hooks take no `enabled` option).
+export default function ProfileScreen(): ReactElement {
+  const myAthlete = useMyAthlete();
+  const { signOut } = useSignOut();
+  const onSignOut = (): void => { void signOut(); };
 
-export default function ProfileScreen() {
-  // All hooks first — Rules of Hooks forbid conditional returns above this block.
-  const myAthleteQuery = useMyAthlete();
-  const publicProfileQuery = useMyPublicProfile();
-  const athleteId = useMemo(() => myAthleteQuery.data?.athleteId ?? null, [myAthleteQuery.data]);
+  if (isBusy(myAthlete)) return <ProfileStateShell state="loading" onRetry={() => undefined} onSignOut={onSignOut} />;
+  if (isFailed(myAthlete) || !myAthlete.data) {
+    return <ProfileStateShell state="error" onRetry={() => { void myAthlete.refetch(); }} onSignOut={onSignOut} />;
+  }
+  return (
+    <ProfileBody
+      athleteId={myAthlete.data.athleteId}
+      displayName={myAthlete.data.displayName}
+      sport={myAthlete.data.sport}
+      onSignOut={onSignOut}
+    />
+  );
+}
 
-  const profileQuery = trpc.athlete.getProfile.useQuery(
-    { athleteId: athleteId ?? '' },
-    { enabled: !!athleteId },
-  );
-  // The profile card previews the three most recent achievements.
-  const achievementsQuery = trpc.achievement.listAchievements.useQuery(
-    { athleteId: athleteId ?? '', take: ACHIEVEMENT_PREVIEW_COUNT },
-    { enabled: !!athleteId },
-  );
-  const connectionsQuery = trpc.connection.listConnections.useQuery(
-    { athleteId: athleteId ?? '' },
-    { enabled: !!athleteId },
-  );
+function ProfileBody({ athleteId, displayName, sport, onSignOut }: {
+  athleteId: string;
+  displayName: string | null;
+  sport: string | null;
+  onSignOut: () => void;
+}): ReactElement {
+  const publicProfile = useMyPublicProfile();
+  const achievements = useListAchievements({ athleteId, take: ACHIEVEMENT_PREVIEW_COUNT });
+  const connections = useConnections(athleteId);
+  const memberships = useMyClubMemberships({ take: 50 });
+  const [dismissedEmpty, setDismissedEmpty] = useState(false);
 
-  if (myAthleteQuery.isLoading) {
-    return <FullScreenSpinner />;
+  const queries = [publicProfile, achievements, connections];
+  const profile = publicProfile.data;
+  const achievementItems = achievements.data?.items ?? [];
+  const hasProfileDetails =
+    !!profile && (!!profile.publicBio || !!profile.primaryPosition || profile.heightCm !== null || profile.weightKg !== null);
+
+  const state = selectViewState({
+    isLoading: queries.some(isBusy),
+    isError: queries.some(isFailed),
+    isEmpty: !hasProfileDetails && achievementItems.length === 0 && !dismissedEmpty,
+  });
+
+  const retry = (): void => {
+    for (const q of queries) void q.refetch();
+  };
+
+  if (state === 'loading' || state === 'error') {
+    return <ProfileStateShell state={state} onRetry={retry} onSignOut={onSignOut} />;
   }
 
-  // Full-screen error — identity is the critical path; without it nothing else loads.
-  // The !hasAthlete case never reaches this screen: (app)/_layout.tsx gates on
-  // useOnboardingState and redirects to /onboarding above the Tabs navigator.
-  if (myAthleteQuery.isError || profileQuery.isError || achievementsQuery.isError || connectionsQuery.isError) {
-    return (
-      <View className="flex-1 items-center justify-center bg-canvas px-4">
-        <Text className="text-text text-body text-center">
-          No pudimos cargar tu perfil. Intenta de nuevo.
-        </Text>
-        <Pressable
-          onPress={() => { void myAthleteQuery.refetch(); }}
-          className="mt-4 bg-blue px-6 py-3 rounded-lg"
-        >
-          <Text className="text-paper font-semibold text-body">Reintentar</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const subtitle = copy.sub.empty;
+  const activeClubs = (memberships.data?.items ?? []).filter((m) => m.status === 'ACTIVE').slice(0, 2);
+  const connectionCount = connections.data?.length ?? 0;
 
-  const profile = profileQuery.data ?? null;
-  const achievements = achievementsQuery.data?.items ?? [];
-  const connections = connectionsQuery.data ?? [];
-  const displayName = myAthleteQuery.data?.displayName ?? null;
-  const sport = myAthleteQuery.data?.sport ?? null;
-
-  // Profile completion derived from available data
-  const completionItems = [
-    { label: 'Foto de perfil', done: false },
-    { label: 'Biografía', done: profile?.onboardingStatus === 'COMPLETE' },
-    { label: 'Deporte', done: !!sport },
-    { label: 'Documentos', done: false },
-    { label: 'Logros', done: achievements.length > 0 },
+  // Completeness counts only what exists after ADR-013 (no documents).
+  const completion = [
+    !!profile?.avatarAssetId,
+    !!profile?.publicBio,
+    !!sport,
+    achievementItems.length > 0,
   ];
-  
-  const pct = Math.round(
-    (completionItems.filter(i => i.done).length / completionItems.length) * 100,
-  );
+  const pct = Math.round((completion.filter(Boolean).length / completion.length) * 100);
 
   return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      contentContainerClassName="pb-8"
-    >
-      {/* ── SECTION 1 — HEADER CARD ─────────────────────────────────── */}
-      <View className="bg-ink rounded-b-2xl">
-        <SafeAreaView edges={['top']}>
-          <View className="px-5 pt-4 pb-6">
-            {/* Edit button — top right */}
-            <View className="flex-row justify-end mb-3">
-              <Pressable
-                onPress={() => { router.push('/profile-edit'); }}
-              >
-                <Text className="text-blue text-body font-medium">Editar</Text>
-              </Pressable>
-            </View>
+    <View className="flex-1 bg-canvas">
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="pb-6">
+        <ScreenHeader title="Profile" subtitle={subtitle} overlap />
 
-            {/* Avatar + identity — skeleton while identity resolves */}
-            {myAthleteQuery.isLoading ? (
-              <View className="items-center">
-                <View className="h-24 w-24 rounded-pill bg-header-chip-bg animate-pulse" />
-                <View className="h-5 w-40 rounded-xs bg-header-chip-bg animate-pulse mt-3" />
-                <View className="h-4 w-24 rounded-pill bg-header-chip-bg animate-pulse mt-2" />
-              </View>
-            ) : (
-              <View className="items-center">
-                {/* Avatar circle with initials */}
-                <View className="bg-blue rounded-pill w-20 h-20 items-center justify-center">
-                  <Text className="text-paper font-bold text-title2">
-                    {getInitials(displayName)}
-                  </Text>
-                </View>
-                {/* Display name */}
-                <Text className="text-title3 font-bold text-on-ink mt-3">
-                  {displayName ?? 'Tu perfil'}
+        {/* Identity card overlaps the header by 20pt */}
+        <View className="-mt-5 px-4">
+          <Card className="px-[18px] pb-[18px] pt-5">
+            <View className="flex-row items-center gap-3.5">
+              <Avatar name={displayName} size={68} ring />
+              <View className="min-w-0 flex-1">
+                <Text className="text-card-title text-text" numberOfLines={1}>
+                  {displayName ?? 'Your profile'}
                 </Text>
-                {/* Sport badge — only when sport is known */}
-                {sport !== null ? (
-                  <View className="bg-header-chip-bg border border-header-chip-border rounded-pill px-3 py-1 mt-2 self-start">
-                    <Text className="text-on-ink text-small font-medium">{sport}</Text>
+                <Text className="mt-1 text-[13.5px] text-muted">
+                  {[profile?.primaryPosition, sport].filter(Boolean).join(' · ') || 'Add your sport and position'}
+                </Text>
+                {activeClubs.length > 0 ? (
+                  <View className="mt-2 flex-row flex-wrap gap-1.5">
+                    {activeClubs.map((m, i) => (
+                      <Tag key={m.id} tone={i === 0 ? 'default' : 'blue'}>
+                        {m.club.name}
+                      </Tag>
+                    ))}
                   </View>
                 ) : null}
               </View>
-            )}
-          </View>
-        </SafeAreaView>
-      </View>
-
-      {/* ── SECTION 2 — STATS ROW ───────────────────────────────────── */}
-      <View className="flex-row bg-paper mx-4 mt-4 rounded-xl">
-        {/* Altura */}
-        <View className="flex-1 items-center py-4 border-r border-line">
-          {publicProfileQuery.isLoading ? (
-            <View className="h-7 w-16 rounded-sm bg-canvas animate-pulse" />
-          ) : (
-            <Text className="text-callout font-bold text-text">
-              {publicProfileQuery.data?.heightCm !== null && publicProfileQuery.data?.heightCm !== undefined
-                ? `${String(publicProfileQuery.data.heightCm)} cm`
-                : '—'}
-            </Text>
-          )}
-          <Text className="text-caption text-muted mt-1">Altura</Text>
-        </View>
-        {/* Peso */}
-        <View className="flex-1 items-center py-4 border-r border-line">
-          {publicProfileQuery.isLoading ? (
-            <View className="h-7 w-16 rounded-sm bg-canvas animate-pulse" />
-          ) : (
-            <Text className="text-callout font-bold text-text">
-              {publicProfileQuery.data?.weightKg !== null && publicProfileQuery.data?.weightKg !== undefined
-                ? `${String(publicProfileQuery.data.weightKg)} kg`
-                : '—'}
-            </Text>
-          )}
-          <Text className="text-caption text-muted mt-1">Peso</Text>
-        </View>
-        {/* Conexiones */}
-        <View className="flex-1 items-center py-4">
-          {connectionsQuery.isLoading ? (
-            <View className="h-7 w-16 rounded-sm bg-canvas animate-pulse" />
-          ) : (
-            <Text className="text-callout font-bold text-text">
-              {String(connections.length)}
-            </Text>
-          )}
-          <Text className="text-caption text-muted mt-1">Conexiones</Text>
-        </View>
-      </View>
-
-      {/* ── SECTION 3 — PROFILE COMPLETION CARD ─────────────────────── */}
-      <View className="bg-paper rounded-xl mx-4 mt-4 p-4">
-        {profileQuery.isLoading ? (
-          <>
-            <View className="h-5 w-48 rounded-xs bg-canvas animate-pulse" />
-            <View className="h-2 rounded-pill bg-canvas animate-pulse mt-3 mb-4" />
-            {[0, 1, 2, 3].map(n => (
-              <View key={n} className="h-4 w-full rounded-xs bg-canvas animate-pulse mt-2" />
-            ))}
-          </>
-        ) : (
-          <>
-            {/* Header row */}
-            <View className="flex-row items-center justify-between">
-              <Text className="text-body font-semibold text-text">Completa tu perfil</Text>
-              <Text className="text-blue font-bold text-body">{pct}%</Text>
             </View>
-            {/* Progress bar — width is the only permitted inline style here */}
-            <View className="h-2 bg-line rounded-pill mt-3 mb-4">
-              <View
-                className="h-2 bg-blue rounded-pill"
-                style={{ width: `${pct}%` }}
-              />
+            <View className="mt-[18px] flex-row border-t border-line pt-4">
+              <Stat label="Height" value={profile && profile.heightCm !== null ? `${profile.heightCm} cm` : '—'} />
+              <Stat label="Weight" value={profile && profile.weightKg !== null ? `${profile.weightKg} kg` : '—'} divider />
+              <Stat label="Connections" value={String(connectionCount)} divider accent />
             </View>
-            {/* Completion item rows */}
-            {completionItems.map(item => (
-              <View key={item.label} className="flex-row items-center py-1">
-                {item.done ? (
-                  <Text className="text-blue font-bold w-5">✓</Text>
-                ) : (
-                  <Text className="text-muted w-5">○</Text>
-                )}
-                <Text className={item.done ? 'text-text text-body' : 'text-muted text-body'}>
-                  {item.label}
-                </Text>
-              </View>
-            ))}
-          </>
-        )}
-      </View>
-
-      {/* ── SECTION 4 — ACHIEVEMENTS PREVIEW ────────────────────────── */}
-      <View className="mx-4 mt-4">
-        {/* Section header */}
-        <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-body font-semibold text-text">Logros</Text>
-          <Pressable
-            onPress={() => router.push('/achievements')}
-          >
-            <Text className="text-blue text-body">Ver todos</Text>
-          </Pressable>
+          </Card>
         </View>
 
-        {achievementsQuery.isLoading ? (
-          <>
-            <View className="bg-paper rounded-xl p-4 mb-3 h-16 animate-pulse" />
-            <View className="bg-paper rounded-xl p-4 mb-3 h-16 animate-pulse" />
-          </>
-        ) : achievements.length === 0 ? (
-          <View className="items-center py-6">
-            <Text className="text-muted text-body text-center">
-              Aún no tienes logros registrados
-            </Text>
+        {state === 'empty' ? (
+          <View className="px-4 pt-5">
+            <StatePanel
+              icon="shield"
+              title={copy.empty.title}
+              body={copy.empty.body}
+              primary={{ label: copy.empty.primary, onPress: () => router.push('/profile-edit') }}
+              secondary={{ label: copy.empty.secondary, onPress: () => setDismissedEmpty(true) }}
+            />
           </View>
         ) : (
-          achievements.map(item => (
-            <View key={item.id} className="bg-paper rounded-xl p-4 mb-3">
-              {/* Row 1: title + badge */}
-              <View className="flex-row items-center justify-between">
-                <Text
-                  className="text-body font-semibold text-text flex-1 mr-2"
-                  numberOfLines={2}
-                >
-                  {item.title}
-                </Text>
-                {item.verificationStatus === 'VERIFIED' ? (
-                  <View className="bg-blue-tint rounded-pill px-2 py-0.5">
-                    <Text className="text-blue text-caption font-medium">Verificado</Text>
-                  </View>
-                ) : item.verificationStatus === 'REJECTED' ? (
-                  <View className="bg-red-100 rounded-pill px-2 py-0.5">
-                    <Text className="text-red-600 text-caption font-medium">Rechazado</Text>
-                  </View>
-                ) : (
-                  <View className="bg-pending-tint rounded-pill px-2 py-0.5">
-                    <Text className="text-pending text-caption font-medium">Pendiente</Text>
-                  </View>
-                )}
-              </View>
-              {/* Row 2: organization */}
-              <Text className="text-muted text-caption mt-1">{item.organization}</Text>
-              {/* Row 3: date */}
-              <Text className="text-muted text-caption mt-0.5">
-                {item.achievedOn.toLocaleDateString('es-CO')}
-              </Text>
-            </View>
-          ))
-        )}
-      </View>
-
-      {/* ── SECTION 5 — CONNECTIONS PREVIEW ─────────────────────────── */}
-      <View className="mx-4 mt-4">
-        {/* Section header */}
-        <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-body font-semibold text-text">Conexiones</Text>
-          <Pressable
-            onPress={() => {
-              // TODO(5.9): router.push('/(tabs)/connections')
-            }}
-          >
-            <Text className="text-blue text-body">Ver todas</Text>
-          </Pressable>
-        </View>
-
-        {connectionsQuery.isLoading ? (
-          <View className="flex-row gap-3">
-            {[0, 1, 2].map(n => (
-              <View key={n} className="items-center">
-                <View className="w-12 h-12 rounded-pill bg-canvas animate-pulse" />
-                <View className="h-3 w-12 rounded-xs bg-canvas animate-pulse mt-1" />
-              </View>
-            ))}
-          </View>
-        ) : connections.length === 0 ? (
-          <View className="items-center py-4">
-            <Text className="text-muted text-body text-center">
-              Aún no tienes conexiones
-            </Text>
-          </View>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-3 px-1"
-          >
-            {connections.slice(0, 5).map(conn => (
-              <View key={conn.id} className="items-center">
-                <View className="w-12 h-12 rounded-pill bg-blue-tint items-center justify-center">
-                  <Text className="text-blue text-body font-medium">?</Text>
+          <View className="px-4 pt-5">
+            <SectionTitle action={{ label: 'Edit', onPress: () => router.push('/profile-edit') }}>About</SectionTitle>
+            <Card className="px-4 py-3.5">
+              <Text className="text-body-copy text-text">{profile?.publicBio ?? 'Add a short bio so other athletes know who you are.'}</Text>
+              {profile?.city ? (
+                <View className="mt-2.5 flex-row items-center gap-1">
+                  <Feather name="map-pin" size={13} color={colors.subtle} />
+                  <Text className="text-[12.5px] text-muted">{profile.city}</Text>
                 </View>
-                <Text
-                  className="text-caption text-muted text-center mt-1"
-                  numberOfLines={1}
-                  style={{ maxWidth: 60 }}
-                >
-                  Conexión
-                </Text>
-              </View>
-            ))}
-          </ScrollView>
+              ) : null}
+            </Card>
+          </View>
         )}
-      </View>
-    </ScrollView>
+
+        <View className="px-4 pt-5">
+          <SectionTitle action={{ label: 'See all', onPress: () => router.push('/achievements') }}>Achievements</SectionTitle>
+          <Card>
+            {achievementItems.length === 0 ? (
+              <EmptyRow icon="shield">{copy.emptyRows.achievements ?? 'No achievements yet'}</EmptyRow>
+            ) : (
+              achievementItems.map((item, index) => (
+                <AchievementRow
+                  key={item.id}
+                  title={item.title}
+                  meta={`${item.achievedOn.getFullYear()} · ${item.organization}`}
+                  status={item.verificationStatus}
+                  last={index === achievementItems.length - 1}
+                  onPress={() => router.push('/achievements')}
+                />
+              ))
+            )}
+          </Card>
+        </View>
+
+        {/* Passport completeness */}
+        <View className="px-4 pt-5">
+          <Card className="flex-row items-center gap-3 border-blue-line px-4 py-3.5" style={{ backgroundColor: '#F7FAFF' }}>
+            <View className="h-10 w-10 items-center justify-center rounded-segmented bg-blue-tint">
+              <Feather name="shield" size={20} color={colors.blue} />
+            </View>
+            <View className="min-w-0 flex-1">
+              <Text className="text-[13.5px] font-semibold text-text">Passport {pct}% complete</Text>
+              <View
+                accessible
+                accessibilityRole="progressbar"
+                accessibilityValue={{ min: 0, max: 100, now: pct }}
+                className="mt-1.5 h-1.5 overflow-hidden rounded-pill bg-[#E6ECF6]"
+              >
+                <View className="h-full rounded-pill bg-blue" style={{ width: `${pct}%` }} />
+              </View>
+            </View>
+            <PillButton label="Finish" variant="ghost" onPress={() => router.push('/profile-edit')} />
+          </Card>
+        </View>
+
+        {/* Visibility entry */}
+        <View className="px-4 pt-5">
+          <Card>
+            <Pressable
+              onPress={() => router.push('/visibility')}
+              accessibilityRole="button"
+              accessibilityHint="Choose who can see your achievements, clubs, and metrics"
+              className="min-h-[52px] flex-row items-center gap-3 px-4 py-3"
+            >
+              <View className="h-[34px] w-[34px] items-center justify-center rounded-md bg-canvas">
+                <Feather name="eye" size={17} color={colors.muted} />
+              </View>
+              <Text className="flex-1 text-row-title text-text">Visibility</Text>
+              <Feather name="chevron-right" size={18} color={colors.subtle} />
+            </Pressable>
+          </Card>
+        </View>
+      </ScrollView>
+    </View>
   );
 }

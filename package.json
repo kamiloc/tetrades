@@ -18,7 +18,11 @@
     "remove-modules": "find . -name 'node_modules' -type d -prune -exec rm -rf {} +",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:seed": "turbo run build --filter=@packages/crypto && tsx prisma/seed.ts"
+    "db:seed": "turbo run build --filter=@packages/crypto && tsx prisma/seed.ts",
+    "db:fixture:clubs": "tsx prisma/dev-fixtures/clubs.ts",
+    "db:fixture:performance": "tsx prisma/dev-fixtures/performance.ts",
+    "db:fixture:connections": "tsx prisma/dev-fixtures/connections.ts",
+    "db:fixture:achievements": "tsx prisma/dev-fixtures/achievements.ts"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

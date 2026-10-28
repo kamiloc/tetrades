@@ -1,8 +1,11 @@
 import { useOnboardingState } from '@packages/api-client';
 import { useSession } from '@packages/auth';
-import FullScreenSpinner from 'apps/mobile/components/spinner';
 import { Redirect, Stack, useSegments } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import FullScreenSpinner from '../../components/spinner';
+import { StatePanel } from '../../components/StatePanel';
+import { isBusy, isFailed } from '../../lib/query-state';
 
 export default function AppLayout() {
   const { isLoading: sessionLoading, isAuthenticated } = useSession();
@@ -23,22 +26,20 @@ export default function AppLayout() {
     return <Redirect href="/login" />;
   }
 
-  if (onboardingState.isLoading) {
+  if (isBusy(onboardingState)) {
     return <FullScreenSpinner />;
   }
 
-  if (onboardingState.isError) {
+  if (isFailed(onboardingState)) {
     return (
-      <View className="flex-1 items-center justify-center bg-canvas px-4">
-        <Text className="text-body text-text text-center mb-4">
-          No pudimos verificar tu perfil. Intenta de nuevo.
-        </Text>
-        <Pressable
-          onPress={() => { void onboardingState.refetch(); }}
-          className="bg-blue px-6 py-3 rounded-lg"
-        >
-          <Text className="text-paper font-semibold text-body">Reintentar</Text>
-        </Pressable>
+      <View className="flex-1 justify-center bg-canvas px-4">
+        <StatePanel
+          tone="danger"
+          icon="alert-circle"
+          title="Couldn't check your profile"
+          body="Check your connection and try again."
+          primary={{ label: 'Try again', onPress: () => { void onboardingState.refetch(); } }}
+        />
       </View>
     );
   }
@@ -56,11 +57,13 @@ export default function AppLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="search" />
+      <Stack.Screen name="visibility" />
       <Stack.Screen
         name="onboarding"
         options={{
           headerShown: true,
-          title: 'Bienvenido',
+          title: 'Welcome',
           headerTitleAlign: 'center',
           headerBackVisible: false,
           gestureEnabled: false,
@@ -71,7 +74,7 @@ export default function AppLayout() {
         options={{
           presentation: 'modal',
           headerShown: true,
-          title: 'Editar perfil',
+          title: 'Edit profile',
           headerTitleAlign: 'center',
         }}
       />
@@ -79,7 +82,7 @@ export default function AppLayout() {
         name="achievements"
         options={{
           headerShown: true,
-          title: 'Mis Logros',
+          title: 'Achievements',
           headerTitleAlign: 'center',
         }}
       />

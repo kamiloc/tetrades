@@ -3,15 +3,13 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
 
+import { KeyboardAwareScrollView } from '../../components/KeyboardAwareScrollView';
 import { colors } from '../../lib/theme';
 
 // Countries are kept short on purpose — expand the list once the product
@@ -83,15 +81,7 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-canvas"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="px-6 pt-14 pb-10"
-        keyboardShouldPersistTaps="handled"
-      >
+    <KeyboardAwareScrollView className="flex-1 bg-canvas" contentContainerClassName="px-6 pt-14 pb-10">
         <Text className="text-title2 font-bold text-text mb-2">
           Crea tu perfil de atleta
         </Text>
@@ -196,7 +186,6 @@ export default function OnboardingScreen() {
             </Text>
           )}
         </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 }

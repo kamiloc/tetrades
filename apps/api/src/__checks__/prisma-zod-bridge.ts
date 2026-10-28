@@ -19,7 +19,11 @@
 // distributes the `extends` check across union members and produces false
 // negatives even when assignability holds at the whole-object level.
 
-import type { ClubMembershipStatusValue } from '@packages/shared-logic';
+import type {
+  AudienceValue,
+  ClubMembershipStatusValue,
+  VerificationStatusValue,
+} from '@packages/shared-logic';
 import type {
   AchievementCertificationRequest,
   Athlete,
@@ -37,6 +41,8 @@ import type {
   PiiConsentLog,
   Sport,
   UserAccount,
+  VerificationStatus,
+  VisibilityAudience,
 } from '@packages/validators';
 import type {
   AchievementCertificationRequest as PrismaAchievementCertificationRequest,
@@ -118,6 +124,12 @@ type _certificationRequest_ok = Assert<
 // are checked against the Zod enum in both directions here.
 type _membershipStatus_ok = Assert<IsAssignable<ClubMembershipStatusValue, ClubMembershipStatus>>;
 type _membershipStatus_rev_ok = Assert<IsAssignable<ClubMembershipStatus, ClubMembershipStatusValue>>;
+// Same check for the mobile chip and visibility-control literals
+// (refactor-mobile-screens-design-handoff).
+type _verificationStatus_ok = Assert<IsAssignable<VerificationStatusValue, VerificationStatus>>;
+type _verificationStatus_rev_ok = Assert<IsAssignable<VerificationStatus, VerificationStatusValue>>;
+type _audience_ok = Assert<IsAssignable<AudienceValue, VisibilityAudience>>;
+type _audience_rev_ok = Assert<IsAssignable<VisibilityAudience, AudienceValue>>;
 
 // Keep TS from tree-shaking the file out of the project graph.
 export const __prismaZodBridge = true;
