@@ -7,8 +7,12 @@
 //   2. Identity card — Avatar (68) + Name + BlueCheck + sport line + tags
 //      + stats row (Height · Weight · Connections divided by hairlines)
 //   3. About card — bio paragraph + location + joined date row
-//   4. Achievements card — list of rows with VerifiedChip / PendingChip
-//   5. Passport completeness card — progress bar + "Finish" button
+//   4. Achievements card — Unverified / Pending / Verified / Rejected rows.
+//      Owners see all statuses; non-owners see Verified only when the
+//      achievements audience permits it. Show certifying club attribution
+//      only when club-membership visibility also permits it.
+//   5. Passport completeness card — progress bar + "Finish" button. Link to
+//      athlete visibility settings from profile management.
 //
 // Data states: call useProfile(); isLoading → ProfileSkeleton, error →
 // ProfileError with refetch and Sign out, no profile data → ProfileEmpty,

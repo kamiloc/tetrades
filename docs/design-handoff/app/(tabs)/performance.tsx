@@ -1,5 +1,5 @@
 // apps/mobile/app/(tabs)/performance.tsx
-// Performance — athlete's season metrics, benchmarks, and verified tests.
+// Performance — trainer-reported athlete metrics, trends, and benchmarks.
 //
 // Layout (375 px, scrollable, colors.canvas, horizontal padding space.lg):
 //   1. <ScreenHeader title="Performance" subtitle="Season 2026 · Midfielder" />
@@ -10,8 +10,9 @@
 //      the prototype's line, grid, fill, labels, and point placement.
 //   4. PF_BENCH — percentile bars. Keep source labels, percentile values,
 //      track/fill colors, spacing, and marker placement.
-//   5. PF_TESTS — metric test rows with <VerifiedChip /> or <PendingChip />.
-//   6. <MSegmented /> — segmented control at the final position shown in
+//   5. PF_TESTS — trainer-reported metric rows with result, date, and reporting
+//      trainer. Do not present metric entries as achievement verification.
+//   6. <MSegmented /> — use only for the performance range control shown in
 //      screens-2.jsx; use colors.segmented and radius.segmented.
 //
 // Data behavior (wire usePerformance() from apps/mobile/lib/):
@@ -46,7 +47,7 @@ export default function PerformanceScreen() {
         {/* <PerformanceKpiGrid items={PF_KPI} /> */}
         {/* <SpeedChart values={PF_SPEED} months={PF_MONTHS} /> */}
         {/* <PerformanceBenchmarks items={PF_BENCH} /> */}
-        {/* <PerformanceTests items={PF_TESTS} /> */}
+        {/* <TrainerReportedMetricList items={PF_TESTS} /> */}
         {/* <MSegmented ... /> */}
       </ScrollView>
     </View>

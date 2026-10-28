@@ -102,6 +102,12 @@ function PendingChip({ small = false }) {
     </span>
   );
 }
+function UnverifiedChip({ small = false }) {
+  return <span style={{ display: 'inline-flex', alignItems: 'center', background: C.canvas, color: C.muted, fontSize: small ? 10 : 11, fontWeight: 600, padding: small ? '2px 6px' : '3px 8px', borderRadius: 999 }}>Unverified</span>;
+}
+function RejectedChip({ small = false }) {
+  return <span style={{ display: 'inline-flex', alignItems: 'center', background: C.dangerTint, color: C.danger, fontSize: small ? 10 : 11, fontWeight: 600, padding: small ? '2px 6px' : '3px 8px', borderRadius: 999 }}>Rejected</span>;
+}
 
 // ─────────────────────────────────────────────────────────────
 // Avatar — stripe placeholder with initials, jersey-style
@@ -314,7 +320,7 @@ function ProfileScreen() {
           <AchievementRow
             title="Combine: 40-yd dash · 4.61s"
             meta="2025 · Bay Area Showcase"
-            pending last />
+            unverified last />
         </Card>
       </div>
 
@@ -390,7 +396,7 @@ function Stat({ label, value, divider, linkish }) {
     </div>
   );
 }
-function AchievementRow({ title, meta, verified, pending, last }) {
+function AchievementRow({ title, meta, verified, pending, unverified, rejected, last }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
@@ -399,11 +405,11 @@ function AchievementRow({ title, meta, verified, pending, last }) {
     }}>
       <div style={{
         width: 34, height: 34, borderRadius: 9,
-        background: pending ? C.pendingTint : C.blueTint,
+        background: rejected ? C.dangerTint : pending ? C.pendingTint : unverified ? C.canvas : C.blueTint,
         display: 'grid', placeItems: 'center', flexShrink: 0,
       }}>
-        <Icon name={pending ? 'clock' : 'check'} size={17}
-              color={pending ? C.pending : C.blue} stroke={2.2} />
+        <Icon name={rejected ? 'alert' : pending ? 'clock' : unverified ? 'shield' : 'check'} size={17}
+              color={rejected ? C.danger : pending ? C.pending : unverified ? C.muted : C.blue} stroke={2.2} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: C.text, lineHeight: 1.25 }}>{title}</div>
@@ -411,6 +417,8 @@ function AchievementRow({ title, meta, verified, pending, last }) {
       </div>
       {verified && <VerifiedChip small />}
       {pending && <PendingChip small />}
+      {unverified && <UnverifiedChip small />}
+      {rejected && <RejectedChip small />}
     </div>
   );
 }
@@ -757,7 +765,7 @@ function TabBar({ active, onChange, hideBadges = false }) {
 
 Object.assign(window, {
   C, Icon, Header, ApMark, Avatar, Card, SectionTitle,
-  VerifiedChip, PendingChip, BlueCheck, Tag,
+  VerifiedChip, PendingChip, UnverifiedChip, RejectedChip, BlueCheck, Tag,
   ProfileScreen, ConnectionsScreen,
   LoginScreen, TabBar, TABS,
 });

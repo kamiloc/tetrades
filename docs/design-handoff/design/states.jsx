@@ -14,13 +14,13 @@ const TAB_STATES = {
   },
   performance: {
     sub: { loaded: 'Season 2026 · Midfielder', empty: 'Season 2026 · Midfielder', error: 'Performance unavailable' },
-    empty: { icon: 'activity', title: 'No performance data yet', body: 'Log a session or invite a trainer to add your first performance update.', primary: 'Log a session', secondary: 'Invite a trainer' },
+    empty: { icon: 'activity', title: 'No performance data yet', body: 'A trainer at one of your active clubs can report your first performance update.', primary: 'View clubs', secondary: 'Manage visibility' },
     error: { title: "Couldn't load performance data", body: 'Check your connection and try again.', primary: 'Try again', secondary: 'Close' },
   },
   clubs: {
-    sub: { loaded: '3 clubs · 2 trainer requests', empty: 'Your club history', error: 'You're offline' },
-    empty: { icon: 'flag', title: 'Add your club history', body: 'Add clubs to your profile and manage trainer access from here.', primary: 'Add a club', secondary: 'Invite a trainer' },
-    error: { title: "You're offline", body: 'Reconnect to refresh clubs and trainer requests.', primary: 'Try again', secondary: 'Close' },
+    sub: { loaded: '2 active clubs · 1 invitation', empty: 'Your clubs and invitations', error: "You're offline" },
+    empty: { icon: 'flag', title: 'No active clubs yet', body: 'When a club invites you, review it here. You choose whether to accept.', primary: 'View invitations', secondary: 'Manage visibility' },
+    error: { title: "You're offline", body: 'Reconnect to refresh your club invitations and active memberships.', primary: 'Try again', secondary: 'Close' },
   },
 };
 
@@ -108,7 +108,7 @@ function PerformanceError() {
 }
 
 function ClubsEmpty() {
-  return <div style={{ padding: '16px 16px 24px' }}><StatePanel icon={TAB_STATES.clubs.empty.icon} title={TAB_STATES.clubs.empty.title} body={TAB_STATES.clubs.empty.body} primary={TAB_STATES.clubs.empty.primary} secondary={TAB_STATES.clubs.empty.secondary} /><div style={{ marginTop: 20 }}><SectionTitle>Trainer requests</SectionTitle><Card><EmptyRow icon="users">No trainer requests</EmptyRow></Card></div><div style={{ marginTop: 20 }}><SectionTitle>Staff</SectionTitle><Card><EmptyRow icon="user">No staff listed</EmptyRow></Card></div></div>;
+  return <div style={{ padding: '16px 16px 24px' }}><StatePanel icon={TAB_STATES.clubs.empty.icon} title={TAB_STATES.clubs.empty.title} body={TAB_STATES.clubs.empty.body} primary={TAB_STATES.clubs.empty.primary} secondary={TAB_STATES.clubs.empty.secondary} /><div style={{ marginTop: 20 }}><SectionTitle>Club invitations</SectionTitle><Card><EmptyRow icon="users">No club invitations</EmptyRow></Card></div><div style={{ marginTop: 20 }}><SectionTitle>Trainers at your clubs</SectionTitle><Card><EmptyRow icon="user">No trainers listed</EmptyRow></Card></div></div>;
 }
 
 function ClubsError() {

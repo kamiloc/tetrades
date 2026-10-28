@@ -1,15 +1,14 @@
 // apps/mobile/app/(tabs)/clubs.tsx
-// Clubs & trainers — athlete-controlled club history and trainer access.
+// Clubs & trainers — club invitations, active club history, and club trainers.
 //
 // Layout (375 px, scrollable, colors.canvas, horizontal padding space.lg):
-//   1. <ScreenHeader title="Clubs & trainers"
-//      subtitle="3 clubs · 2 trainer requests" />
-//   2. Trainer requests section — CL_REQ rows, each showing trainer identity,
-//      club, and the permission chips shown in design/screens-2.jsx.
-//   3. Club history section — CL_HIST timeline. Visually mark the current club
-//      with the source's flag treatment and preserve source chronology/copy.
-//   4. Staff access section — CL_STAFF rows with name, role, club, and access
-//      presentation as shown in the prototype.
+//   1. <ScreenHeader title="Clubs & trainers" subtitle from TAB_STATES />
+//   2. Club invitations — show the inviting club and trainer. The athlete
+//      accepts or declines; only acceptance activates membership.
+//   3. Active club history — render CL_HIST. Pending and rejected invitations
+//      never appear in public profile or public club roster views.
+//   4. Trainers at your clubs — show trainer assignments for active clubs.
+//      This list does not imply access to athlete private-profile data.
 //
 // Data behavior (wire useClubs() from apps/mobile/lib/):
 //   const { data, isLoading, error, refetch } = useClubs();
@@ -39,9 +38,9 @@ export default function ClubsScreen() {
     <View style={styles.root}>
       {/* <ScreenHeader title="Clubs & trainers" subtitle="3 clubs · 2 trainer requests" /> */}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* <TrainerRequests items={CL_REQ} /> */}
+        {/* <ClubInvitations items={CL_REQ} onAccept={...} onDecline={...} /> */}
         {/* <ClubTimeline items={CL_HIST} /> */}
-        {/* <StaffAccessList items={CL_STAFF} /> */}
+        {/* <ClubTrainerList items={CL_STAFF} /> */}
       </ScrollView>
     </View>
   );

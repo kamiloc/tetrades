@@ -5,6 +5,8 @@ const { useState } = React;
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "activeTab": "profile",
+  "activeFlow": "tabs",
+  "certificationState": "UNVERIFIED",
   "authenticated": true,
   "authMode": "signin",
   "dataState": "loaded",
@@ -21,7 +23,10 @@ const HEADER_BY_TAB = {
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const active = t.activeTab;
-  const head = { ...HEADER_BY_TAB[active], subtitle: TAB_STATES[active].sub[t.dataState] };
+  const flow = t.activeFlow;
+  const head = flow === 'tabs'
+    ? { ...HEADER_BY_TAB[active], subtitle: TAB_STATES[active].sub[t.dataState] }
+    : { title: flowLabel(flow), subtitle: flow === 'trainerInbox' || flow === 'metricEntry' ? 'Trainer workspace · Stanford Athletics' : 'Your athlete account' };
 
   // override --blue at runtime if accent changed
   React.useEffect(() => {
@@ -29,6 +34,10 @@ function App() {
   }, [t.accent]);
 
   const renderTabBody = () => {
+    if (flow !== 'tabs') {
+      const FlowScreen = FLOW_SCREENS[flow];
+      return FlowScreen ? <FlowScreen status={t.certificationState} setStatus={(value) => setTweak('certificationState', value)} /> : null;
+    }
     if (t.dataState === 'empty') {
       switch (active) {
         case 'profile': return <ProfileEmpty />;
@@ -65,7 +74,7 @@ function App() {
         }}>
           {t.authenticated ? (
             <React.Fragment>
-              <Header title={head.title} subtitle={head.subtitle} />
+              <Header title={head.title} subtitle={head.subtitle} action={flow !== 'tabs' ? <button type="button" onClick={() => setTweak('activeFlow', 'tabs')} style={{ color: '#fff', border: 0, background: 'transparent', fontSize: 12 }}>Done</button> : undefined} />
               <main style={{
                 flex: 1, overflow: 'auto',
                 background: 'var(--canvas)',
@@ -73,7 +82,7 @@ function App() {
               }}>
                 {renderTabBody()}
               </main>
-              <TabBar active={active} hideBadges={t.dataState !== 'loaded'} onChange={(id) => setTweak('activeTab', id)} />
+              {flow === 'tabs' ? <TabBar active={active} hideBadges={t.dataState !== 'loaded'} onChange={(id) => setTweak('activeTab', id)} /> : null}
             </React.Fragment>
           ) : (
             <main style={{ flex: 1, overflow: 'auto' }}>
@@ -96,6 +105,31 @@ function App() {
             onChange={(v) => setTweak('activeTab', v)}
             options={TABS.map(x => ({ value: x.id, label: x.label }))}
           />
+          <TweakSelect
+            label="Preview flow"
+            value={t.activeFlow}
+            onChange={(v) => setTweak('activeFlow', v)}
+            options={[
+              { value: 'tabs', label: 'Main tabs' },
+              { value: 'visibility', label: 'Visibility settings' },
+              { value: 'certification', label: 'Athlete certification' },
+              { value: 'invitations', label: 'Club invitations' },
+              { value: 'trainerInbox', label: 'Trainer certification inbox' },
+              { value: 'metricEntry', label: 'Trainer metric entry' },
+            ]}
+          />
+          {t.activeFlow === 'certification' ? <TweakSelect
+            label="Certification state"
+            value={t.certificationState}
+            onChange={(v) => setTweak('certificationState', v)}
+            options={[
+              { value: 'UNVERIFIED', label: 'Unverified' },
+              { value: 'PENDING', label: 'Pending' },
+              { value: 'VERIFIED', label: 'Approved / verified' },
+              { value: 'REJECTED', label: 'Rejected' },
+              { value: 'CANCELLED', label: 'Withdrawn / cancelled' },
+            ]}
+          /> : null}
           <TweakToggle
             label="Authenticated"
             value={t.authenticated}
