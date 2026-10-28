@@ -43,16 +43,21 @@ export interface FixtureAthlete {
   displayName: string;
 }
 
+// Seed accounts use placeholder ids prefixed "seed-"; real sign-ups don't.
+const SEED_USER_ID_PREFIX = 'seed-';
+const NON_SEED_ATHLETE = { userAccount: { supabaseUserId: { not: { startsWith: SEED_USER_ID_PREFIX } } } } as const;
+
+// Fixtures only ever target a signed-up (non-seed) athlete, whether chosen by
+// slug or automatically; seed athletes are left as the seed wrote them.
 export async function resolveAthlete(slug: string | null): Promise<FixtureAthlete> {
   const select = { id: true, slug: true, displayName: true } as const;
   if (slug !== null) {
-    const athlete = await prisma.athlete.findUnique({ where: { slug }, select });
-    if (athlete === null) throw new Error(`No athlete with slug "${slug}".`);
+    const athlete = await prisma.athlete.findFirst({ where: { slug, ...NON_SEED_ATHLETE }, select });
+    if (athlete === null) throw new Error(`No signed-up (non-seed) athlete with slug "${slug}".`);
     return athlete;
   }
-  // Seed accounts use placeholder ids prefixed "seed-"; real sign-ups don't.
   const candidates = await prisma.athlete.findMany({
-    where: { userAccount: { supabaseUserId: { not: { startsWith: 'seed-' } } } },
+    where: NON_SEED_ATHLETE,
     select,
     orderBy: { createdAt: 'desc' },
     take: 10,
@@ -72,13 +77,27 @@ export function daysAgo(now: Date, days: number, hourUtc = 14): Date {
   return new Date(base - days * DAY_MS);
 }
 
+// Database-target guard, independent of NODE_ENV (which the yarn scripts don't
+// set): fixtures run only where yarn db:seed has run. The seed is dev-only, so
+// a production database has no seed accounts and is refused before any write.
+async function assertDevDatabase(): Promise<void> {
+  const seedAccount = await prisma.userAccount.findFirst({
+    where: { supabaseUserId: { startsWith: SEED_USER_ID_PREFIX } },
+    select: { id: true },
+  });
+  if (seedAccount === null) {
+    throw new Error('This database has no seed accounts, so it may not be a dev database. Run yarn db:seed on a dev database first.');
+  }
+}
+
 export function runFixture(name: string, main: () => Promise<void>): void {
   if (process.env['NODE_ENV'] === 'production') {
     console.error(`${name}: refusing to run in production.`);
     process.exitCode = 1;
     return;
   }
-  main()
+  assertDevDatabase()
+    .then(main)
     .catch((error: unknown) => {
       console.error(`${name}: ${error instanceof Error ? error.message : String(error)}`);
       process.exitCode = 1;

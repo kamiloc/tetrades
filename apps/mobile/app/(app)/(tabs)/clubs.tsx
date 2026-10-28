@@ -55,7 +55,7 @@ export default function ClubsScreen(): ReactElement {
   const state = selectViewState({
     isLoading: isBusy(memberships),
     isError: isFailed(memberships),
-    isEmpty: invitations.length === 0 && active.length === 0,
+    isEmpty: invitations.length === 0 && active.length === 0 && history.length === 0,
   });
 
   const refresh = async (): Promise<void> => {

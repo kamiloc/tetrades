@@ -72,7 +72,8 @@ export const TAB_STATES: Readonly<Record<TabKey, TabStateCopy>> = {
     error: {
       icon: 'alert-circle',
       title: "Couldn't load requests",
-      body: 'Your saved network is shown below. Try again to refresh requests.',
+      // Production copy: no cached network is shown yet (handoff README exceptions).
+      body: 'Check your connection and try again.',
       primary: 'Try again',
       secondary: 'View cached network',
     },

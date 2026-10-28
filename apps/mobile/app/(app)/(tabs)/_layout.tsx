@@ -1,13 +1,12 @@
-import { useMyClubMemberships } from '@packages/api-client';
+import { trpc } from '@packages/api-client';
 import { Tabs } from 'expo-router';
-import type { ReactElement } from 'react';
+import { useEffect, type ReactElement } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { Feather, type IconName } from '../../../lib/icons';
 import { colors } from '../../../lib/theme';
 
-// Pending invitations are a small subset of memberships; the first page
-// (server max 50) is enough for the badge. The Clubs tab pages the rest.
+// Same query and page size as the Clubs tab, so both share one cache entry.
 const MEMBERSHIP_PAGE_SIZE = 50;
 
 function TabIcon({ name, focused, badge }: { name: IconName; focused: boolean; badge?: number }): ReactElement {
@@ -27,12 +26,22 @@ function TabIcon({ name, focused, badge }: { name: IconName; focused: boolean; b
   );
 }
 
-// Badge count only when the query succeeded and the count is positive
-// (hidden while loading, on error, and at zero).
+// Badge count only once every page has loaded and the count is positive
+// (hidden while loading, on error, and at zero). Pending invitations can sit
+// on any page, so a partial count would undercount.
 function usePendingInvitationCount(): number {
-  const memberships = useMyClubMemberships({ take: MEMBERSHIP_PAGE_SIZE });
-  if (!memberships.isSuccess) return 0;
-  return memberships.data.items.filter((m) => m.status === 'PENDING_ATHLETE_CONFIRMATION').length;
+  const memberships = trpc.club.listMyMemberships.useInfiniteQuery(
+    { take: MEMBERSHIP_PAGE_SIZE },
+    { getNextPageParam: (page) => page.nextCursor ?? undefined },
+  );
+  const { hasNextPage, isFetchingNextPage, isError, fetchNextPage } = memberships;
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && !isError) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, isError, fetchNextPage]);
+  if (!memberships.isSuccess || hasNextPage) return 0;
+  return memberships.data.pages
+    .flatMap((page) => page.items)
+    .filter((m) => m.status === 'PENDING_ATHLETE_CONFIRMATION').length;
 }
 
 function tabLabel(label: string) {

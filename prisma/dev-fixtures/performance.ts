@@ -19,8 +19,9 @@
  *   yarn db:fixture:performance --athlete <slug>   # a specific athlete
  *   yarn db:fixture:performance --athlete <slug> --replace
  *
- * --replace deletes this athlete's entries for the four metrics first.
- * Entries are append-only (no UPDATE), so re-running without it is refused.
+ * --replace deletes the entries this fixture created earlier, and refuses when
+ * the athlete has any other entries for the four metrics. Entries are
+ * append-only (no UPDATE), so re-running without it is refused.
  * Never run against production. console output is allowed here (dev utility).
  */
 
@@ -77,6 +78,24 @@ const PLANS: readonly SeriesPlan[] = [
   },
 ];
 
+// A row this fixture wrote: reported by the fixture club's trainer, with
+// createdAt equal to measuredAt (real entries get createdAt at report time)
+// and measured at exactly 14:00 UTC, the fixture's default hour.
+function isFixtureEntry(
+  entry: { reportedByClubTrainerId: string; measuredAt: Date; createdAt: Date },
+  trainerId: string,
+): boolean {
+  const at = entry.measuredAt;
+  return (
+    entry.reportedByClubTrainerId === trainerId &&
+    entry.createdAt.getTime() === at.getTime() &&
+    at.getUTCHours() === 14 &&
+    at.getUTCMinutes() === 0 &&
+    at.getUTCSeconds() === 0 &&
+    at.getUTCMilliseconds() === 0
+  );
+}
+
 // Spread `count` dates evenly between two "days ago" marks, 14:00 UTC
 // (morning sessions in Colombia, UTC-5), oldest first.
 function datesFor(plan: SeriesPlan, now: Date): Date[] {
@@ -110,11 +129,21 @@ async function main(): Promise<void> {
   }
   const metricIds = definitions.map((d) => d.id);
 
-  const existing = await prisma.athleteMetricEntry.count({
+  const existing = await prisma.athleteMetricEntry.findMany({
     where: { athleteId: athlete.id, metricDefinitionId: { in: metricIds } },
+    select: { id: true, reportedByClubTrainerId: true, measuredAt: true, createdAt: true },
   });
-  if (existing > 0 && !replace) {
-    throw new Error(`${athlete.slug} already has ${existing} entries for these metrics. Re-run with --replace.`);
+  if (existing.length > 0 && !replace) {
+    throw new Error(`${athlete.slug} already has ${existing.length} entries for these metrics. Re-run with --replace.`);
+  }
+  // --replace removes only rows this fixture wrote, and refuses when any other
+  // entry exists, so real trainer-reported history is never deleted.
+  const fixtureEntryIds = existing.filter((e) => isFixtureEntry(e, trainer.id)).map((e) => e.id);
+  const otherEntries = existing.length - fixtureEntryIds.length;
+  if (replace && otherEntries > 0) {
+    throw new Error(
+      `${athlete.slug} has ${otherEntries} entries for these metrics that this fixture didn't create. Refusing to replace them.`,
+    );
   }
 
   // Membership: reuse an ACTIVE one at this club, otherwise invite then accept
@@ -153,8 +182,8 @@ async function main(): Promise<void> {
   }
 
   await prisma.$transaction(async (tx) => {
-    if (replace) {
-      await tx.athleteMetricEntry.deleteMany({ where: { athleteId: athlete.id, metricDefinitionId: { in: metricIds } } });
+    if (replace && fixtureEntryIds.length > 0) {
+      await tx.athleteMetricEntry.deleteMany({ where: { id: { in: fixtureEntryIds } } });
     }
     for (const plan of PLANS) {
       const definition = byKey.get(plan.metricKey);

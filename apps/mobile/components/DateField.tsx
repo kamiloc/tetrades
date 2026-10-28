@@ -19,8 +19,12 @@ export function toIsoDate(date: Date): string {
 export function fromIsoDate(value: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  return isNaN(date.getTime()) ? null : date;
+  const [year, month, day] = [Number(match[1]), Number(match[2]) - 1, Number(match[3])];
+  const date = new Date(year, month, day);
+  // Date rolls impossible days over (2026-02-31 becomes March 3), so check
+  // that the parts survived unchanged.
+  const valid = date.getFullYear() === year && date.getMonth() === month && date.getDate() === day;
+  return valid ? date : null;
 }
 
 interface DateFieldProps {

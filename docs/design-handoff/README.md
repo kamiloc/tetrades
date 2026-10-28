@@ -521,7 +521,7 @@ Production deliberately differs from this prototype here:
 - **Metric attribution names the club, not the trainer** (“Reported by a trainer at <Club>”), because entries expose only a trainer id. The prototype copy has been aligned.
 - **Club invitations show the club, not the inviting trainer**, for the same reason.
 - **Styling uses NativeWind**, not `StyleSheet.create` (AGENTS.md, ADR-011).
-- **Loaded subtitles use live values** (connection count, active clubs and invitations, sport and position). Empty and error copy is used verbatim from `TAB_STATES`. Error panels omit the “Close” and “View cached network” secondary actions, which have no production behavior.
+- **Loaded subtitles use live values** (connection count, active clubs and invitations, sport and position). Empty and error copy is used verbatim from `TAB_STATES`. Error panels omit the “Close” and “View cached network” secondary actions, which have no production behavior. One exception to verbatim copy: the Connections error body reads “Check your connection and try again.” instead of “Your saved network is shown below…”, because production shows no cached network yet.
 - **Performance range options** are 1M, 3M, 6M, and All (the prototype leaves `MSegmented` options empty). All-time charts stop at the latest 200 entries and say so.
 - **Terms and Privacy Policy** are plain text on sign-in until those pages exist.
 

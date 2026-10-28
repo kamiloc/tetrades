@@ -11,6 +11,8 @@ Run them in this order, from the repo root. `--athlete <slug>` is optional when 
 | 3 | `yarn db:fixture:connections --athlete <slug>` | ACCEPTED ×3, PENDING ×2 (one incoming, one outgoing), DECLINED ×1 (the schema's "rejected" state); connection counts updated |
 | 4 | `yarn db:fixture:achievements --athlete <slug>` | One achievement per certification state: UNVERIFIED, UNVERIFIED after a CANCELLED request, PENDING, VERIFIED, REJECTED with a reason |
 
-All four are idempotent: rows that already exist are skipped and reported. `--replace` (performance and achievements only) deletes that fixture's rows first. Memberships and connections are never deleted.
+All four are idempotent: rows that already exist are skipped and reported. `--replace` (performance and achievements only) deletes that fixture's own rows first; performance refuses when the athlete has metric entries the fixture didn't create. Memberships and connections are never deleted.
+
+Safeguards: every fixture refuses to run when `NODE_ENV=production`, and when the database has no seed accounts (run `yarn db:seed` first; a production database never has them). `--athlete` accepts only a signed-up athlete, never a seed one.
 
 Visibility settings are left untouched, so a fresh athlete still shows the defaults (achievements Public; clubs and metrics Private).

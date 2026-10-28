@@ -7,7 +7,7 @@ import {
   type VisibilityCategory,
 } from '@packages/shared-logic';
 import { router } from 'expo-router';
-import type { ReactElement } from 'react';
+import { useRef, type ReactElement } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { Card } from '../../components/Card';
@@ -38,30 +38,44 @@ const CATEGORIES: ReadonlyArray<{ key: VisibilityCategory; title: string; descri
 ];
 
 // Who can see each category (ADR-013, ADR-014). Each change sends only that
-// category; the control updates at once and rolls back if the save fails.
+// category; the control updates at once and rolls back if that save fails.
 export default function VisibilityScreen(): ReactElement {
   const utils = trpc.useUtils();
   const settings = useMyVisibilitySettings();
   const update = useUpdateVisibilitySettings();
   const toast = useToast();
 
+  // Saves still in flight. Several categories can change before the first save
+  // settles, so each callback touches only its own category, and the refetch
+  // waits until the last save settles.
+  const inFlight = useRef(0);
+
   const change = (key: VisibilityCategory, value: AudienceValue): void => {
-    const previous = utils.visibility.get.getData();
-    if (previous) utils.visibility.get.setData(undefined, { ...previous, [key]: value });
+    const previousValue = utils.visibility.get.getData()?.[key];
+    void utils.visibility.get.cancel();
+    utils.visibility.get.setData(undefined, (current) => (current ? { ...current, [key]: value } : current));
+    inFlight.current += 1;
     update.mutate(
       { [key]: value },
       {
         onSuccess: (saved) => {
-          utils.visibility.get.setData(undefined, saved);
+          utils.visibility.get.setData(undefined, (current) => (current ? { ...current, [key]: saved[key] } : saved));
           const category = CATEGORIES.find((c) => c.key === key)?.title ?? 'Visibility';
           toast.success(`${category}: ${AUDIENCE_LABELS[value]}`);
         },
         onError: (error) => {
-          if (previous) utils.visibility.get.setData(undefined, previous);
+          // Roll back only if this save's value is still showing; a later change
+          // to the same category wins.
+          utils.visibility.get.setData(undefined, (current) =>
+            current && previousValue !== undefined && current[key] === value
+              ? { ...current, [key]: previousValue }
+              : current,
+          );
           toast.error(mutationErrorMessage(error, { fallback: "Couldn't save this setting. Try again." }));
         },
         onSettled: () => {
-          void utils.visibility.get.invalidate();
+          inFlight.current -= 1;
+          if (inFlight.current === 0) void utils.visibility.get.invalidate();
         },
       },
     );

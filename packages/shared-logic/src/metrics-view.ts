@@ -24,11 +24,17 @@ const MONTHS: Readonly<Record<Exclude<MetricRange, 'ALL'>, number>> = {
   '6M': 6,
 };
 
-// Start of the range, or null for all time.
+// Start of the range, or null for all time. The day clamps to the target
+// month's last day (March 31 minus 1M is February 28 or 29), since setMonth
+// alone would roll over into the next month.
 export function rangeStart(range: MetricRange, now: Date): Date | null {
   if (range === 'ALL') return null;
+  const targetMonth = now.getMonth() - MONTHS[range];
+  const lastDay = new Date(now.getFullYear(), targetMonth + 1, 0).getDate();
   const start = new Date(now.getTime());
-  start.setMonth(start.getMonth() - MONTHS[range]);
+  start.setDate(1);
+  start.setMonth(targetMonth);
+  start.setDate(Math.min(now.getDate(), lastDay));
   return start;
 }
 

@@ -20,6 +20,26 @@ describe('rangeStart', () => {
   it('goes back whole months', () => {
     expect(rangeStart('3M', NOW)?.toISOString()).toBe('2026-07-18T12:00:00.000Z');
   });
+
+  it('clamps to the last day of a shorter target month', () => {
+    const endOfMarch = new Date(2026, 2, 31, 12);
+    const oneMonth = rangeStart('1M', endOfMarch);
+    expect([oneMonth?.getFullYear(), oneMonth?.getMonth(), oneMonth?.getDate()]).toEqual([2026, 1, 28]);
+    const threeMonths = rangeStart('3M', new Date(2026, 4, 31, 12));
+    expect([threeMonths?.getMonth(), threeMonths?.getDate()]).toEqual([1, 28]);
+  });
+
+  it('clamps into a leap-year February and crosses the year boundary', () => {
+    const leap = rangeStart('1M', new Date(2028, 2, 30, 12));
+    expect([leap?.getMonth(), leap?.getDate()]).toEqual([1, 29]);
+    const lastYear = rangeStart('6M', new Date(2026, 1, 15, 12));
+    expect([lastYear?.getFullYear(), lastYear?.getMonth(), lastYear?.getDate()]).toEqual([2025, 7, 15]);
+  });
+
+  it('keeps the time of day', () => {
+    const start = rangeStart('1M', new Date(2026, 2, 31, 9, 30));
+    expect([start?.getHours(), start?.getMinutes()]).toEqual([9, 30]);
+  });
 });
 
 describe('filterEntriesByRange', () => {
