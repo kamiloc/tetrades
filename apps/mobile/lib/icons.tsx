@@ -1,18 +1,35 @@
+import ExpoFeather from '@expo/vector-icons/Feather';
 import type { ReactElement } from 'react';
-import { Text } from 'react-native';
 
+// The Feather icons this app uses. Keeping the union narrow catches typos
+// and documents the icon set from the design handoff.
 export type IconName =
+  | 'activity'
+  | 'alert-circle'
   | 'bell'
+  | 'calendar'
   | 'check'
+  | 'chevron-left'
+  | 'chevron-right'
   | 'clock'
+  | 'eye'
   | 'file-text'
+  | 'flag'
   | 'lock'
+  | 'log-out'
+  | 'mail'
   | 'map-pin'
   | 'plus'
+  | 'refresh-cw'
   | 'search'
   | 'shield'
+  | 'trending-down'
+  | 'trending-up'
   | 'user'
-  | 'users';
+  | 'user-plus'
+  | 'users'
+  | 'wifi-off'
+  | 'x';
 
 interface FeatherProps {
   name: IconName;
@@ -21,33 +38,15 @@ interface FeatherProps {
   accessibilityLabel?: string;
 }
 
-const ICONS: Record<IconName, string> = {
-  bell: '!',
-  check: '✓',
-  clock: '◷',
-  'file-text': '▤',
-  lock: '⌕',
-  'map-pin': '•',
-  plus: '+',
-  search: '⌕',
-  shield: '◆',
-  user: '◯',
-  users: '◎',
-};
-
-export function Feather({
-  name,
-  size,
-  color,
-  accessibilityLabel,
-}: FeatherProps): ReactElement {
+export function Feather({ name, size, color, accessibilityLabel }: FeatherProps): ReactElement {
   return (
-    <Text
+    <ExpoFeather
+      name={name}
+      size={size}
+      color={color}
       accessibilityLabel={accessibilityLabel}
-      className="font-bold text-center"
-      style={{ color, fontSize: size, lineHeight: size }}
-    >
-      {ICONS[name]}
-    </Text>
+      accessibilityElementsHidden={accessibilityLabel === undefined}
+      importantForAccessibility={accessibilityLabel === undefined ? 'no-hide-descendants' : 'auto'}
+    />
   );
 }

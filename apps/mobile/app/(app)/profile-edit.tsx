@@ -10,15 +10,16 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
+
+import { DateField, fromIsoDate } from '../../components/DateField';
+import { KeyboardAwareScrollView } from '../../components/KeyboardAwareScrollView';
+import { ToastViewport, useToast } from '../../components/Toast';
 
 function getSpanishError(message: string): string {
   if (message.includes('FORBIDDEN')) return 'No tienes permiso para editar este perfil';
@@ -29,6 +30,7 @@ function getSpanishError(message: string): string {
 
 export default function ProfileEditScreen() {
   const router = useRouter();
+  const toast = useToast();
   const queryClient = useQueryClient();
 
   const myAthleteQuery = useMyAthlete();
@@ -105,8 +107,10 @@ export default function ProfileEditScreen() {
       }
     }
 
-    if (exactDob !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(exactDob)) {
-      newErrors['exactDob'] = 'Ingresa una fecha válida (AAAA-MM-DD)';
+    if (exactDob !== '') {
+      const dob = fromIsoDate(exactDob);
+      if (!dob) newErrors['exactDob'] = 'Selecciona una fecha válida';
+      else if (dob > new Date()) newErrors['exactDob'] = 'La fecha no puede ser futura';
     }
 
     if (contactEmail !== '' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail)) {
@@ -166,10 +170,13 @@ export default function ProfileEditScreen() {
       await queryClient.invalidateQueries({ queryKey: [['athlete', 'getMyAthlete']] });
       setIsPublicDirty(false);
       setIsPrivateDirty(false);
+      toast.success('Perfil guardado');
       router.back();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error desconocido';
-      setErrors({ save: getSpanishError(message) });
+      const saveError = getSpanishError(message);
+      setErrors({ save: saveError });
+      toast.error(saveError);
     } finally {
       setIsSaving(false);
     }
@@ -189,15 +196,8 @@ export default function ProfileEditScreen() {
   const isDirty = isPublicDirty || isPrivateDirty;
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1"
-    >
-      <ScrollView
-        className="flex-1 bg-canvas"
-        contentContainerClassName="p-4 pb-12"
-        keyboardShouldPersistTaps="handled"
-      >
+    <View className="flex-1">
+    <KeyboardAwareScrollView className="flex-1 bg-canvas" contentContainerClassName="p-4 pb-12">
         {errors['save'] !== undefined && (
           <View className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
             <Text className="text-red-600 text-sm">{errors['save']}</Text>
@@ -311,16 +311,16 @@ export default function ProfileEditScreen() {
         {/* Fecha de nacimiento */}
         <View className="mb-5">
           <Text className="text-body font-medium text-text mb-1">Fecha de nacimiento</Text>
-          <TextInput
+          <DateField
+            label="Fecha de nacimiento"
+            placeholder="Selecciona tu fecha de nacimiento"
             value={exactDob}
-            onChangeText={setPrivate(setExactDob)}
-            className={`border rounded-xl px-4 py-3 text-text bg-paper text-base ${
-              errors['exactDob'] !== undefined ? 'border-red-400' : 'border-line'
-            }`}
-            placeholder="AAAA-MM-DD"
-            placeholderTextColor="#6B7280"
-            keyboardType="numbers-and-punctuation"
-            returnKeyType="next"
+            onChange={setPrivate(setExactDob)}
+            maximumDate={new Date()}
+            error={errors['exactDob'] !== undefined}
+            locale="es-CO"
+            cancelLabel="Cancelar"
+            doneLabel="Listo"
           />
           {errors['exactDob'] !== undefined && (
             <Text className="text-red-500 text-xs mt-1">{errors['exactDob']}</Text>
@@ -396,7 +396,8 @@ export default function ProfileEditScreen() {
             : <Text className="text-white font-semibold text-base">Guardar cambios</Text>
           }
         </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
+    <ToastViewport />
+    </View>
   );
 }

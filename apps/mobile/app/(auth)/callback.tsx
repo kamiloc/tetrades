@@ -4,6 +4,7 @@ import { ActivityIndicator, View } from 'react-native'
 
 import { verifyMagicLinkCallback } from '../../lib/auth-actions'
 import { authClient } from '../../lib/auth-client'
+import { colors } from '../../lib/theme'
 
 export default function CallbackScreen() {
   const router = useRouter()
@@ -39,8 +40,8 @@ export default function CallbackScreen() {
   }, [router, tokenHash, otpType])
 
   return (
-    <View className="flex-1 items-center justify-center bg-canvas">
-      <ActivityIndicator />
+    <View className="flex-1 items-center justify-center bg-ink">
+      <ActivityIndicator color={colors.blue} accessibilityLabel="Signing you in" />
     </View>
   )
 }

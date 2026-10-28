@@ -21,6 +21,13 @@ export const colors = {
   blue:       '#1A6BFF', //  primary athletic blue — links, CTAs, verified
   blueTint:   '#E8F0FF', //  blue-50: chip background, soft surfaces
   blueLine:   '#D8E4FB', //  blue-100: blue card borders
+  dash:       '#CBD3DF', //  dashed empty-state outlines
+
+  // ── Performance / state surfaces ───────────────────────────
+  danger:     '#C23B3B',
+  dangerTint: '#FDECEC',
+  dangerLine: '#F6D4D4',
+  segmented:  '#E9EDF3',
 
   // ── Status ──────────────────────────────────────────────────
   pending:    '#B5651D', //  warm pending text

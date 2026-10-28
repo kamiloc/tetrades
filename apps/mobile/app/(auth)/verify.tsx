@@ -2,15 +2,17 @@ import { useSignIn } from '@packages/auth'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
-  ActivityIndicator,
   Pressable,
   Text,
   TextInput,
   View,
 } from 'react-native'
 
+import { KeyboardAwareScrollView } from '../../components/KeyboardAwareScrollView'
+import { PillButton } from '../../components/PillButton'
 import { sendLoginMagicLink } from '../../lib/auth-actions'
-import { getSpanishError } from '../../lib/auth-errors'
+import { authErrorMessage } from '../../lib/auth-errors'
+import { Feather } from '../../lib/icons'
 import { colors } from '../../lib/theme'
 
 export default function VerifyScreen() {
@@ -58,7 +60,7 @@ export default function VerifyScreen() {
     const { error: verifyError } = await verifyOtp(email, code)
     setIsLoading(false)
     if (verifyError !== null) {
-      setError(getSpanishError(verifyError))
+      setError(authErrorMessage(verifyError))
       setCode('')
       return
     }
@@ -77,7 +79,7 @@ export default function VerifyScreen() {
     } catch (error: unknown) {
       setIsLoading(false)
       const message = error instanceof Error ? error.message : ''
-      setError(getSpanishError(message))
+      setError(authErrorMessage(message))
       return
     }
     setIsLoading(false)
@@ -93,38 +95,35 @@ export default function VerifyScreen() {
   const resendDisabled = cooldown > 0 || isLoading
 
   return (
-    <View className="flex-1 bg-canvas px-6">
+    <KeyboardAwareScrollView className="flex-1 bg-canvas" contentContainerClassName="px-6 pb-8">
       {/* Back button */}
-      <View className="pt-14 pb-6 flex-row items-center">
+      <View className="flex-row items-center pb-6 pt-14">
         <Pressable
           onPress={() => router.back()}
-          className="pr-4"
+          className="min-h-[44px] flex-row items-center gap-1 pr-4"
           accessibilityRole="button"
-          accessibilityLabel="Volver"
+          accessibilityLabel="Back"
         >
-          <Text className="text-body-lg text-blue">← Volver</Text>
+          <Feather name="chevron-left" size={20} color={colors.blue} />
+          <Text className="text-body-lg text-blue">Back</Text>
         </Pressable>
       </View>
 
-      {/* Heading */}
-      <Text className="text-title2 font-bold text-text mb-2">
-        Revisa tu correo
+      <Text accessibilityRole="header" className="mb-2 text-title2 font-bold text-text">
+        Check your email
       </Text>
-      <Text className="text-body text-muted mb-1">
-        Ingresaste como {email}
-      </Text>
-      <Text className="text-footnote text-subtle mb-8">
-        Ingresa el código de 6 dígitos que te enviamos
-      </Text>
+      <Text className="mb-1 text-body text-muted">We sent a link and a code to {email}</Text>
+      <Text className="mb-8 text-footnote text-subtle">Enter the 6-digit code from the email.</Text>
 
       {/* OTP input */}
       <TextInput
-        className="bg-paper border border-line rounded-lg px-4 py-4 text-title2 font-bold text-text text-center mb-4 tracking-widest"
+        className="mb-4 rounded-lg border border-line bg-paper px-4 py-4 text-center text-title2 font-bold tracking-widest text-text"
         maxLength={8}
         keyboardType="numeric"
         autoFocus
         placeholder="000000"
         placeholderTextColor={colors.subtle}
+        accessibilityLabel="Verification code"
         value={code}
         onChangeText={setCode}
         onSubmitEditing={handleVerify}
@@ -132,53 +131,37 @@ export default function VerifyScreen() {
         returnKeyType="done"
       />
 
-      {/* Inline error */}
       {error !== null ? (
-        <Text className="text-body text-red-600 mb-4">{error}</Text>
+        <View accessibilityLiveRegion="polite" className="mb-4 rounded-lg border border-danger-line bg-danger-tint p-3">
+          <Text className="text-footnote text-danger">{error}</Text>
+        </View>
       ) : null}
 
-      {/* Verify button */}
-      <Pressable
-        className={`items-center justify-center rounded-lg py-4 mb-8 bg-blue ${verifyDisabled ? 'opacity-50' : ''}`}
-        onPress={handleVerify}
+      <PillButton
+        label="Verify code"
+        onPress={() => { void handleVerify(); }}
         disabled={verifyDisabled}
-        accessibilityRole="button"
-        accessibilityLabel="Verificar código"
-      >
-        {isLoading ? (
-          <ActivityIndicator color={colors.paper} />
-        ) : (
-          <Text className="text-body-lg font-semibold text-on-ink">
-            Verificar código
-          </Text>
-        )}
-      </Pressable>
+        loading={isLoading}
+        fullWidth
+      />
 
       {/* Resend section */}
-      <View className="items-center mb-4">
-        <Text className="text-body text-muted mb-2">
-          ¿No recibiste el código?
-        </Text>
+      <View className="mb-4 mt-8 items-center">
+        <Text className="mb-2 text-body text-muted">Didn't get the code?</Text>
         <Pressable
           onPress={handleResend}
           disabled={resendDisabled}
           accessibilityRole="button"
-          accessibilityLabel={
-            cooldown > 0 ? `Reenviar en ${cooldown}s` : 'Reenviar código'
-          }
+          accessibilityLabel={cooldown > 0 ? `Resend in ${cooldown} seconds` : 'Resend code'}
+          className="min-h-[44px] justify-center"
         >
-          <Text
-            className={`text-body font-semibold ${resendDisabled ? 'text-subtle' : 'text-blue'}`}
-          >
-            {cooldown > 0 ? `Reenviar en ${cooldown}s` : 'Reenviar código'}
+          <Text className={`text-body font-semibold ${resendDisabled ? 'text-subtle' : 'text-blue'}`}>
+            {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
           </Text>
         </Pressable>
       </View>
 
-      {/* Magic link note */}
-      <Text className="text-small text-subtle text-center">
-        También puedes abrir el enlace que te enviamos por correo
-      </Text>
-    </View>
+      <Text className="text-center text-small text-subtle">You can also open the link we emailed you.</Text>
+    </KeyboardAwareScrollView>
   )
 }

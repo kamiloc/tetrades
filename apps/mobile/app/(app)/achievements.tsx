@@ -1,398 +1,523 @@
-import { trpc, useAddAchievement, useMyAthlete, useQueryClient } from '@packages/api-client';
-import type { AthleteAchievementPublicOutput, VerificationStatus } from '@packages/validators';
-import { useState } from 'react';
 import {
-  ActivityIndicator,
+  trpc,
+  useAddAchievement,
+  useMyAthlete,
+  useMyCertificationRequests,
+  useMyClubMemberships,
+  useRequestCertification,
+  useWithdrawCertification,
+} from '@packages/api-client';
+import { canRequestCertification } from '@packages/shared-logic';
+import type { AthleteAchievementPublicOutput, MyCertificationRequestOutput } from '@packages/validators';
+import { router } from 'expo-router';
+import { useMemo, useState, type ComponentProps, type ReactElement } from 'react';
+import {
+  Alert,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
+  Modal,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-type Filter = 'ALL' | 'VERIFIED' | 'PENDING' | 'REJECTED';
+import { AchievementRow } from '../../components/AchievementRow';
+import { Card } from '../../components/Card';
+import { DateField, fromIsoDate } from '../../components/DateField';
+import { EmptyRow } from '../../components/EmptyRow';
+import { useKeyboardOverlap } from '../../components/KeyboardAwareScrollView';
+import { PillButton } from '../../components/PillButton';
+import { TabSkeleton } from '../../components/Skeleton';
+import { StatePanel } from '../../components/StatePanel';
+import { StatusChip } from '../../components/StatusChip';
+import { ToastViewport, useToast } from '../../components/Toast';
+import { Feather } from '../../lib/icons';
+import { mutationErrorMessage, type ErrorCopy } from '../../lib/mutation-errors';
+import { isBusy, isFailed } from '../../lib/query-state';
+import { colors } from '../../lib/theme';
 
-function filterLabel(f: Filter): string {
-  switch (f) {
-    case 'ALL':
-      return 'Todos';
-    case 'VERIFIED':
-      return 'Verificados';
-    case 'PENDING':
-      return 'Pendientes';
-    case 'REJECTED':
-      return 'Rechazados';
-  }
-}
+type Filter = 'ALL' | 'VERIFIED' | 'PENDING' | 'UNVERIFIED' | 'REJECTED';
 
-function EmptyState({ filter, isLoading }: { filter: Filter; isLoading: boolean }) {
-  if (isLoading) {
-    return (
-      <View className="py-12 items-center gap-3">
-        {[1, 2, 3].map(i => (
-          <View key={i} className="h-24 bg-paper rounded-xl w-full animate-pulse" />
-        ))}
-      </View>
-    );
-  }
-  const messages: Record<Filter, string> = {
-    ALL: 'Aún no tienes logros registrados.\n¡Agrega tu primer logro!',
-    VERIFIED: 'No tienes logros verificados aún.',
-    PENDING: 'No tienes logros pendientes de verificación.',
-    REJECTED: 'No tienes logros rechazados.',
-  };
-  return (
-    <View className="py-16 items-center px-6">
-      <Text className="text-muted text-body text-center leading-6">{messages[filter]}</Text>
-    </View>
-  );
-}
-
-type BadgeConfig = { label: string; bgClassName: string; textClassName: string };
-
-const badgeConfig: Record<VerificationStatus, BadgeConfig> = {
-  VERIFIED: {
-    label: 'Verificado',
-    bgClassName: 'bg-blue-tint',
-    textClassName: 'text-blue',
-  },
-  PENDING: {
-    label: 'Pendiente',
-    bgClassName: 'bg-pending-tint',
-    textClassName: 'text-pending',
-  },
-  UNVERIFIED: {
-    label: 'Sin verificar',
-    bgClassName: 'bg-pending-tint',
-    textClassName: 'text-pending',
-  },
-  REJECTED: {
-    label: 'Rechazado',
-    bgClassName: 'bg-red-100',
-    textClassName: 'text-red-600',
-  },
+const FILTER_LABELS: Record<Filter, string> = {
+  ALL: 'All',
+  VERIFIED: 'Verified',
+  PENDING: 'Pending',
+  UNVERIFIED: 'Unverified',
+  REJECTED: 'Rejected',
 };
 
-function AchievementCard({ achievement }: { achievement: AthleteAchievementPublicOutput }) {
-  const badge = badgeConfig[achievement.verificationStatus];
-  const formattedDate = achievement.achievedOn.toLocaleDateString('es-CO', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-
-  return (
-    <View className="bg-paper rounded-xl p-4">
-      <View className="flex-row items-start justify-between gap-2">
-        <Text className="text-body font-semibold text-text flex-1" numberOfLines={2}>
-          {achievement.title}
-        </Text>
-        <View className={`${badge.bgClassName} rounded-pill px-3 py-1`}>
-          <Text className={`${badge.textClassName} text-caption font-medium`}>
-            {badge.label}
-          </Text>
-        </View>
-      </View>
-
-      <Text className="text-muted text-small mt-2">{achievement.organization}</Text>
-
-      <Text className="text-muted text-caption mt-1">{formattedDate}</Text>
-
-      {achievement.verificationStatus === 'PENDING' && (
-        <Text className="text-pending text-caption mt-3 italic">
-          En espera de verificación por un administrador
-        </Text>
-      )}
-    </View>
-  );
-}
+const EMPTY_MESSAGES: Record<Filter, string> = {
+  ALL: 'No achievements yet. Add your first one.',
+  VERIFIED: 'No verified achievements yet.',
+  PENDING: 'No achievements waiting for a club decision.',
+  UNVERIFIED: 'No unverified achievements.',
+  REJECTED: 'No rejected achievements.',
+};
 
 const ACHIEVEMENTS_PAGE_SIZE = 20;
+// Requests and memberships are bounded per athlete; one page (server max) is enough here.
+const LOOKUP_PAGE_SIZE = 50;
 
-export default function AchievementsScreen() {
-  const queryClient = useQueryClient();
+const REQUEST_ERRORS: ErrorCopy = {
+  CONFLICT: 'This achievement already has an open request.',
+  FORBIDDEN: 'You need an active membership at this club to ask it for certification.',
+  BAD_REQUEST: "This achievement can't be submitted right now.",
+  NOT_FOUND: 'That club or achievement no longer exists.',
+  fallback: "Couldn't send the request. Try again.",
+};
 
-  const myAthleteQuery = useMyAthlete();
-  const athleteId = myAthleteQuery.data?.athleteId ?? null;
+const WITHDRAW_ERRORS: ErrorCopy = {
+  BAD_REQUEST: 'This request was already decided or withdrawn.',
+  NOT_FOUND: 'This request no longer exists.',
+  fallback: "Couldn't withdraw the request. Try again.",
+};
 
-  // Paginated: the next page loads as the list nears its end (onEndReached).
+const ADD_ERRORS: ErrorCopy = {
+  FORBIDDEN: "You don't have permission to add achievements.",
+  NOT_FOUND: 'Athlete profile not found.',
+  fallback: "Couldn't save the achievement. Try again.",
+};
+
+const longDate = (date: Date): string =>
+  date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+export default function AchievementsScreen(): ReactElement {
+  const myAthlete = useMyAthlete();
+  if (isBusy(myAthlete)) return <TabSkeleton variant="list" />;
+  if (isFailed(myAthlete) || !myAthlete.data) {
+    return (
+      <View className="flex-1 bg-canvas px-4 pt-4">
+        <StatePanel
+          tone="danger"
+          icon="alert-circle"
+          title="Couldn't load your achievements"
+          body="Check your connection and try again."
+          primary={{ label: 'Try again', onPress: () => { void myAthlete.refetch(); } }}
+        />
+      </View>
+    );
+  }
+  return <AchievementsBody athleteId={myAthlete.data.athleteId} />;
+}
+
+function AchievementsBody({ athleteId }: { athleteId: string }): ReactElement {
+  const utils = trpc.useUtils();
   const achievementsQuery = trpc.achievement.listAchievements.useInfiniteQuery(
-    { athleteId: athleteId ?? '', take: ACHIEVEMENTS_PAGE_SIZE },
-    { enabled: !!athleteId, getNextPageParam: page => page.nextCursor ?? undefined },
+    { athleteId, take: ACHIEVEMENTS_PAGE_SIZE },
+    { getNextPageParam: (page) => page.nextCursor ?? undefined },
+  );
+  const requests = useMyCertificationRequests({ take: LOOKUP_PAGE_SIZE });
+  const memberships = useMyClubMemberships({ take: LOOKUP_PAGE_SIZE });
+
+  const achievements = useMemo(
+    () => achievementsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [achievementsQuery.data],
+  );
+  // Requests arrive newest first, so the first one seen is the latest.
+  const latestRequest = useMemo(() => {
+    const map = new Map<string, MyCertificationRequestOutput>();
+    for (const r of requests.data?.items ?? []) if (!map.has(r.achievementId)) map.set(r.achievementId, r);
+    return map;
+  }, [requests.data]);
+  const activeClubs = useMemo(
+    () => (memberships.data?.items ?? []).filter((m) => m.status === 'ACTIVE').map((m) => m.club),
+    [memberships.data],
   );
 
-  const addAchievement = useAddAchievement();
-
-  const achievements = achievementsQuery.data?.pages.flatMap(page => page.items) ?? [];
-
   const [activeFilter, setActiveFilter] = useState<Filter>('ALL');
-
-  const filteredAchievements = achievements.filter(a => {
-    if (activeFilter === 'ALL') return true;
-    return a.verificationStatus === activeFilter;
-  });
-
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [formTitle, setFormTitle] = useState('');
-  const [formOrganization, setFormOrganization] = useState('');
-  const [formDate, setFormDate] = useState('');
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function resetForm() {
-    setFormTitle('');
-    setFormOrganization('');
-    setFormDate('');
-    setFormErrors({});
-    setShowForm(false);
-  }
+  const filtered = achievements.filter((a) => activeFilter === 'ALL' || a.verificationStatus === activeFilter);
+  const selected = achievements.find((a) => a.id === selectedId) ?? null;
 
-  function validateForm(): boolean {
-    const errs: Record<string, string> = {};
+  const refreshCertification = (): void => {
+    void utils.achievement.listAchievements.invalidate();
+    void utils.achievement.listMyCertificationRequests.invalidate();
+  };
 
-    if (!formTitle.trim()) {
-      errs['title'] = 'El título del logro es requerido';
-    } else if (formTitle.trim().length < 2) {
-      errs['title'] = 'El título debe tener al menos 2 caracteres';
-    }
-
-    if (!formOrganization.trim()) {
-      errs['organization'] = 'La organización es requerida';
-    } else if (formOrganization.trim().length < 2) {
-      errs['organization'] = 'La organización debe tener al menos 2 caracteres';
-    }
-
-    if (!formDate) {
-      errs['date'] = 'La fecha es requerida';
-    } else {
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(formDate)) {
-        errs['date'] = 'Formato inválido. Usa AAAA-MM-DD';
-      } else {
-        const parsed = new Date(formDate);
-        if (isNaN(parsed.getTime())) {
-          errs['date'] = 'Fecha inválida';
-        } else if (parsed > new Date()) {
-          errs['date'] = 'La fecha no puede ser futura';
-        }
-      }
-    }
-
-    setFormErrors(errs);
-    return Object.keys(errs).length === 0;
-  }
-
-  function getSpanishError(message: string): string {
-    if (message.includes('FORBIDDEN')) return 'No tienes permiso para agregar logros';
-    if (message.includes('NOT_FOUND')) return 'Perfil de atleta no encontrado';
-    if (message.includes('Too many requests')) return 'Demasiados intentos. Espera un momento';
-    return 'No se pudo guardar el logro. Intenta de nuevo';
-  }
-
-  async function handleSubmit() {
-    if (!validateForm()) return;
-
-    setIsSubmitting(true);
-    try {
-      await addAchievement.mutateAsync({
-        title: formTitle.trim(),
-        organization: formOrganization.trim(),
-        achievedOn: formDate,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: [['achievement', 'listAchievements']],
-      });
-      resetForm();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      setFormErrors({ submit: getSpanishError(msg) });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  if (myAthleteQuery.isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-canvas">
-        <ActivityIndicator />
-      </View>
-    );
-  }
-
-  if (myAthleteQuery.isError) {
-    return (
-      <View className="flex-1 items-center justify-center bg-canvas p-6">
-        <Text className="text-muted text-small text-center mb-4">
-          No pudimos cargar tus logros. Intenta de nuevo.
-        </Text>
-        <Pressable
-          onPress={() => {
-            void myAthleteQuery.refetch();
-          }}
-          className="bg-blue rounded-xl px-6 py-3"
-        >
-          <Text className="text-paper font-medium">Reintentar</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const meta = (a: AthleteAchievementPublicOutput): string => {
+    const base = `${a.achievedOn.getFullYear()} · ${a.organization}`;
+    const club = latestRequest.get(a.id)?.club.name;
+    return a.verificationStatus === 'PENDING' && club ? `${base} · ${club}` : base;
+  };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-canvas"
-    >
-      {/* Filter bar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerClassName="px-4 py-3 gap-2"
-      >
-        {(['ALL', 'VERIFIED', 'PENDING', 'REJECTED'] as Filter[]).map(f => (
+    <View className="flex-1 bg-canvas">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-4 py-3" className="grow-0">
+        {(Object.keys(FILTER_LABELS) as Filter[]).map((f) => (
           <Pressable
             key={f}
             onPress={() => setActiveFilter(f)}
-            className={`px-4 py-2 rounded-pill border ${
-              activeFilter === f ? 'bg-blue border-blue' : 'bg-paper border-line'
-            }`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeFilter === f }}
+            className={`min-h-[36px] justify-center rounded-pill border px-4 ${activeFilter === f ? 'border-blue bg-blue' : 'border-line bg-paper'}`}
           >
-            <Text
-              className={`text-small font-medium ${
-                activeFilter === f ? 'text-paper' : 'text-muted'
-              }`}
-            >
-              {filterLabel(f)}
-            </Text>
+            <Text className={`text-cta ${activeFilter === f ? 'text-paper' : 'text-muted'}`}>{FILTER_LABELS[f]}</Text>
           </Pressable>
         ))}
       </ScrollView>
 
-      {/* Achievements list */}
-      <FlatList<AthleteAchievementPublicOutput>
-        data={filteredAchievements}
-        keyExtractor={item => item.id}
-        contentContainerClassName="px-4 pb-32"
-        onRefresh={() => {
-          void achievementsQuery.refetch();
-        }}
-        refreshing={achievementsQuery.isRefetching && !achievementsQuery.isFetchingNextPage}
-        onEndReachedThreshold={0.5}
-        onEndReached={() => {
-          if (achievementsQuery.hasNextPage && !achievementsQuery.isFetchingNextPage) {
-            void achievementsQuery.fetchNextPage();
+      {isBusy(achievementsQuery) ? (
+        <TabSkeleton variant="list" />
+      ) : isFailed(achievementsQuery) ? (
+        <View className="px-4">
+          <StatePanel
+            tone="danger"
+            icon="alert-circle"
+            title="Couldn't load your achievements"
+            body="Check your connection and try again."
+            primary={{ label: 'Try again', onPress: () => { void achievementsQuery.refetch(); } }}
+          />
+        </View>
+      ) : (
+        <FlatList<AthleteAchievementPublicOutput>
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          contentContainerClassName="px-4 pb-32"
+          onRefresh={() => {
+            void achievementsQuery.refetch();
+            void requests.refetch();
+          }}
+          refreshing={achievementsQuery.isRefetching && !achievementsQuery.isFetchingNextPage}
+          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            if (achievementsQuery.hasNextPage && !achievementsQuery.isFetchingNextPage) {
+              void achievementsQuery.fetchNextPage();
+            }
+          }}
+          ListEmptyComponent={
+            <Card>
+              <EmptyRow icon="shield">{EMPTY_MESSAGES[activeFilter]}</EmptyRow>
+            </Card>
           }
-        }}
-        ListEmptyComponent={
-          <EmptyState filter={activeFilter} isLoading={achievementsQuery.isLoading} />
-        }
-        renderItem={({ item }) => <AchievementCard achievement={item} />}
-        ItemSeparatorComponent={() => <View className="h-3" />}
-      />
-
-      {/* Add form (slides in above the fixed button) */}
-      {showForm && (
-        <View className="absolute bottom-20 left-0 right-0 bg-canvas border-t border-line px-4 pt-4 pb-2">
-          <Text className="text-body font-semibold text-text mb-4">Nuevo logro</Text>
-
-          {formErrors['submit'] !== undefined && (
-            <View className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3">
-              <Text className="text-red-600 text-small">{formErrors['submit']}</Text>
+          renderItem={({ item, index }) => (
+            <View className={`overflow-hidden border-x border-line bg-paper ${index === 0 ? 'rounded-t-xl border-t' : ''} ${index === filtered.length - 1 ? 'rounded-b-xl border-b' : ''}`}>
+              <AchievementRow
+                title={item.title}
+                meta={meta(item)}
+                status={item.verificationStatus}
+                last={index === filtered.length - 1}
+                onPress={() => setSelectedId(item.id)}
+              />
             </View>
           )}
-
-          <View className="mb-3">
-            <TextInput
-              value={formTitle}
-              onChangeText={v => {
-                setFormTitle(v);
-                setFormErrors({});
-              }}
-              placeholder="Título del logro *"
-              placeholderTextColor="#6B7280"
-              className={`border rounded-xl px-4 py-3 text-text bg-paper ${
-                formErrors['title'] !== undefined ? 'border-red-400' : 'border-line'
-              }`}
-              autoCapitalize="sentences"
-              returnKeyType="next"
-            />
-            {formErrors['title'] !== undefined && (
-              <Text className="text-red-500 text-caption mt-1">{formErrors['title']}</Text>
-            )}
-          </View>
-
-          <View className="mb-3">
-            <TextInput
-              value={formOrganization}
-              onChangeText={v => {
-                setFormOrganization(v);
-                setFormErrors({});
-              }}
-              placeholder="Organización *"
-              placeholderTextColor="#6B7280"
-              className={`border rounded-xl px-4 py-3 text-text bg-paper ${
-                formErrors['organization'] !== undefined ? 'border-red-400' : 'border-line'
-              }`}
-              autoCapitalize="sentences"
-              returnKeyType="next"
-            />
-            {formErrors['organization'] !== undefined && (
-              <Text className="text-red-500 text-caption mt-1">{formErrors['organization']}</Text>
-            )}
-          </View>
-
-          <View className="mb-4">
-            <TextInput
-              value={formDate}
-              onChangeText={v => {
-                setFormDate(v);
-                setFormErrors({});
-              }}
-              placeholder="Fecha (AAAA-MM-DD) *"
-              placeholderTextColor="#6B7280"
-              className={`border rounded-xl px-4 py-3 text-text bg-paper ${
-                formErrors['date'] !== undefined ? 'border-red-400' : 'border-line'
-              }`}
-              keyboardType="numbers-and-punctuation"
-              returnKeyType="done"
-              maxLength={10}
-            />
-            {formErrors['date'] !== undefined && (
-              <Text className="text-red-500 text-caption mt-1">{formErrors['date']}</Text>
-            )}
-          </View>
-
-          <Pressable
-            onPress={() => {
-              void handleSubmit();
-            }}
-            disabled={isSubmitting}
-            className={`rounded-xl py-3 items-center mb-2 ${
-              isSubmitting ? 'opacity-50 bg-blue' : 'bg-blue'
-            }`}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text className="text-paper font-semibold">Guardar logro</Text>
-            )}
-          </Pressable>
-        </View>
+        />
       )}
 
-      {/* Fixed bottom button */}
-      <View className="absolute bottom-0 left-0 right-0 p-4 bg-canvas border-t border-line">
-        <Pressable
-          onPress={() => setShowForm(prev => !prev)}
-          className="bg-blue rounded-xl py-4 items-center"
-        >
-          <Text className="text-paper font-semibold text-body">
-            {showForm ? 'Cancelar' : '+ Agregar logro'}
-          </Text>
-        </Pressable>
+      {showForm ? (
+        <AddAchievementForm
+          onClose={() => setShowForm(false)}
+          onDone={() => {
+            setShowForm(false);
+            void utils.achievement.listAchievements.invalidate();
+          }}
+        />
+      ) : null}
+
+      <View className="absolute bottom-0 left-0 right-0 border-t border-line bg-canvas p-4">
+        <PillButton
+          label="Add achievement"
+          icon="plus"
+          onPress={() => setShowForm(true)}
+          fullWidth
+        />
       </View>
-    </KeyboardAvoidingView>
+
+      {selected ? (
+        <CertificationSheet
+          achievement={selected}
+          latestRequest={latestRequest.get(selected.id) ?? null}
+          activeClubs={activeClubs}
+          clubsLoading={memberships.isLoading}
+          onClose={() => setSelectedId(null)}
+          onChanged={refreshCertification}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+// ── Certification (ADR-016) ─────────────────────────────────────────────────
+// Ask one active club to certify one achievement; withdraw while Pending; see
+// the rejection reason and ask again. Only the server changes the status.
+function CertificationSheet({
+  achievement,
+  latestRequest,
+  activeClubs,
+  clubsLoading,
+  onClose,
+  onChanged,
+}: {
+  achievement: AthleteAchievementPublicOutput;
+  latestRequest: MyCertificationRequestOutput | null;
+  activeClubs: ReadonlyArray<{ id: string; name: string }>;
+  clubsLoading: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+}): ReactElement {
+  const requestCertification = useRequestCertification();
+  const withdraw = useWithdrawCertification();
+  const toast = useToast();
+  const [clubId, setClubId] = useState<string | null>(activeClubs[0]?.id ?? null);
+  const status = achievement.verificationStatus;
+  const pendingRequest = status === 'PENDING' && latestRequest?.status === 'PENDING' ? latestRequest : null;
+  const rejection = status === 'REJECTED' && latestRequest?.status === 'REJECTED' ? latestRequest : null;
+
+  const submit = (): void => {
+    if (!clubId) return;
+    requestCertification.mutate(
+      { achievementId: achievement.id, clubId },
+      {
+        onSuccess: () => {
+          const club = activeClubs.find((c) => c.id === clubId)?.name;
+          toast.success(club ? `Certification requested from ${club}` : 'Certification requested');
+          onChanged();
+          onClose();
+        },
+        onError: (error) => {
+          toast.error(mutationErrorMessage(error, REQUEST_ERRORS));
+          onChanged();
+        },
+      },
+    );
+  };
+
+  const confirmWithdraw = (requestId: string): void => {
+    Alert.alert('Withdraw request?', 'The achievement goes back to Unverified. You can ask again later.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Withdraw',
+        style: 'destructive',
+        onPress: () =>
+          withdraw.mutate(
+            { requestId },
+            {
+              onSuccess: () => {
+                toast.success('Request withdrawn');
+                onChanged();
+                onClose();
+              },
+              onError: (error) => {
+                toast.error(mutationErrorMessage(error, WITHDRAW_ERRORS));
+                onChanged();
+              },
+            },
+          ),
+      },
+    ]);
+  };
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable className="flex-1 bg-black/30" onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
+      <SafeAreaView edges={['bottom']} style={{ borderTopLeftRadius: 18, borderTopRightRadius: 18, backgroundColor: colors.paper, paddingHorizontal: 20, paddingTop: 20 }}>
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="min-w-0 flex-1">
+            <Text className="text-card-title text-text">{achievement.title}</Text>
+            <Text className="mt-1 text-meta text-muted">
+              {achievement.organization} · {longDate(achievement.achievedOn)}
+            </Text>
+          </View>
+          <StatusChip status={status} />
+        </View>
+
+        <View className="mt-4 gap-3 pb-4">
+          {status === 'VERIFIED' ? (
+            <Text className="text-state-body text-muted">
+              {achievement.certifyingClub
+                ? `Verified by ${achievement.certifyingClub.name}. Others see the club only if your club-membership visibility allows it.`
+                : 'Verified.'}
+            </Text>
+          ) : null}
+
+          {status === 'PENDING' ? (
+            <>
+              <Text className="text-state-body text-muted">
+                {pendingRequest
+                  ? `Waiting for a trainer at ${pendingRequest.club.name} to review it. You can't edit it while it's pending.`
+                  : 'Waiting for a club trainer to review it.'}
+              </Text>
+              {pendingRequest ? (
+                <PillButton
+                  label="Withdraw request"
+                  variant="danger"
+                  loading={withdraw.isPending}
+                  onPress={() => confirmWithdraw(pendingRequest.id)}
+                />
+              ) : null}
+            </>
+          ) : null}
+
+          {rejection ? (
+            <View className="rounded-lg border border-danger-line bg-danger-tint p-3">
+              <Text className="text-row-title text-danger">Rejected by {rejection.club.name}</Text>
+              {rejection.rejectionReason ? (
+                <Text className="mt-1 text-state-body text-text">“{rejection.rejectionReason}”</Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          {canRequestCertification(status) ? (
+            clubsLoading ? (
+              <Text className="text-meta text-muted">Loading your clubs…</Text>
+            ) : activeClubs.length === 0 ? (
+              <View className="gap-2">
+                <Text className="text-state-body text-muted">
+                  You need an active club membership before a club can certify this achievement.
+                </Text>
+                <PillButton label={status === 'REJECTED' ? 'Request again' : 'Request certification'} onPress={() => undefined} disabled />
+                <PillButton
+                  label="View clubs"
+                  variant="text"
+                  onPress={() => {
+                    onClose();
+                    router.push('/clubs');
+                  }}
+                />
+              </View>
+            ) : (
+              <View className="gap-2">
+                <Text className="text-eyebrow uppercase text-muted">Ask a club to certify it</Text>
+                <View accessibilityRole="radiogroup" className="overflow-hidden rounded-lg border border-line">
+                  {activeClubs.map((club, index) => {
+                    const checked = club.id === clubId;
+                    return (
+                      <Pressable
+                        key={club.id}
+                        onPress={() => setClubId(club.id)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked }}
+                        className={`min-h-[44px] flex-row items-center gap-3 px-3 ${index === 0 ? '' : 'border-t border-line'}`}
+                      >
+                        <Feather name={checked ? 'check' : 'flag'} size={16} color={checked ? colors.blue : colors.subtle} />
+                        <Text className={`text-row-title ${checked ? 'text-blue' : 'text-text'}`}>{club.name}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <PillButton
+                  label={status === 'REJECTED' ? 'Request again' : 'Request certification'}
+                  loading={requestCertification.isPending}
+                  disabled={!clubId}
+                  onPress={submit}
+                />
+              </View>
+            )
+          ) : null}
+
+          <PillButton label="Close" variant="text" onPress={onClose} />
+        </View>
+      </SafeAreaView>
+      <ToastViewport />
+    </Modal>
+  );
+}
+
+// ── Add achievement ─────────────────────────────────────────────────────────
+// New achievements start Unverified (ADR-016).
+function AddAchievementForm({ onDone, onClose }: { onDone: () => void; onClose: () => void }): ReactElement {
+  const addAchievement = useAddAchievement();
+  const toast = useToast();
+  const { overlap, containerRef } = useKeyboardOverlap();
+  const [title, setTitle] = useState('');
+  const [organization, setOrganization] = useState('');
+  const [date, setDate] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (title.trim().length < 2) errs['title'] = 'Title must be at least 2 characters.';
+    if (organization.trim().length < 2) errs['organization'] = 'Organization must be at least 2 characters.';
+    const parsed = fromIsoDate(date);
+    if (!parsed) errs['date'] = 'Choose the date of the achievement.';
+    else if (parsed > new Date()) errs['date'] = "The date can't be in the future.";
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const submit = (): void => {
+    if (!validate()) return;
+    addAchievement.mutate(
+      { title: title.trim(), organization: organization.trim(), achievedOn: date },
+      {
+        onSuccess: () => {
+          toast.success('Achievement added');
+          onDone();
+        },
+        onError: (error) => {
+          const message = mutationErrorMessage(error, ADD_ERRORS);
+          setErrors({ submit: message });
+          toast.error(message);
+        },
+      },
+    );
+  };
+
+  const field = (
+    key: 'title' | 'organization',
+    value: string,
+    onChange: (v: string) => void,
+    placeholder: string,
+    extra: Partial<ComponentProps<typeof TextInput>> = {},
+  ): ReactElement => (
+    <View className="mb-3">
+      <TextInput
+        value={value}
+        onChangeText={(v) => {
+          onChange(v);
+          setErrors({});
+        }}
+        placeholder={placeholder}
+        placeholderTextColor={colors.muted}
+        accessibilityLabel={placeholder}
+        className={`rounded-lg border bg-paper px-4 py-3 text-text ${errors[key] !== undefined ? 'border-danger' : 'border-line'}`}
+        {...extra}
+      />
+      {errors[key] !== undefined ? <Text className="mt-1 text-caption text-danger">{errors[key]}</Text> : null}
+    </View>
+  );
+
+  // Bottom sheet; padding by the keyboard overlap keeps every field above it.
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View ref={containerRef} className="flex-1 justify-end" style={{ paddingBottom: overlap }}>
+        <Pressable className="flex-1 bg-black/30" onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
+        <SafeAreaView
+          edges={overlap > 0 ? [] : ['bottom']}
+          style={{ backgroundColor: colors.canvas, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}
+        >
+          <View className="mb-4 flex-row items-center justify-between">
+            <Text accessibilityRole="header" className="text-row-title text-text">New achievement</Text>
+            <PillButton label="Cancel" variant="text" onPress={onClose} />
+          </View>
+          {errors['submit'] !== undefined ? (
+            <View className="mb-3 rounded-lg border border-danger-line bg-danger-tint p-3">
+              <Text className="text-meta text-danger">{errors['submit']}</Text>
+            </View>
+          ) : null}
+          {field('title', title, setTitle, 'Achievement title', { autoCapitalize: 'sentences', returnKeyType: 'next', autoFocus: true })}
+          {field('organization', organization, setOrganization, 'Organization', { autoCapitalize: 'sentences', returnKeyType: 'done' })}
+          <View className="mb-4">
+            <DateField
+              label="Achievement date"
+              placeholder="Date of the achievement"
+              value={date}
+              onChange={(v) => {
+                setDate(v);
+                setErrors({});
+              }}
+              maximumDate={new Date()}
+              error={errors['date'] !== undefined}
+            />
+            {errors['date'] !== undefined ? <Text className="mt-1 text-caption text-danger">{errors['date']}</Text> : null}
+          </View>
+          <PillButton label="Save achievement" loading={addAchievement.isPending} onPress={submit} fullWidth />
+        </SafeAreaView>
+      </View>
+      <ToastViewport />
+    </Modal>
   );
 }

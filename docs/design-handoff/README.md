@@ -1,14 +1,16 @@
-# Handoff: The Athlete Passport — Tab Navigation
+# Handoff: The Athlete Passport — Athlete & Trainer Workflows
 
-> **Sprint 3 deliverable.** Bottom-tab navigation shell for the Athlete
-> Passport iOS app. Profile tab is fully designed; Connections/Search are
-> populated. (The former Documents tab was removed by the ADR-013 pivot.)
+> **Design handoff.** Athlete tab shell and the club, metric, visibility, and
+> achievement-certification workflows required by ADR-013–016.
 
 ---
 
 ## About the design files
 
-The files in this bundle (`design/`) are **design references created in HTML** — they're a clickable prototype showing intended look and behavior, not production code to copy.
+The files in this bundle (`design/`) are design references created in HTML —
+they are a clickable prototype showing intended look and behavior, not
+production code to copy. The prototype keeps the established four-tab design
+as its base and exposes the additional role-based flows from the Tweaks panel.
 
 **Your task:** recreate these designs in the target codebase
 (`apps/mobile/`) using React Native + Expo Router. Use the **TypeScript token files in `tokens/`** as the source of truth for colors, typography, spacing, radii, and shadows — they map 1:1 to the values in the HTML.
@@ -32,8 +34,8 @@ of native rendering (system fonts, native shadow model, platform safe areas).
 - React Native + Expo (SDK that ships `@expo/vector-icons`)
 - Expo Router — file-based routing, `(tabs)` group
 - TypeScript, `"strict": true`
-- `StyleSheet.create` for all styles (no NativeWind, no Tailwind, no styled-components)
-- **No new npm dependencies** beyond what Expo provides
+- Styling: **NativeWind** classes generated from these tokens (see “Intentional production exceptions”; the original `StyleSheet.create` instruction is superseded by AGENTS.md and ADR-011)
+- Expo-bundled packages only: `@expo/vector-icons`, `react-native-svg`, `expo-linear-gradient` (added to `apps/mobile` as direct dependencies)
 
 The only icon library used is `@expo/vector-icons` (Feather set), which is
 included with Expo by default.
@@ -53,7 +55,8 @@ apps/mobile/
 │       ├── _layout.tsx        ← bottom tab bar config (provided)
 │       ├── profile.tsx        ← stub (provided)
 │       ├── connections.tsx    ← stub (provided)
-│       └── search.tsx         ← stub (provided)
+│       ├── performance.tsx    ← stub (provided)
+│       └── clubs.tsx          ← stub (provided)
 └── tokens/
     ├── colors.ts              ← provided
     ├── typography.ts          ← provided
@@ -93,6 +96,11 @@ Add to `tsconfig.json` so `@/tokens` resolves:
 | **`blue`**         | **`#1A6BFF`**            | **Athletic accent — CTAs, links, verified**     |
 | `blueTint`         | `#E8F0FF`                | Verified chip background, soft callouts          |
 | `blueLine`         | `#D8E4FB`                | Borders on blue surfaces                         |
+| `danger`           | `#C23B3B`                | Error icons and accents                          |
+| `dangerTint`       | `#FDECEC`                | Offline and danger surfaces                      |
+| `dangerLine`       | `#F6D4D4`                | Error panel border                               |
+| `dash`             | `#CBD3DF`                | Dashed empty-state outlines                      |
+| `segmented`        | `#E9EDF3`                | Segmented control background                     |
 | `pending`          | `#B5651D`                | Pending chip text                                |
 | `pendingTint`      | `#FFF3E0`                | Pending chip background                          |
 | `tabActive`        | `#1A6BFF`                | Active tab icon + label                          |
@@ -111,6 +119,8 @@ Roboto (Android). Use the named presets in `text.*`:
 | `cardTitle`        |   19 |  700   | "Marcus Chen"                                    |
 | `rowTitle`         |   14 |  600   | List row titles                                  |
 | `body`             |   15 |  400   | Bio paragraph, descriptive copy                  |
+| `stateTitle`       |   18 |  700   | State-panel title                                |
+| `stateBody`        | 13.5 |  400   | State-panel body                                 |
 | `meta`             |   12 |  400   | Row meta, captions                               |
 | `sectionEyebrow`   |   12 |  700   | Uppercase section labels                         |
 | `statValue`        |   17 |  700   | Height / Weight / Connections numbers            |
@@ -139,8 +149,9 @@ Roboto (Android). Use the named presets in `text.*`:
 | Token   | px | Used for                              |
 |---------|---:|---------------------------------------|
 | `sm`    |  6 | Tiny tags                             |
-| `md`    |  9 | Avatar tiles, locked doc icon         |
-| `lg`    | 12 | Search field                          |
+| `md`    |  9 | Avatar and compact icon tiles          |
+| `lg`    | 12 | Rounded input surfaces                |
+| `segmented` | 10 | Segmented control                    |
 | `xl`    | 16 | **All cards**                         |
 | `2xl`   | 18 | Auth gate AP icon                     |
 | `pill`  |999 | Buttons, chips, badges                |
@@ -153,9 +164,9 @@ Cross-platform: iOS `shadow*` props + Android `elevation`. Apply via
 | Token     | iOS                                          | Android | Used for                  |
 |-----------|----------------------------------------------|--------:|---------------------------|
 | `sm`      | `#0F172A 0/1 · 0.04 · 2`                     |    `1`  | All cards                 |
-| `cta`     | `#1A6BFF 0/4 · 0.25 · 12`                    |    `4`  | Notify-me CTA, Connect    |
+| `cta`     | `#1A6BFF 0/4 · 0.25 · 12`                    |    `4`  | Primary action buttons    |
 | `ctaLg`   | `#1A6BFF 0/6 · 0.28 · 16`                    |    `6`  | Auth-gate Sign In button  |
-| `ink`     | `#0B1220 0/10 · 0.18 · 20`                   |    `6`  | Lock hero icon, AP shield |
+| `ink`     | `#0B1220 0/10 · 0.18 · 20`                   |    `6`  | Sign-in brand tile, AP shield |
 
 ---
 
@@ -239,11 +250,12 @@ The prototype shows neutral monogram placeholders so the design ships without tr
 
 ### Tab order (do not change)
 
-| # | Route                 | Title         | Icon (Feather) | Decorator     |
-|---|-----------------------|---------------|----------------|---------------|
-| 1 | `(tabs)/profile`      | Profile       | `user`         | —             |
-| 2 | `(tabs)/connections`  | Connections   | `users`        | Badge `3`     |
-| 3 | `(tabs)/search`       | Search        | `search`       | —             |
+| # | Route                  | Title         | Icon (Feather) | Badge source |
+|---|------------------------|---------------|----------------|--------------|
+| 1 | `(tabs)/profile`       | Profile       | `user`         | —            |
+| 2 | `(tabs)/connections`   | Connections   | `users`        | `pendingCount` (3) |
+| 3 | `(tabs)/performance`   | Performance   | `activity`     | —            |
+| 4 | `(tabs)/clubs`         | Clubs         | `flag`         | `requestCount` (2) |
 
 **Initial active tab:** Profile (Expo Router defaults to the first child of the `(tabs)` group; keep `profile.tsx` first).
 
@@ -290,17 +302,16 @@ The prototype shows neutral monogram placeholders so the design ships without tr
 
 4. **Achievements section**
    - Eyebrow **"ACHIEVEMENTS"** with right link **"See all"** (blue, 12.5, semibold)
-   - Card with 4 rows, separated by 1px `line` (no border on last):
+   - Card with 3 rows, separated by 1px `line` (no border on last):
      - Each row (padding `12/16`, gap 12, align center):
        - 34×34 tile, `radius.md`, background `blueTint` (verified) or `pendingTint` (pending)
        - Feather `check` (verified) or `clock` (pending), size 17, color `blue` / `pending`, stroke 2.2
        - Center column: title (`text.rowTitle`) + meta (`text.meta`, `muted`)
-       - Right: `<VerifiedChip small />` or `<PendingChip small />`
+       - Right: status chip for Unverified, Pending, Verified, or Rejected
    - Rows in order:
      1. *PAC-12 All-Conference* · "2024 · Stanford Athletics" · **verified**
      2. *U.S. Youth National Team — Player Pool* · "2023 · U.S. Soccer" · **verified**
      3. *Combine: 40-yd dash · 4.61s* · "2025 · Bay Area Showcase" · **pending**
-     4. *Annual Physical — Cleared* · "Mar 2025 · Stanford Sports Med" · **verified**
 
 5. **Passport completeness card**
    - Background: linear-gradient `#F7FAFF → #FFFFFF`, border `blueLine`
@@ -329,35 +340,38 @@ The prototype shows neutral monogram placeholders so the design ships without tr
 
 ---
 
-### 3. Search
+### 3. Performance
 
-**Purpose:** discover other athletes by name or sport.
+**Purpose:** show the athlete's trainer-reported metrics, season trend, and benchmarks. Athletes review these entries; trainers report them.
 
-1. Header: title **"Discover"**, subtitle **"Find athletes & teams"**
-2. **Search field** (padding `lg/lg/0`):
-   - `paper` bg, 1px `line`, `radius.lg`, padding `11/14`, `shadow.sm`
-   - Row gap 8: Feather `search` 18 (`subtle`) · placeholder text "Search athletes by name or sport" (14.5, `subtle`, flex 1) · right hint chip **"⌘K"** (11/`muted`, `canvas` bg, 1px `line`, `radius.xs`, padding `2/6`)
-   - Tap → push to `app/search/results.tsx` (out of scope for this sprint) OR focus the inline input
-3. **Browse by sport** — flex-wrap row of 10 pill buttons (`paper` bg, 1px `line`, `pill`, padding `8/14`, 13/500/`text`):
-   > Soccer · Basketball · Football · Track & Field · Volleyball · Baseball · Tennis · Swimming · Rowing · Lacrosse
-4. **Recent** section (right link **"Clear"**, blue):
-   - Card, 3 rows: clock icon tile (32×32 `canvas` bg + `line` border + Feather `clock` 15 `muted`) · query (`text.rowTitle` 14/500) · meta (`muted` 12) · right Feather `search` 15 `subtle`
-   - Rows: **"Stanford soccer"** (Sport · org) · **"D1 swimmers"** (Sport · division) · **"Sofia Martinez"** (Athlete)
-5. **Suggested for you** — 3 athlete rows reusing the connection-row pattern but the right button is a primary **"+ Connect"** (`blue` bg, `#FFF` text, `pill`, padding `6/12`, 12/600, with Feather `plus` size 13/stroke 2.5)
+1. Header: title **"Performance"**, subtitle **"Season 2026 · Midfielder"**.
+2. **PF_KPI** — two-column grid of KPI cards. Preserve each source label, value, unit, comparison, icon, and color. Cards use the shared `Card` surface (`paper`, `line`, `radius.xl`, `shadow.sm`) with the values styled as prominent stats.
+3. **Speed chart** — plot `PF_SPEED` against `PF_MONTHS` in an SVG chart. Use `react-native-svg` already included with Expo; add no chart package. Draw the source line and area fill using `blue` / `blueTint`; use `line` for grid lines and the prototype's month labels.
+4. **PF_BENCH** — one percentile bar per source benchmark. Keep the source's label, percentile, marker position, and order; use `canvas` for tracks and `blue` for fills.
+5. **PF_TESTS** — metric rows use the shared list rhythm and show the trainer-reported result and date. Do not use achievement verification chips for metric entries.
+6. **MSegmented** — use the source's options and selected state; background `segmented` (`#E9EDF3`), radius `radius.segmented` (10).
 
----
+### 4. Clubs & trainers
 
-### Auth gate (shared)
+**Purpose:** show incoming club invitations, active club history, and trainers assigned to those clubs.
 
-Renders when there is no session, in place of any tab's body content.
+1. Header: title **"Clubs & trainers"**, subtitle shows active clubs and pending invitations.
+2. **Club invitations** — render `CL_REQ` as invitations from a club/trainer, with clear Accept and Decline actions. Acceptance activates the membership; pending and rejected invitations are never public.
+3. **Active club history** — render `CL_HIST` chronologically. Only active memberships are eligible for public display, subject to the athlete's club-membership audience setting.
+4. **Trainers at your clubs** — render `CL_STAFF` for active clubs. Do not imply that this list grants access to private identity data.
 
-- Centered column, padding `0 28`, text-aligned center
-- 64×64 ink square (`radius.2xl`, `shadow.ink`) with an 32 px AP shield
-- Title (marginTop 20, `text.title2` 22/700, `text`, letter-spacing -0.3): **"Sign in to continue"**
-- Body (`text.body` 14, `muted`, line-height 1.5, max-width 280):
-  > "The *{tabLabel}* tab is private. Sign in to access your verified athletic identity."
-- Primary CTA (marginTop 22): **"Sign in with Athlete Passport"** — blue pill, `shadow.ctaLg`
-- Secondary CTA (marginTop 10): **"Create an account"** — transparent, `muted`, 13/500
+The collections (`PF_KPI`, `PF_SPEED`, `PF_MONTHS`, `PF_BENCH`, `PF_TESTS`, `CL_REQ`, `CL_HIST`, and `CL_STAFF`) contain illustrative prototype data only. They are not live athlete records or production seed data.
+
+### ADR-013–016 workflow previews
+
+The Tweaks panel's **Preview flow** control opens the additional flows in the HTML prototype. These screens use the existing tokens and visual components.
+
+- **Visibility settings:** separate audience controls for achievements, club memberships, and metrics. Show the defaults beside each control: Public for achievements; Private for clubs and metrics. Options are Private, Connections, and Public.
+- **Athlete certification:** submit one achievement to one active club; show Pending and allow withdrawal; show the decision and rejection reason; allow a new request after rejection or cancellation. New achievements start Unverified. Editing while Pending is unavailable; editing a Verified achievement requires a warning that it resets to Unverified.
+- **Club invitations:** show the inviting club and trainer, then accept or decline. Only acceptance activates the membership and enables trainer access.
+- **Trainer certification inbox:** show only pending requests made to the trainer's club. Review title, organization, date, and athlete's public identity. Approve or reject; rejection requires a reason. No general achievement-list or private-profile access.
+- **Trainer metric entry:** select an athlete with an active membership, choose a metric, enter result/date, and identify the reporting trainer. The athlete does not submit metric entries; summaries are derived from entries.
+- **Public attribution:** a non-owner may see the certifying club name only when the club-membership audience admits them. Otherwise show the verified achievement without club attribution.
 
 ---
 
@@ -375,13 +389,20 @@ Build these in `apps/mobile/components/`:
 | `BlueCheck`              | Verified badge — blue circle + white check                      |
 | `VerifiedChip`           | Pill chip — `blueTint` / `blue` / check icon                    |
 | `PendingChip`            | Pill chip — `pendingTint` / `pending` / clock icon              |
+| `UnverifiedChip`         | Neutral status pill for achievements with no open request       |
+| `RejectedChip`           | Danger-tint status pill for rejected achievements               |
 | `Tag`                    | Square tag — default (`#F1F4F9`) or `blue` tone                 |
 | `AchievementRow`         | Tile icon + title + meta + chip                                 |
 | `ConnectionRow`          | Avatar + name (+ check) + sport + org + action button           |
 | `ValueProp`              | Sign-in icon-tile + label row (dark surface)                    |
 | `AuthButton`             | Provider button (apple / google / email variants)               |
+| `MSegmented`             | Performance range/segment switch using `segmented` and radius 10 |
+| `SpeedChart`              | SVG speed series and month labels; no chart dependency          |
+| `StatePanel`              | Empty/error hero panel with actions and optional error code     |
+| `EmptyRow`                | Inline dashed-icon empty row inside a section card              |
+| `OfflineBanner`           | Compact danger-tint connectivity banner with Retry action       |
 
-> **Linear gradients** (used in the header and the Passport / Lock-hero cards) need `expo-linear-gradient`, which is included by default with Expo and does not count as a new dependency.
+> **Linear gradients** (used in the header and blue state panels) need `expo-linear-gradient`, which is included by default with Expo and does not count as a new dependency.
 >
 > **SVG primitives** (BlueCheck, ApMark, jersey stripes) need `react-native-svg`, also included with Expo.
 
@@ -390,26 +411,25 @@ Build these in `apps/mobile/components/`:
 ## Interactions & behavior
 
 - **Tab switching:** standard Expo Router. No cross-tab state; each screen owns its own data hooks.
-- **Pending-request badge:** the `3` is sourced from `useConnections().pendingCount`. When it hits 0, omit the `badge` prop on `<Tabs.Screen name="connections">`.
+- **Badges:** Connections reads `useConnections().pendingCount`; Clubs reads `useClubs().requestCount`. Hide each badge when its count is `0`, while loading, or while that tab is in empty/error state.
 - **Active tint:** label and icon swap to `colors.blue`; label weight goes from 500 → 700 (`text.tabLabel` → `text.tabLabelActive`).
-- **Search input:** debounce 200 ms before firing a query.
-- **Auth gate:** if `useSession()` returns no session, return `<AuthGate tabLabel={...} />` early from each tab. Sign-in button starts the OAuth flow (out of scope this sprint — link to `app/(auth)/sign-in.tsx`).
+- **Data-state preview:** the prototype's Data state control switches among loaded, empty, and error for the active tab. `TabBar` hides badges outside loaded state.
+- **Retry:** error-panel and offline-banner Try again/Retry actions call the relevant hook's `refetch()`.
 - **Safe areas:** wrap each screen in `SafeAreaView` from `react-native-safe-area-context` (Expo bundled) with `edges={['top']}` — the dark header should extend behind the status bar but content must respect the notch. The tab bar bottom inset is handled by Expo Router automatically on iOS via the `paddingBottom: 20` we pass.
 
----
+## State hooks
 
-## State
-
-Sprint 3 scope is presentation only; wire to backend later. Recommended hooks (to be implemented in `apps/mobile/lib/`):
+Wire hooks from `apps/mobile/lib/`:
 
 ```ts
-useSession()       // { session: Session | null, signIn, signOut }
-useProfile()       // { profile, isLoading, error }
-useConnections()   // { connections, pending, pendingCount, accept, reject, message }
-useSearchAthletes(q: string)
+useSession()       // { session, signIn, signOut }
+useProfile()       // { data, isLoading, error, refetch }
+useConnections()   // { data, pendingCount, isLoading, error, refetch }
+usePerformance()   // { data, isLoading, error, refetch }
+useClubs()         // { data, requestCount, isLoading, error, refetch }
 ```
 
-All three screens should render skeleton states while `isLoading` and an empty state if `data?.length === 0`.
+Each tab branches in this order: `isLoading` → skeleton; `error` → error state; empty data → empty state; otherwise → loaded screen. A partial Connections request failure keeps the cached network visible while surfacing the request error.
 
 ---
 
@@ -417,8 +437,28 @@ All three screens should render skeleton states while `isLoading` and an empty s
 
 - All tappable elements ≥ 44×44 (`minTouch`).
 - Tab buttons get `accessibilityRole="tab"`, `accessibilityLabel="<label>"`, and `accessibilityState={{ selected: focused }}`.
-- BlueCheck, VerifiedChip, PendingChip include an `accessibilityLabel` ("Verified", "Pending").
-- Icon-only buttons (bell, lock dot) need explicit `accessibilityLabel`.
+- BlueCheck and achievement status chips include an accessible label matching their visible state.
+- Error panels announce changes with `accessibilityLiveRegion="polite"`.
+- Try again controls have a minimum 44 pt hit target. Icon-only actions need an accessible label.
+- State icon aliases map to Feather: `alert` → `alert-circle`, `refresh` → `refresh-cw`, and `wifi-off` → `wifi-off`.
+
+## Data states
+
+Every tab has loaded, empty, and error presentations. Continue showing the screen header in each state and use `TAB_STATES[tab].sub[state]` for its subtitle. Keep state layouts in `design/states.jsx`; use the same `StatePanel`, `EmptyRow`, and `OfflineBanner` components across tabs. Show the relevant skeleton while a hook reports `isLoading`.
+
+| Tab | Empty trigger and presentation | Error type / presentation | Empty CTAs and error actions |
+|---|---|---|---|
+| Profile | No profile data. Dashed avatar, `—` stats, “Build your passport” panel, empty Achievements row. | Profile query failure: “Couldn't load your profile” panel. | Empty: “Build your passport” / “Not now”. Error: “Try again” calls `refetch`; “Sign out” calls session sign-out. |
+| Connections | No network entries. “No connections yet” panel and an empty Pending row. | Partial request failure: offline banner, dimmed cached network, “Couldn't load requests” panel. | Empty: “Find athletes” / “Invite teammates”. Error: “Retry” refreshes requests; cached network remains visible. |
+| Performance | No performance data. Dashed KPI grid with `—` values and “No performance data yet” panel. | Performance query failure: “Couldn't load performance data” panel. | Empty: “View clubs” / “Manage visibility”. Metrics are trainer-reported. Error: “Try again” calls `refetch`. |
+| Clubs | No active clubs. Show invitation and trainer empty rows. | Offline/network failure: danger panel “You're offline” with wifi-off icon. | Empty: “View invitations” / “Manage visibility”. A club initiates membership; athlete accepts or declines. Error: “Try again” calls `refetch`. |
+
+Use the state copy from `TAB_STATES` verbatim:
+
+- **Profile subtitles:** loaded/empty “Your athlete identity”; error “Profile unavailable”. Empty panel: “Build your passport” / “Add your athlete details and achievements to start building your verified profile.” / “Build your passport” / “Not now”. Error panel: “Couldn't load your profile” / “Check your connection and try again.” / “Try again” / “Sign out”. Empty achievement row: “No achievements yet”.
+- **Connections subtitles:** loaded “247 athletes · 3 pending”; empty “Your network starts here”; error “Connection issue”. Empty panel: “No connections yet” / “Find athletes you know or invite teammates to join your network.” / “Find athletes” / “Invite teammates”. Error banner: “You're offline”; panel: “Couldn't load requests” / “Your saved network is shown below. Try again to refresh requests.” / “Try again” / “View cached network”.
+- **Performance subtitles:** loaded/empty “Season 2026 · Midfielder”; error “Performance unavailable”. Empty panel: “No performance data yet” / “A trainer at one of your active clubs can report your first performance update.” / “View clubs” / “Manage visibility”. Error panel: “Couldn't load performance data” / “Check your connection and try again.” / “Try again” / “Close”.
+- **Clubs subtitles:** loaded “2 active clubs · 1 invitation”; empty “Your clubs and invitations”; error “You're offline”. Empty panel: “No active clubs yet” / “When a club invites you, review it here. You choose whether to accept.” / “View invitations” / “Manage visibility”. Error panel: “You're offline” / “Reconnect to refresh your club invitations and active memberships.” / “Try again” / “Close”. Empty rows: “No club invitations”, “No trainers listed”.
 
 ---
 
@@ -428,56 +468,82 @@ No raster assets. All marks are SVG (AP shield, blue check, Feather icons via `@
 
 ---
 
-## Files in this bundle
+## Files in this handoff
+
+This handoff lives at `docs/design-handoff/`. The HTML prototype is in
+`design/`; the values documented above remain the design-token source of truth
+for the intended React Native implementation. The bundle also contains
+Expo Router screen scaffolds under `app/` and TypeScript token files under
+`tokens/`. The prototype source files are:
 
 ```
-design_handoff_athlete_passport_tabs/
-├── README.md                       ← you are here
-├── tokens/
-│   ├── colors.ts
-│   ├── typography.ts
-│   ├── spacing.ts
-│   └── index.ts
-├── app/
-│   ├── (auth)/
-│   │   └── sign-in.tsx             ← login screen (stub)
-│   └── (tabs)/
-│       ├── _layout.tsx             ← tab bar wiring (Feather icons)
-│       ├── profile.tsx             ← stub
-│       ├── connections.tsx         ← stub
-│       └── search.tsx              ← stub
-└── design/
-    ├── index.html                  ← interactive prototype (open in browser)
-    ├── app.jsx
-    ├── screens.jsx
-    ├── ios-frame.jsx
-    └── tweaks-panel.jsx
+design/
+├── index.html              ← interactive entry point
+├── app.jsx                 ← tab shell and preview controls
+├── screens.jsx             ← profile, connections, and shared UI
+├── screens-2.jsx           ← performance and clubs
+├── adr-flows.jsx           ← visibility, certification, invitation, trainer flows
+├── states.jsx              ← empty and error states
+├── ios-frame.jsx           ← device frame
+└── tweaks-panel.jsx        ← prototype preview controls
 ```
+
+The screen scaffolds cover the current four-tab design. The additional
+workflow screens are presented in the prototype flow selector; trainer portal
+implementation routes remain to be selected when that surface is decided.
+
+The app route inventory is separate from this visual bundle. Current routes
+and known coverage differences are recorded under “Out of scope”.
 
 Open `design/index.html` in any modern browser to interact with the
-prototype. The Tweaks toolbar inside the prototype lets you switch the
-active tab, toggle the auth-gated state (login screen ↔ tabs), flip the
-login-mode copy (sign-in ↔ create), and preview alternate accents.
+prototype. The Tweaks toolbar lets you switch tabs and workflow previews, set
+Data state (loaded / empty / error), toggle sign-in mode, and preview accents.
 
 ---
 
+## Production implementation status
+
+The four-tab shell and the athlete-side ADR flows are implemented in `apps/mobile` by the OpenSpec change `refactor-mobile-screens-design-handoff`:
+
+- Tabs: `app/(app)/(tabs)/{profile,connections,performance,clubs}.tsx`, in the order Profile, Connections, Performance, Clubs.
+- Stack screens: `app/(app)/search.tsx` (opened from Connections → “Find athletes”), `app/(app)/visibility.tsx`, and `app/(app)/achievements.tsx` (certification sheet).
+- Auth: `app/(auth)/login.tsx`, `verify.tsx`, `callback.tsx`. The handoff's illustrative `(auth)/sign-in` and `(tabs)` paths map to these; URLs are unchanged.
+- Tokens: `apps/mobile/lib/tokens.js` (also read by `tailwind.config.js`) and `lib/theme.ts`. Components: `apps/mobile/components/` (see its README).
+
+## Intentional production exceptions
+
+Production deliberately differs from this prototype here:
+
+- **Trainer surfaces stay prototype-only.** The trainer certification inbox and trainer metric entry previews are not built, because the trainer portal platform is undecided.
+- **Sign-in is email only** (Magic Link with OTP fallback, AGENTS.md Auth rules). The Apple and Google buttons are not built. The value prop “End-to-end secure” reads “Secure and athlete-owned”, because data is encrypted at rest, not end to end.
+- **Benchmarks** (percentiles) and **Trainers at your clubs** are deferred until athlete-facing APIs exist.
+- **Connections is UI-only.** `connection.listConnections` returns accepted connections as bare ids with no pending-request listing, so the tab shows the real count and “Find athletes”. The network list, the pending-requests card, the Connections badge, “Invite teammates”, and “View cached network” wait for a connection API change.
+- **Metric attribution names the club, not the trainer** (“Reported by a trainer at <Club>”), because entries expose only a trainer id. The prototype copy has been aligned.
+- **Club invitations show the club, not the inviting trainer**, for the same reason.
+- **Styling uses NativeWind**, not `StyleSheet.create` (AGENTS.md, ADR-011).
+- **Loaded subtitles use live values** (connection count, active clubs and invitations, sport and position). Empty and error copy is used verbatim from `TAB_STATES`. Error panels omit the “Close” and “View cached network” secondary actions, which have no production behavior. One exception to verbatim copy: the Connections error body reads “Check your connection and try again.” instead of “Your saved network is shown below…”, because production shows no cached network yet.
+- **Performance range options** are 1M, 3M, 6M, and All (the prototype leaves `MSegmented` options empty). All-time charts stop at the latest 200 entries and say so.
+- **Terms and Privacy Policy** are plain text on sign-in until those pages exist.
+
 ## Out of scope (this sprint)
 
-- Real OAuth wiring (Apple / Google SDKs) — flag with product before adding deps
-- Profile **edit** mode
-- Connection request actions wired to the backend
-- Search results screen (`app/search/results.tsx`)
-- Push notifications
+- Public athlete profile route and public web rendering
+- Athlete search: the search screen shows a “coming soon” panel. Follow-up change `wire-athlete-search` adds display name and sport to `athlete.searchAthletes` results and a Connect action (`connection.sendRequest`).
+- Profile edit flow detail (the app already has a profile-edit route)
+- Push notifications (the header bell is decorative)
 - Light/dark theme — the design is intentionally light-themed only (the sign-in screen is permanently dark by design)
 
 ---
 
-## Definition of done
+## Design handoff acceptance
 
-- [ ] Unauthenticated users land on `(auth)/sign-in` and never see the tab UI.
-- [ ] `(tabs)/_layout.tsx` renders three tabs in the spec'd order with Feather icons; Connections shows badge `3`.
-- [ ] Profile screen matches the prototype within ±2 px on iPhone 14 (375×812).
-- [ ] Connections and Search render their static content.
-- [ ] Successful sign-in routes to `(tabs)/profile`; sign-out routes back to `(auth)/sign-in`.
-- [ ] No imports from `nativewind`, `tailwind*`, `styled-components`, or any new npm dependency outside the Expo SDK (Apple/Google SDKs flagged for follow-up sprint).
-- [ ] `tsc --noEmit` passes under `"strict": true`.
+- [ ] The prototype retains the four-tab design order: Profile, Connections, Performance, Clubs.
+- [ ] Each tab has loaded, empty, and error guidance with consistent copy.
+- [ ] Visibility defaults and all three audience choices are explicit per category.
+- [ ] Athlete certification covers Unverified, Pending, withdrawal, Verified, Rejected with reason, and resubmission.
+- [ ] Club invitations require athlete acceptance before membership becomes active; pending/rejected invitations are not public.
+- [ ] Trainer certification is club-scoped, only shows pending requests, and requires a rejection reason.
+- [ ] Metric entry is trainer-attributed and limited to active club memberships; athlete metric entry is not offered.
+- [ ] Public attribution follows both achievement and club-membership visibility.
+- [x] Search, OTP, public profile, profile-edit, and production tab/route differences are documented (see “Production implementation status” and “Intentional production exceptions”).
+- [ ] The prototype controls allow reviewers to reach all new screens and certification states.

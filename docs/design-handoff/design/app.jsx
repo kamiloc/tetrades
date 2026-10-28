@@ -5,21 +5,28 @@ const { useState } = React;
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "activeTab": "profile",
+  "activeFlow": "tabs",
+  "certificationState": "UNVERIFIED",
   "authenticated": true,
   "authMode": "signin",
+  "dataState": "loaded",
   "accent": "#1A6BFF"
 }/*EDITMODE-END*/;
 
 const HEADER_BY_TAB = {
-  profile:     { title: 'Profile',     subtitle: 'Your athlete identity' },
-  connections: { title: 'Connections', subtitle: '247 athletes · 3 pending' },
-  search:      { title: 'Discover',    subtitle: 'Find athletes & teams' },
+  profile:     { title: 'Profile' },
+  connections: { title: 'Connections' },
+  performance: { title: 'Performance' },
+  clubs:       { title: 'Clubs & trainers' },
 };
 
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const active = t.activeTab;
-  const head = HEADER_BY_TAB[active];
+  const flow = t.activeFlow;
+  const head = flow === 'tabs'
+    ? { ...HEADER_BY_TAB[active], subtitle: TAB_STATES[active].sub[t.dataState] }
+    : { title: flowLabel(flow), subtitle: flow === 'trainerInbox' || flow === 'metricEntry' ? 'Trainer workspace · Stanford Athletics' : 'Your athlete account' };
 
   // override --blue at runtime if accent changed
   React.useEffect(() => {
@@ -27,10 +34,33 @@ function App() {
   }, [t.accent]);
 
   const renderTabBody = () => {
+    if (flow !== 'tabs') {
+      const FlowScreen = FLOW_SCREENS[flow];
+      return FlowScreen ? <FlowScreen status={t.certificationState} setStatus={(value) => setTweak('certificationState', value)} /> : null;
+    }
+    if (t.dataState === 'empty') {
+      switch (active) {
+        case 'profile': return <ProfileEmpty />;
+        case 'connections': return <ConnectionsEmpty />;
+        case 'performance': return <PerformanceEmpty />;
+        case 'clubs': return <ClubsEmpty />;
+        default: return null;
+      }
+    }
+    if (t.dataState === 'error') {
+      switch (active) {
+        case 'profile': return <ProfileError />;
+        case 'connections': return <ConnectionsError />;
+        case 'performance': return <PerformanceError />;
+        case 'clubs': return <ClubsError />;
+        default: return null;
+      }
+    }
     switch (active) {
       case 'profile':     return <ProfileScreen />;
       case 'connections': return <ConnectionsScreen />;
-      case 'search':      return <SearchScreen />;
+      case 'performance': return <PerformanceScreen />;
+      case 'clubs':       return <ClubsScreen />;
       default:            return null;
     }
   };
@@ -44,7 +74,7 @@ function App() {
         }}>
           {t.authenticated ? (
             <React.Fragment>
-              <Header title={head.title} subtitle={head.subtitle} />
+              <Header title={head.title} subtitle={head.subtitle} action={flow !== 'tabs' ? <button type="button" onClick={() => setTweak('activeFlow', 'tabs')} style={{ color: '#fff', border: 0, background: 'transparent', fontSize: 12 }}>Done</button> : undefined} />
               <main style={{
                 flex: 1, overflow: 'auto',
                 background: 'var(--canvas)',
@@ -52,7 +82,7 @@ function App() {
               }}>
                 {renderTabBody()}
               </main>
-              <TabBar active={active} onChange={(id) => setTweak('activeTab', id)} />
+              {flow === 'tabs' ? <TabBar active={active} hideBadges={t.dataState !== 'loaded'} onChange={(id) => setTweak('activeTab', id)} /> : null}
             </React.Fragment>
           ) : (
             <main style={{ flex: 1, overflow: 'auto' }}>
@@ -75,10 +105,45 @@ function App() {
             onChange={(v) => setTweak('activeTab', v)}
             options={TABS.map(x => ({ value: x.id, label: x.label }))}
           />
+          <TweakSelect
+            label="Preview flow"
+            value={t.activeFlow}
+            onChange={(v) => setTweak('activeFlow', v)}
+            options={[
+              { value: 'tabs', label: 'Main tabs' },
+              { value: 'visibility', label: 'Visibility settings' },
+              { value: 'certification', label: 'Athlete certification' },
+              { value: 'invitations', label: 'Club invitations' },
+              { value: 'trainerInbox', label: 'Trainer certification inbox' },
+              { value: 'metricEntry', label: 'Trainer metric entry' },
+            ]}
+          />
+          {t.activeFlow === 'certification' ? <TweakSelect
+            label="Certification state"
+            value={t.certificationState}
+            onChange={(v) => setTweak('certificationState', v)}
+            options={[
+              { value: 'UNVERIFIED', label: 'Unverified' },
+              { value: 'PENDING', label: 'Pending' },
+              { value: 'VERIFIED', label: 'Approved / verified' },
+              { value: 'REJECTED', label: 'Rejected' },
+              { value: 'CANCELLED', label: 'Withdrawn / cancelled' },
+            ]}
+          /> : null}
           <TweakToggle
             label="Authenticated"
             value={t.authenticated}
             onChange={(v) => setTweak('authenticated', v)}
+          />
+          <TweakRadio
+            label="Data state"
+            value={t.dataState}
+            onChange={(v) => setTweak('dataState', v)}
+            options={[
+              { value: 'loaded', label: 'Loaded' },
+              { value: 'empty', label: 'Empty' },
+              { value: 'error', label: 'Error' },
+            ]}
           />
           <TweakRadio
             label="Login mode"
@@ -107,7 +172,8 @@ function App() {
             app/(tabs)/_layout.tsx<br/>
             ├── profile.tsx<br/>
             ├── connections.tsx<br/>
-            └── search.tsx
+            ├── performance.tsx<br/>
+            └── clubs.tsx
           </div>
         </TweakSection>
       </TweaksPanel>

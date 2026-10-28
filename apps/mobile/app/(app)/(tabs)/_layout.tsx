@@ -1,70 +1,87 @@
+import { trpc } from '@packages/api-client';
 import { Tabs } from 'expo-router';
+import { useEffect, type ReactElement } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { Feather, type IconName } from '../../../lib/icons';
 import { colors } from '../../../lib/theme';
 
-function TabIcon({
-  name,
-  focused,
-  badge,
-  locked,
-}: {
-  name: IconName;
-  focused: boolean;
-  badge?: number;
-  locked?: boolean;
-}) {
-  const tint = focused ? colors.blue : colors.tabInactive;
+// Same query and page size as the Clubs tab, so both share one cache entry.
+const MEMBERSHIP_PAGE_SIZE = 50;
+
+function TabIcon({ name, focused, badge }: { name: IconName; focused: boolean; badge?: number }): ReactElement {
+  const tint = focused ? colors.tabActive : colors.tabInactive;
   return (
-    <View className="w-8 h-6 items-center justify-center">
-      <Feather name={name} size={24} color={tint} />
+    <View className="h-6 w-8 items-center justify-center">
+      <Feather name={name} size={22} color={tint} />
       {badge ? (
         <View
-          className="absolute -top-1 -right-2 min-w-4 h-4 px-1 rounded-pill bg-blue items-center justify-center border-paper"
+          className="absolute -right-2 -top-1 h-4 min-w-4 items-center justify-center rounded-pill border-paper bg-blue px-1"
           style={{ borderWidth: 1.5 }}
         >
-          <Text className="text-paper text-badge font-bold">{badge}</Text>
-        </View>
-      ) : null}
-      {locked ? (
-        <View
-          className={`absolute -top-1 -right-2 w-3.5 h-3.5 rounded-full bg-paper items-center justify-center ${focused ? 'border-tab-active' : 'border-line'}`}
-          style={{ borderWidth: 1.5 }}
-        >
-          <Feather name="lock" size={8} color={tint} />
+          <Text className="text-badge font-bold text-paper">{badge}</Text>
         </View>
       ) : null}
     </View>
   );
 }
 
-export default function TabsLayout() {
+// Badge count only once every page has loaded and the count is positive
+// (hidden while loading, on error, and at zero). Pending invitations can sit
+// on any page, so a partial count would undercount.
+function usePendingInvitationCount(): number {
+  const memberships = trpc.club.listMyMemberships.useInfiniteQuery(
+    { take: MEMBERSHIP_PAGE_SIZE },
+    { getNextPageParam: (page) => page.nextCursor ?? undefined },
+  );
+  const { hasNextPage, isFetchingNextPage, isError, fetchNextPage } = memberships;
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && !isError) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, isError, fetchNextPage]);
+  if (!memberships.isSuccess || hasNextPage) return 0;
+  return memberships.data.pages
+    .flatMap((page) => page.items)
+    .filter((m) => m.status === 'PENDING_ATHLETE_CONFIRMATION').length;
+}
+
+function tabLabel(label: string) {
+  return function TabLabel({ focused }: { focused: boolean }): ReactElement {
+    return (
+      <Text
+        className={focused ? 'text-tab-label font-bold text-tab-active' : 'text-tab-label text-tab-inactive'}
+      >
+        {label}
+      </Text>
+    );
+  };
+}
+
+export default function TabsLayout(): ReactElement {
+  const pendingInvitations = usePendingInvitationCount();
+
   return (
     <Tabs
       initialRouteName="profile"
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.blue,
+        tabBarActiveTintColor: colors.tabActive,
         tabBarInactiveTintColor: colors.tabInactive,
         tabBarStyle: {
-          backgroundColor: colors.paper,
-          borderTopColor: colors.line,
+          backgroundColor: colors.tabBarBg,
+          borderTopColor: colors.tabBarBorder,
           borderTopWidth: StyleSheet.hairlineWidth,
-          height: Platform.select({
-            ios: 98,
-            android: 64,
-          }),
+          height: Platform.select({ ios: 98, android: 64 }),
           paddingTop: 8,
           paddingBottom: Platform.select({ ios: 20, android: 8 }),
         },
-        tabBarLabelStyle: { fontSize: 10.5, fontWeight: '500', letterSpacing: 0.1 },
       }}
     >
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
+          tabBarAccessibilityLabel: 'Profile',
+          tabBarLabel: tabLabel('Profile'),
           tabBarIcon: ({ focused }) => <TabIcon name="user" focused={focused} />,
         }}
       />
@@ -72,14 +89,31 @@ export default function TabsLayout() {
         name="connections"
         options={{
           title: 'Connections',
-          tabBarIcon: ({ focused }) => <TabIcon name="users" focused={focused} badge={3} />,
+          tabBarAccessibilityLabel: 'Connections',
+          tabBarLabel: tabLabel('Connections'),
+          // No badge until a pending-request listing exists (proposal: UI-only Connections).
+          tabBarIcon: ({ focused }) => <TabIcon name="users" focused={focused} />,
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="performance"
         options={{
-          title: 'Search',
-          tabBarIcon: ({ focused }) => <TabIcon name="search" focused={focused} />,
+          title: 'Performance',
+          tabBarAccessibilityLabel: 'Performance',
+          tabBarLabel: tabLabel('Performance'),
+          tabBarIcon: ({ focused }) => <TabIcon name="activity" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="clubs"
+        options={{
+          title: 'Clubs',
+          tabBarAccessibilityLabel:
+            pendingInvitations > 0 ? `Clubs, ${pendingInvitations} pending invitations` : 'Clubs',
+          tabBarLabel: tabLabel('Clubs'),
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="flag" focused={focused} badge={pendingInvitations > 0 ? pendingInvitations : undefined} />
+          ),
         }}
       />
     </Tabs>

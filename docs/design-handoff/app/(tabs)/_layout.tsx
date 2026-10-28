@@ -1,43 +1,32 @@
 // apps/mobile/app/(tabs)/_layout.tsx
-// Athlete Passport — bottom-tab navigation (Expo Router).
+// Athlete Passport — four-tab navigation shell (Expo Router).
 //
-// Tab order is FIXED (per product spec):
-//   1. Profile  2. Connections  3. Search
-//
-// Notes for the implementer:
-// - Icons use @expo/vector-icons (Feather), bundled with Expo.
-// - The dark app header is NOT part of the tab bar — implement it as a
-//   reusable <ScreenHeader> component rendered inside each screen, so each
-//   tab can decide its own title/subtitle without fighting the router.
-// - The notification badge (3) on Connections comes from app state; the
-//   value below is a placeholder.
+// Fixed order: Profile · Connections · Performance · Clubs.
+// Icons: Feather user · users · activity · flag.
+// Connections badge uses useConnections().pendingCount; Clubs uses
+// useClubs().requestCount. Hide the relevant badge when its hook is loading,
+// errored, empty, or the count is 0. See the Data states section in README.
 
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Platform, View, Text, StyleSheet } from 'react-native';
 import { colors, layout, text as textStyle } from '@/tokens';
+import { useConnections, useClubs } from '@/lib/hooks';
 
-// ─── Custom badge / lock decorator over a tab icon ───────────────────
 function TabIcon({
-  name, focused, badge, locked,
+  name, focused, badge,
 }: {
   name: React.ComponentProps<typeof Feather>['name'];
   focused: boolean;
   badge?: number;
-  locked?: boolean;
 }) {
   const tint = focused ? colors.tabActive : colors.tabInactive;
   return (
     <View style={styles.iconWrap}>
       <Feather name={name} size={24} color={tint} />
-      {badge ? (
+      {badge !== undefined && badge > 0 ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badge}</Text>
-        </View>
-      ) : null}
-      {locked ? (
-        <View style={[styles.lockDot, { borderColor: focused ? colors.tabActive : '#CBD2DE' }]}>
-          <Feather name="lock" size={8} color={tint} />
         </View>
       ) : null}
     </View>
@@ -45,6 +34,15 @@ function TabIcon({
 }
 
 export default function TabsLayout() {
+  const connections = useConnections();
+  const clubs = useClubs();
+  const connectionsEmpty = !connections.isLoading && !connections.error && !connections.data?.length;
+  const clubsEmpty = !clubs.isLoading && !clubs.error && !clubs.data?.length;
+  const connectionsBadge = connections.isLoading || connections.error || connectionsEmpty || connections.pendingCount === 0
+    ? undefined : connections.pendingCount;
+  const clubsBadge = clubs.isLoading || clubs.error || clubsEmpty || clubs.requestCount === 0
+    ? undefined : clubs.requestCount;
+
   return (
     <Tabs
       screenOptions={{
@@ -62,27 +60,22 @@ export default function TabsLayout() {
         tabBarLabelStyle: textStyle.tabLabel,
       }}
     >
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ focused }) => <TabIcon name="user" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="connections"
-        options={{
-          title: 'Connections',
-          tabBarIcon: ({ focused }) => <TabIcon name="users" focused={focused} badge={3} />,
-        }}
-      />
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: 'Search',
-          tabBarIcon: ({ focused }) => <TabIcon name="search" focused={focused} />,
-        }}
-      />
+      <Tabs.Screen name="profile" options={{
+        title: 'Profile',
+        tabBarIcon: ({ focused }) => <TabIcon name="user" focused={focused} />,
+      }} />
+      <Tabs.Screen name="connections" options={{
+        title: 'Connections',
+        tabBarIcon: ({ focused }) => <TabIcon name="users" focused={focused} badge={connectionsBadge} />,
+      }} />
+      <Tabs.Screen name="performance" options={{
+        title: 'Performance',
+        tabBarIcon: ({ focused }) => <TabIcon name="activity" focused={focused} />,
+      }} />
+      <Tabs.Screen name="clubs" options={{
+        title: 'Clubs',
+        tabBarIcon: ({ focused }) => <TabIcon name="flag" focused={focused} badge={clubsBadge} />,
+      }} />
     </Tabs>
   );
 }
@@ -97,10 +90,4 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#FFFFFF',
   },
   badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
-  lockDot: {
-    position: 'absolute', top: -4, right: -8,
-    width: 14, height: 14, borderRadius: 7,
-    backgroundColor: '#FFFFFF', borderWidth: 1.5,
-    alignItems: 'center', justifyContent: 'center',
-  },
 });

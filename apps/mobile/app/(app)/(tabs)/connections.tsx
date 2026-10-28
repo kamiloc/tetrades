@@ -1,147 +1,124 @@
-import { Platform, ScrollView, Text, View } from 'react-native';
-import type { ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useConnections, useMyAthlete } from '@packages/api-client';
+import { TAB_STATES, connectionsSubtitle, selectViewState } from '@packages/shared-logic';
+import { router } from 'expo-router';
+import type { ReactElement } from 'react';
+import { ScrollView, Text, View } from 'react-native';
 
+import { Card } from '../../../components/Card';
+import { EmptyRow } from '../../../components/EmptyRow';
+import { PillButton } from '../../../components/PillButton';
+import { ScreenHeader } from '../../../components/ScreenHeader';
+import { SectionTitle } from '../../../components/SectionTitle';
+import { TabSkeleton } from '../../../components/Skeleton';
+import { StatePanel } from '../../../components/StatePanel';
 import { Feather } from '../../../lib/icons';
+import { isBusy, isFailed } from '../../../lib/query-state';
 import { colors } from '../../../lib/theme';
 
-const shadowSm: ViewStyle = Platform.select<ViewStyle>({
-  ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },
-  android: { elevation: 1 },
-  default: {},
-}) ?? {};
+const copy = TAB_STATES.connections;
 
-const NETWORK: Array<{ initials: string; name: string; verified: boolean; sport: string; org: string; hue: number }> = [
-  { initials: 'SM', name: 'Sofia Martinez', verified: true,  sport: 'Track & Field',  org: 'UCLA Athletics',         hue: 160 },
-  { initials: 'JO', name: 'James Okafor',   verified: true,  sport: 'Basketball',     org: 'Duke University',        hue: 220 },
-  { initials: 'AR', name: 'Amelia Reed',    verified: true,  sport: 'Volleyball',     org: 'USC Trojans',            hue: 280 },
-  { initials: 'DB', name: 'Devon Brooks',   verified: false, sport: 'Football',       org: 'Ohio State',             hue: 30  },
-  { initials: 'PS', name: 'Priya Shah',     verified: true,  sport: 'Swimming',       org: 'Stanford Athletics',     hue: 190 },
-  { initials: 'LO', name: "Liam O'Connor",  verified: true,  sport: 'Soccer',         org: 'UCLA Bruins',            hue: 350 },
-];
+// connection.listConnections returns accepted connections as bare ids only,
+// with no pending-request listing. Until a connection API change lands, this
+// tab shows the real count and the way to find athletes, never sample people.
 
-export default function ConnectionsScreen() {
+function ConnectionsShell({ subtitle, children }: { subtitle: string; children: ReactElement }): ReactElement {
   return (
     <View className="flex-1 bg-canvas">
-      {/* Dark header */}
-      <View className="bg-ink px-5 pb-3">
-        <SafeAreaView edges={['top']}>
-          <View className="h-8 mt-1.5 flex-row items-center">
-            <View className="flex-row items-center gap-1">
-              <View className="w-[18px] h-[18px] rounded-xs bg-header-chip-bg border border-header-chip-border" />
-              <Text
-                className="text-caption font-semibold uppercase text-on-ink-muted"
-                style={{ letterSpacing: 2.4 }}
-              >
-                THE ATHLETE PASSPORT
-              </Text>
-            </View>
-          </View>
-          <Text
-            className="text-title1 font-bold text-on-ink mt-3"
-            style={{ letterSpacing: -0.4, lineHeight: 29.9 }}
-          >
-            Connections
-          </Text>
-          <Text
-            className="text-footnote font-regular text-on-ink-muted mt-0.5 mb-5"
-            style={{ letterSpacing: 0.1 }}
-          >
-            247 athletes · 3 pending
-          </Text>
-        </SafeAreaView>
-      </View>
-
-      <ScrollView
-        contentContainerClassName="px-4 pt-4 pb-6"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Pending requests */}
-        <View className="mb-5">
-          <View className="flex-row items-center justify-between pb-2 px-1">
-            <Text
-              className="text-small font-bold uppercase text-muted"
-              style={{ letterSpacing: 1.7 }}
-            >
-              PENDING REQUESTS
-            </Text>
-            <Text className="text-small font-semibold text-blue">Manage</Text>
-          </View>
-          <View className="bg-paper rounded-xl border border-line" style={shadowSm}>
-            <View className="flex-row items-center px-3.5 py-3.5 gap-3">
-              <View className="flex-row w-[76px]">
-                <View className="w-9 h-9 rounded-pill items-center justify-center border-2 border-paper bg-blue">
-                  <Text className="text-small font-bold text-paper">K</Text>
-                </View>
-                <View className="-ml-2.5 w-9 h-9 rounded-pill items-center justify-center border-2 border-paper bg-pending">
-                  <Text className="text-small font-bold text-paper">Z</Text>
-                </View>
-                <View className="-ml-2.5 w-9 h-9 rounded-pill items-center justify-center border-2 border-paper bg-muted">
-                  <Text className="text-small font-bold text-paper">E</Text>
-                </View>
-              </View>
-              <View className="flex-1">
-                <Text className="text-body font-semibold text-text" style={{ lineHeight: 17.5 }}>
-                  3 athletes want to connect
-                </Text>
-                <Text className="text-small font-regular text-muted mt-0.5">Kai, Zara, Ethan</Text>
-              </View>
-              <View className="min-w-[22px] h-[22px] rounded-pill bg-blue items-center justify-center px-[7px]">
-                <Text className="text-small font-bold text-paper">3</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Network list */}
-        <View className="mb-5">
-          <View className="flex-row items-center justify-between pb-2 px-1">
-            <Text
-              className="text-small font-bold uppercase text-muted"
-              style={{ letterSpacing: 1.7 }}
-            >
-              YOUR NETWORK
-            </Text>
-            <Text className="text-small font-regular text-muted">247 total</Text>
-          </View>
-          <View className="bg-paper rounded-xl border border-line" style={shadowSm}>
-            {NETWORK.map((athlete, index) => (
-              <View key={athlete.name}>
-                <View className="flex-row items-center px-3 py-3 gap-3">
-                  <View
-                    className="w-11 h-11 rounded-pill items-center justify-center"
-                    style={{ backgroundColor: `hsl(${athlete.hue}, 60%, 50%)` }}
-                  >
-                    <Text className="text-body font-bold text-paper">{athlete.initials}</Text>
-                  </View>
-                  <View className="flex-1">
-                    <View className="flex-row items-center gap-1">
-                      <Text
-                        className="text-body font-semibold text-text shrink"
-                        numberOfLines={1}
-                        style={{ lineHeight: 17.5 }}
-                      >
-                        {athlete.name}
-                      </Text>
-                      {athlete.verified ? (
-                        <View className="w-3.5 h-3.5 rounded-pill bg-blue items-center justify-center">
-                          <Feather name="check" size={9} color={colors.paper} accessibilityLabel="Verified" />
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text className="text-small font-regular text-muted mt-0.5">{athlete.sport}</Text>
-                    <Text className="text-small font-regular text-subtle">{athlete.org}</Text>
-                  </View>
-                  <View className="px-3 py-1.5 rounded-pill border border-blue-line bg-paper">
-                    <Text className="text-small font-semibold text-blue">Message</Text>
-                  </View>
-                </View>
-                {index < NETWORK.length - 1 ? <View className="h-px bg-line mx-3" /> : null}
-              </View>
-            ))}
-          </View>
-        </View>
+      <ScreenHeader title="Connections" subtitle={subtitle} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="px-4 pb-6 pt-4">
+        {children}
       </ScrollView>
     </View>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }): ReactElement {
+  return (
+    <ConnectionsShell subtitle={copy.sub.error}>
+      <StatePanel
+        tone="danger"
+        icon="alert-circle"
+        title={copy.error.title}
+        body={copy.error.body}
+        primary={{ label: copy.error.primary, onPress: onRetry }}
+      />
+    </ConnectionsShell>
+  );
+}
+
+export default function ConnectionsScreen(): ReactElement {
+  const myAthlete = useMyAthlete();
+  if (isBusy(myAthlete)) {
+    return (
+      <ConnectionsShell subtitle={copy.sub.empty}>
+        <TabSkeleton variant="list" />
+      </ConnectionsShell>
+    );
+  }
+  if (isFailed(myAthlete) || !myAthlete.data) {
+    return <ErrorState onRetry={() => { void myAthlete.refetch(); }} />;
+  }
+  return <ConnectionsBody athleteId={myAthlete.data.athleteId} />;
+}
+
+function ConnectionsBody({ athleteId }: { athleteId: string }): ReactElement {
+  const connections = useConnections(athleteId);
+  const count = connections.data?.length ?? 0;
+  const state = selectViewState({
+    isLoading: isBusy(connections),
+    isError: isFailed(connections),
+    isEmpty: count === 0,
+  });
+  const findAthletes = (): void => router.push('/search');
+
+  if (state === 'loading') {
+    return (
+      <ConnectionsShell subtitle={copy.sub.empty}>
+        <TabSkeleton variant="list" />
+      </ConnectionsShell>
+    );
+  }
+  if (state === 'error') {
+    return <ErrorState onRetry={() => { void connections.refetch(); }} />;
+  }
+  if (state === 'empty') {
+    return (
+      <ConnectionsShell subtitle={copy.sub.empty}>
+        <View>
+          <StatePanel
+            icon="users"
+            title={copy.empty.title}
+            body={copy.empty.body}
+            primary={{ label: copy.empty.primary, onPress: findAthletes }}
+          />
+          <View className="pt-5">
+            <SectionTitle>Pending requests</SectionTitle>
+            <Card>
+              <EmptyRow icon="users">{copy.emptyRows.pending ?? 'No pending requests'}</EmptyRow>
+            </Card>
+          </View>
+        </View>
+      </ConnectionsShell>
+    );
+  }
+
+  return (
+    <ConnectionsShell subtitle={connectionsSubtitle(count)}>
+      <View>
+        <SectionTitle meta={`${count} total`}>Your network</SectionTitle>
+        <Card className="flex-row items-center gap-3 p-3.5">
+          <View className="h-11 w-11 items-center justify-center rounded-md bg-blue-tint">
+            <Feather name="users" size={20} color={colors.blue} />
+          </View>
+          <View className="min-w-0 flex-1">
+            <Text className="text-row-title text-text">{connectionsSubtitle(count)} in your network</Text>
+            <Text className="mt-0.5 text-meta text-muted">Find more athletes you know.</Text>
+          </View>
+        </Card>
+        <View className="pt-4">
+          <PillButton label={copy.empty.primary} icon="search" onPress={findAthletes} fullWidth />
+        </View>
+      </View>
+    </ConnectionsShell>
   );
 }

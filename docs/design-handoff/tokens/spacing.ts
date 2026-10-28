@@ -19,9 +19,10 @@ export const space = {
 export const radius = {
   xs:   4,
   sm:   6,   //  small tags
-  md:   9,   //  avatar tile / locked doc icon
-  lg:  12,   //  search field
+  md:   9,   //  avatar and compact icon tiles
+  lg:  12,   //  rounded input surfaces
   xl:  16,   //  cards
+  segmented: 10,
   '2xl': 18, //  auth gate AP icon
   pill: 999,
 } as const;
