@@ -36,3 +36,4 @@ Return the branch, commit hash/message, push result, and any checks run or block
 - Do not stash, reset, clean, rebase, force-push, or discard changes.
 - Do not commit credentials, environment files, or unrelated work.
 - Never stage all changes with `git add -A` or `git add .`; stage proposal paths only.
+- Do not commit and push changes. Leave a commit message at the end and wait for me to commit and push
