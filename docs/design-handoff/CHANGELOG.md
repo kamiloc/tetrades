@@ -1,5 +1,11 @@
 # Changelog
 
+# 2026-10-28 (web portal audit)
+
+- Added the admin and trainer web portal prototype inventory to the handoff README.
+- Audited the prototype against ADR-013–016, the PII access matrix, and current API procedures in `WEB-AUDIT.md`.
+- Recorded unsupported admin, trainer, document-review, evidence, invitation, search, export, and activity-feed capabilities as implementation gaps; clarified the trainer access and certification boundaries.
+
 ## 2026-10-18 (production alignment)
 
 - Recorded the production implementation status and intentional production exceptions (trainer surfaces, email-only sign-in, deferred benchmarks and trainer list, UI-only Connections, club-only attribution, NativeWind, live loaded subtitles).

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Athlete Passport — Admin & Trainer Portals</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Surfaces */
+    --ink:        #0B1220;
+    --ink-2:      #131B2E;
+    --ink-3:      #1A2238;     /* sidebar elevated row hover */
+    --ink-line:   rgba(255,255,255,0.08);
+    --ink-line-2: rgba(255,255,255,0.14);
+    --on-ink:     #FFFFFF;
+    --on-ink-2:   rgba(255,255,255,0.62);
+    --on-ink-3:   rgba(255,255,255,0.42);
+
+    --paper:      #FFFFFF;
+    --paper-2:    #FAFBFD;     /* alt row, subtle inset */
+    --canvas:     #F4F6FA;     /* page background */
+    --line:       #E5E8EE;
+    --line-2:     #EEF1F5;     /* softer hairlines for inner rows */
+
+    --text:       #0F172A;
+    --muted:      #6B7280;
+    --subtle:     #9AA3B2;
+
+    /* Brand */
+    --blue:       #1A6BFF;
+    --blue-2:     #155EE0;
+    --blue-tint:  #E8F0FF;
+    --blue-line:  #D8E4FB;
+    --blue-glow:  rgba(26,107,255,0.18);
+
+    /* Status */
+    --verified:        #16A34A;
+    --verified-tint:   #E7F6EC;
+    --pending:         #B5651D;
+    --pending-tint:    #FFF3E0;
+    --rejected:        #DC2626;
+    --rejected-tint:   #FDECEC;
+
+    /* Elevation */
+    --shadow-xs: 0 1px 0 rgba(15,23,42,0.04);
+    --shadow-sm: 0 1px 2px rgba(15,23,42,0.04), 0 1px 1px rgba(15,23,42,0.03);
+    --shadow-md: 0 6px 18px -8px rgba(15,23,42,0.10), 0 2px 4px rgba(15,23,42,0.04);
+    --shadow-cta: 0 6px 16px -4px rgba(26,107,255,0.32);
+
+    --radius-xs: 4px;
+    --radius-sm: 6px;
+    --radius-md: 9px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-pill: 999px;
+
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #DCE0E8;
+    font-family: "Inter", -apple-system, "Helvetica Neue", system-ui, sans-serif;
+    color: var(--text);
+    font-feature-settings: "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* artboard frame */
+  .ap-frame {
+    width: 1440px;
+    height: 900px;
+    background: var(--canvas);
+    color: var(--text);
+    display: flex;
+    overflow: hidden;
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    position: relative;
+  }
+
+  /* universal resets inside frames */
+  .ap-frame *, .ap-collapsed * { box-sizing: border-box; }
+  .ap-frame button { font-family: inherit; cursor: pointer; }
+  .ap-frame svg { display: block; }
+  a{color:var(--blue);text-decoration:none}a:hover{color:var(--blue-2);text-decoration:underline}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="icons.jsx"></script>
+  <script type="text/babel" src="atoms.jsx"></script>
+  <script type="text/babel" src="portal-shell.jsx"></script>
+  <script type="text/babel" src="admin-portal.jsx"></script>
+  <script type="text/babel" src="trainer-portal.jsx"></script>
+  <script type="text/babel" src="portals-app.jsx"></script>
+</body>
+</html>

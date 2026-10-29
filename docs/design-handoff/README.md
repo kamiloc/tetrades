@@ -3,6 +3,12 @@
 > **Design handoff.** Athlete tab shell and the club, metric, visibility, and
 > achievement-certification workflows required by ADR-013–016.
 
+## Web portals
+
+The web prototype in [`web/`](web/) adds two desktop portal concepts: a platform admin portal for club and trainer management, and a trainer portal for club rosters, metrics, invitations, and achievement certification. It is a visual prototype with mock records; the controls do not describe existing authorization or API capabilities.
+
+Read [WEB-AUDIT.md](WEB-AUDIT.md) before implementing either portal. The trainer workflows must follow ADR-013 and ADR-016. The admin workflow, club/trainer provisioning, credential review, and global activity access need product and security decisions before implementation. Neither portal may grant trainers access to L2 data or imply global admin access to `audit_log`.
+
 ---
 
 ## About the design files
