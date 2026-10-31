@@ -2,11 +2,13 @@
 
 ## 1. Prerequisites and confirmations
 
-- [ ] 1.1 Confirm `add-admin-club-trainer-management` is applied: `admin.*` (including `whoAmI`) and `trainerInvitation.*` exist in `router/index.ts`, and their hooks are exported from `@packages/api-client`. Verify: `turbo typecheck` passes on this branch after rebasing onto the applied admin branch. If they're missing, STOP and report; this change can't start before them.
+- [ ] 1.1 Confirm `add-admin-club-trainer-management` is applied: `admin.*` (including `whoAmI`) and `trainerInvitation.*` exist in `router/index.ts`, and their hooks are exported from `@packages/api-client`. Also confirm the admin change's D4 contract fix: `trainerInvitation.accept`/`decline` return `NOT_FOUND`, not `FORBIDDEN`, when the club is no longer active. Verify: `turbo typecheck` passes on this branch after rebasing onto the applied admin branch, and the admin change's integration test asserts `NOT_FOUND` for "accepting for a club deactivated meanwhile". If either is missing, STOP and report; this change can't start before them.
 - [ ] 1.2 STOP and get the owner's explicit confirmation for each item below (AGENTS.md "Explicit confirmation required"). Verify: the owner's reply is recorded before task 2.1.
   - New dependencies in `apps/web`: `tailwindcss@^3.4`, `postcss`, `autoprefixer`, `vitest`, with the reason for each (design D5, D9).
   - Supabase Auth configuration: add the local and deployed `/auth/callback` redirect URLs, and keep `{{ .Token }}` in the Magic Link template (design D1).
   - Deleting the placeholder files in `apps/web` listed in design D8. No test files are deleted.
+  - Changing `@packages/api-client`: the `server` subpath export and the optional `ApiProvider` `onUnauthorized` prop, which also stops retrying unauthorized queries on mobile (design D3, D11).
+  - Adding `WEB_URL` to the `@app/web#build` env in `turbo.json`, and requiring `WEB_URL` in every web deployment (design D10). No environment file in the repo changes.
 
 ## 2. Tooling and tokens
 
@@ -16,13 +18,15 @@
 
 ## 3. Server-side auth and session
 
+- [ ] 3.0 Create `lib/app-origin.ts` (design D10) and add `WEB_URL` to the `@app/web#build` env in `turbo.json`. Verify: unit tests prove `http://localhost:3000` and `https://portal.example.co` give the expected `APP_ORIGIN`, and a missing value, a value with a path, or `javascript:` throw.
 - [ ] 3.1 Create `lib/supabase-server.ts` (design D1: per-request client from `createSsrServerClient`; forced `httpOnly`, `sameSite: 'lax'`, `path: '/'`, and `secure` except on localhost) and `lib/safe-next.ts` (design D2). Verify with unit tests:
   - cookie options are forced even when Supabase passes `httpOnly: false`
-  - `safeNext` accepts `/admin/clubs?status=ALL` and rejects `https://evil.test`, `//evil.test`, `/\evil.test` and control characters
+  - `safeNext` accepts `/admin/clubs?status=ALL` and rejects `https://evil.test`, `//evil.test`, `/\evil.test` and control characters, resolving against `APP_ORIGIN`
 - [ ] 3.2 Create `middleware.ts` (design D2: refresh through `getUser()`; guard `/admin/:path*` and `/trainer/:path*`; copy pending cookies onto redirects; matcher excludes static assets). Verify with unit tests:
   - a sessionless `/admin/clubs` request redirects to `/login?next=%2Fadmin%2Fclubs`
   - a request whose session was refreshed returns the new `Set-Cookie` headers on both the pass-through and the redirect response
-- [ ] 3.3 Build `/login` (email step, then code step), the server actions `requestSignIn`, `verifyCode` and `signOut`, and the `/auth/callback` route handler (design D1). Choose the landing with `safeNext` and `admin.whoAmI`. Verify: unit tests prove the request step shows the same message for known and unknown emails and that the callback redirects only through `safeNext`. Then check manually against local Supabase:
+  - with `Host: evil.test` and `X-Forwarded-Host: evil.test`, the redirect still targets `APP_ORIGIN`
+- [ ] 3.3 Build `/login` (email step, then code step), the server actions `requestSignIn`, `verifyCode` and `signOut`, and the `/auth/callback` route handler (design D1). Choose the landing with `safeNext` and `admin.whoAmI`. Verify: unit tests prove the request step shows the same message for known and unknown emails, `emailRedirectTo` is built from `APP_ORIGIN` even with a spoofed `Host`, and the callback redirects only through `safeNext` to `APP_ORIGIN`. Then check manually against local Supabase:
   - sign in by link
   - sign in by code
   - a wrong code shows the retry message and creates no session
@@ -30,9 +34,12 @@
 
 ## 4. API path
 
-- [ ] 4.1 Add the subpath export `@packages/api-client/server` with `createServerApiClient({ url, getToken })` (vanilla `createTRPCClient`, `httpLink`, `superjson`; no React imports), and its `package.json` `exports` entry (design D3). Verify:
+- [ ] 4.1 Add the subpath export `@packages/api-client/server` with `createServerApiClient({ url, getToken })` (vanilla `createTRPCClient`, `httpLink`, `superjson`, `fetch` with `cache: 'no-store'`; no React imports), and its `package.json` `exports` entry (design D3). Verify:
   - `turbo typecheck` and `turbo lint` pass
-  - a test imports it in a Node environment without React installed in the test's module graph
+  - a test imports it in a Node environment without React in the test's module graph, and asserts the bearer comes from `getToken` and the fetch is `no-store`
+- [ ] 4.1a Add the optional `onUnauthorized` prop to `ApiProvider` (design D11: `QueryCache`/`MutationCache` `onError`, no retry on `UNAUTHORIZED`). Verify:
+  - a `@packages/api-client` unit test proves it's called once for an `UNAUTHORIZED` query and once for an `UNAUTHORIZED` mutation, and never for `FORBIDDEN` or a network error
+  - `turbo typecheck` passes for `@app/mobile` without changes there
 - [ ] 4.2 Build the proxy `app/api/trpc/[trpc]/route.ts` and `lib/api-origin.ts` (design D3). Verify with unit tests against a stubbed upstream `fetch`:
   - a single GET keeps the path and the `input` query
   - a batched GET keeps `a,b` and `?batch=1&input=…`
@@ -40,10 +47,17 @@
   - `authorization` is absent without a session and present with one
   - `cookie` and client `authorization` are never forwarded
   - a cross-origin POST and a POST without `Origin` both get 403 with no upstream call
+  - a POST with spoofed `Host`/`X-Forwarded-Host` is judged only against `APP_ORIGIN`
+  - the upstream fetch is called with `cache: 'no-store'`, and 200, 4xx and 5xx responses all carry `Cache-Control: private, no-store`
   - cookies refreshed during the request are on the response
   - upstream status and `content-type` are passed through
   - the logger is never called with headers or the body
-- [ ] 4.3 Rewrite `components/providers.tsx` to mount `ApiProvider apiUrl="/api/trpc" getToken={async () => null}` with a query-client `onError` that sends `UNAUTHORIZED` to `/login?next=<current path>`. Add `lib/server-api.ts`. Delete the placeholders listed in design D8. Verify: `turbo typecheck` passes for `@app/web`, and `grep -rn "get-token\|createBrowserClient" apps/web` returns nothing.
+- [ ] 4.3 Rewrite `components/providers.tsx` to mount `ApiProvider apiUrl="/api/trpc" getToken={async () => null} onUnauthorized={…}` (navigating to `/login?next=<current path + search>`, design D11). Add `lib/server-api.ts` (design D3). Delete the placeholders listed in design D8, and replace `app/page.tsx` with the root placeholder (no redirect). Verify:
+  - `turbo typecheck` passes for `@app/web`
+  - `grep -rn "get-token\|createBrowserClient\|/dashboard" apps/web --exclude-dir=node_modules --exclude-dir=.next` returns nothing
+  - no file with `'use client'` imports `lib/server-api`
+  - manual: `/` returns 200 and its "Sign in to the portal" link opens `/login`
+  - manual: with a session whose refresh token was revoked in Supabase, an admin page query sends the browser to `/login?next=` that page
 
 ## 5. Shell and components
 
@@ -62,10 +76,13 @@
   - a duplicate slug shows the message and creates nothing
   - an empty filter shows the empty state
   - with more than 20 clubs seeded, Load more appends the next page
+  - a unit test with a test `QueryClient` proves `createClub` invalidates `admin.listClubs` (design D7 table)
 - [ ] 6.2 Build `/admin/clubs/[clubId]`: details, edit form with read-only slug, Deactivate and Reactivate with `ConfirmDialog` copy from the spec, cancelled counts after deactivation, and the "Club not found" state. Verify manually:
   - deactivating a seeded club with a pending certification request, an athlete invitation and a trainer invitation shows counts 1/1/1 and the Deactivated chip
   - closing the dialog changes nothing
   - reactivating shows the "stay cancelled" copy
+  - after deactivating, going back to the club list shows the club as Deactivated without a reload, and editing the name updates the list row
+  - unit tests prove `updateClub`, `deactivateClub` and `reactivateClub` invalidate the keys in the design D7 table
 - [ ] 6.3 Build `/admin/clubs/[clubId]/trainers`:
   - trainers table ("Invited as …" / "Provisioned before invitations")
   - invitations table with state chips including Expired
@@ -74,8 +91,13 @@
   - invite disabled with an explanation when the club is deactivated
 
   Verify:
-  - a unit test for `InviteInstructions` covers the exact address and the formatted expiry
-  - manual checks: invite, then a Pending row and the instructions; a duplicate shows the conflict message; revoking a trainer shows Revoked; a seeded expired invitation shows Expired
+  - a unit test for `InviteInstructions` covers the exact address, `APP_ORIGIN` (passed as a prop) and the formatted expiry
+  - unit tests prove `inviteTrainer`, `revokeTrainerInvitation` and `revokeTrainer` invalidate the keys in the design D7 table
+  - manual checks:
+    - invite, then a Pending row appears and the instructions show, without a reload
+    - a duplicate shows the conflict message
+    - revoking a trainer shows Revoked, and the club list's trainer count drops without a reload
+    - a seeded expired invitation shows Expired
 
 ## 7. Trainer invitations page
 
@@ -85,7 +107,7 @@
   - the list with Accept and Decline (decline confirmed)
   - the accepted confirmation
   - "no longer available" with a refetch on `NOT_FOUND`/`BAD_REQUEST`
-  - the separate-account message on `FORBIDDEN`
+  - the separate-account message on `FORBIDDEN` only
   - an empty state suggesting the invited address
 
   Verify manually, end to end on local Supabase:
@@ -93,10 +115,12 @@
   - an athlete account signing in with an invited email gets the separate-account message and the invitation stays Pending
   - declining removes the invitation
   - revoking an invitation and then accepting it on the trainer page shows "no longer available"
+  - with the invitation page open, an admin deactivates the club; accepting then shows "no longer available" (not the separate-account message) and the list refreshes
+  - an admin account signing in with an invited email gets the separate-account message
 
 ## 8. Docs and handoff
 
-- [ ] 8.1 Write `apps/web/README.md` (auth flow, proxy, environment variables, how to run tests). Update `docs/project-architecture.md` with the web sign-in and proxy flow. Verify: every environment variable the README lists exists in `env.example` (no new ones), and the architecture doc names the proxy route.
+- [ ] 8.1 Write `apps/web/README.md` (auth flow, proxy, environment variables, how to run tests). Update `docs/project-architecture.md` with the web sign-in and proxy flow. The README marks `WEB_URL` as required and explains that it's the only trusted origin. Verify: every environment variable the README lists exists in `env.example` (no new ones), and the architecture doc names the proxy route and both API paths (browser proxy, server-only client).
 - [ ] 8.2 Add the web deviations to "Intentional handoff exceptions" in `docs/design-handoff/README.md`, with a CHANGELOG entry:
   - A1 replaced by the club list
   - no applications, documents, activity feed, permissions or search
@@ -109,4 +133,4 @@
 
 ## 9. Integration
 
-- [ ] 9.1 Run `turbo typecheck && turbo test && turbo lint`. Verify: all pass. List the changed files and the satisfied spec requirements in the handoff note, and record which manual checks from groups 3, 5, 6 and 7 were run and their results.
+- [ ] 9.1 Run `turbo typecheck && turbo test && turbo lint`. Verify: all pass. List the changed files and the satisfied spec requirements in the handoff note, and record which manual checks from groups 3, 4, 5, 6 and 7 were run and their results. The root page and deactivated-club checks must be among them.

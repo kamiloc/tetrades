@@ -29,8 +29,12 @@ The page SHALL let the user accept or decline each invitation. Declining SHALL a
 - **THEN** the invitation leaves the list and no trainer access is granted
 
 #### Scenario: Invitation no longer valid
-- **WHEN** the user answers an invitation that has expired, was revoked, or whose club was deactivated in the meantime
+- **WHEN** the user answers an invitation that has expired or was revoked in the meantime
 - **THEN** the page says the invitation is no longer available and refreshes the list
+
+#### Scenario: Club deactivated meanwhile
+- **WHEN** the user accepts an invitation whose club was deactivated after the page loaded
+- **THEN** the page says the invitation is no longer available, does not show the separate-account message, and refreshes the list
 
 ### Requirement: The page explains accounts that cannot accept
 The page SHALL explain, when accepting is refused because the account is an athlete or admin account, that a trainer needs a separate account with a different email, and SHALL explain, when the account's email is not confirmed, that the email must be confirmed before invitations can be seen.
@@ -38,6 +42,10 @@ The page SHALL explain, when accepting is refused because the account is an athl
 #### Scenario: Athlete account
 - **WHEN** a user whose account is an athlete account tries to accept
 - **THEN** the page explains that trainer access needs a separate account with a different email, and the invitation stays pending
+
+#### Scenario: Admin account
+- **WHEN** a user whose account is an admin account tries to accept
+- **THEN** the page shows the same separate-account explanation and the invitation stays pending
 
 #### Scenario: Unconfirmed email
 - **WHEN** the signed-in account's email is not confirmed

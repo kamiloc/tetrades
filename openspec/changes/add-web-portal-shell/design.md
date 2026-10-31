@@ -28,7 +28,8 @@ See proposal.md for the motivation. The current state that shapes the approach:
 
 **Goals:**
 - No token is ever readable by browser JavaScript, and all session handling follows the `@supabase/ssr` App Router pattern.
-- One authenticated path to the API for client and server code, which `add-trainer-portal` and Change 9 reuse unchanged.
+- Two server-held paths to the API that share one rule: the token comes from the server session and never reaches the browser. Browser calls go through the proxy (D3). Server Components call the API directly with a server-only client (D3), for the few server-side decisions. `add-trainer-portal` and Change 9 reuse both unchanged.
+- One trusted origin (`WEB_URL`) for every redirect, link and CSRF decision (D10).
 - A shell and component set faithful to the prototype within `WEB-AUDIT.md`.
 
 **Non-Goals:**
@@ -42,12 +43,12 @@ See proposal.md for the motivation. The current state that shapes the approach:
 - **`lib/supabase-server.ts`** builds a client per request with `createSsrServerClient`, adapting Next's `cookies()` to `getAll`/`setAll`.
   - Every cookie it sets is forced to `httpOnly: true`, `sameSite: 'lax'`, `path: '/'`, and `secure: true` unless the request is to `localhost`.
   - Supabase's own cookie names and max-age are kept.
-- **`/login`** is a Server Component with a form. Its server action `requestSignIn(email, next)` calls `signInWithOtp({ email, options: { emailRedirectTo: <origin>/auth/callback?next=…, shouldCreateUser: true } })`.
+- **`/login`** is a Server Component with a form. Its server action `requestSignIn(email, next)` calls `signInWithOtp({ email, options: { emailRedirectTo: <APP_ORIGIN>/auth/callback?next=…, shouldCreateUser: true } })`. `APP_ORIGIN` is the configured origin from D10, never the request's `Host`.
   - One email carries both the link and the code (the template keeps `{{ .Token }}`).
   - The page then shows the code-entry step.
   - The same message appears whether or not the email exists, so the form can't be used to probe accounts.
 - **`verifyCode(email, code, next)`** (server action) calls `verifyOtp({ email, token, type: 'email' })`.
-- **`/auth/callback`** (route handler) calls `exchangeCodeForSession(code)` (PKCE) and redirects to `next`.
+- **`/auth/callback`** (route handler) calls `exchangeCodeForSession(code)` (PKCE) and redirects to `new URL(safeNext(next), APP_ORIGIN)`.
 - **Sign-out** is a server action calling `signOut()`, which clears the cookies.
 - **Why `shouldCreateUser: true`:** an invited trainer may have no account yet. The invitation is the gate, not account creation. An athlete who signs in on the web just lands on a page that offers them nothing.
 - **Where users land when there's no `next`:** admins go to `/admin/clubs`, everyone else to `/trainer/invitations`. The landing is chosen by calling `admin.whoAmI` server-side (D3) after sign-in. `add-trainer-portal` will change the non-admin default.
@@ -61,24 +62,27 @@ See proposal.md for the motivation. The current state that shapes the approach:
 
 - The matcher excludes `_next/static`, `_next/image`, favicon and image files.
 - It runs for `/api/trpc` too, so a refreshed session reaches the proxy, and the proxy writes the same cookies on its own response (D3).
-- **`safeNext(value)`** (`lib/safe-next.ts`) accepts only strings starting with a single `/` that aren't `//`. It rejects backslashes, control characters, and any value that `new URL(value, origin)` resolves to another origin. Anything else becomes the default landing (D1). The login form, the callback and middleware all use it.
+- **`safeNext(value)`** (`lib/safe-next.ts`) accepts only strings starting with a single `/` that aren't `//`. It rejects backslashes, control characters, and any value that `new URL(value, APP_ORIGIN)` resolves to another origin. Anything else becomes the default landing (D1). The login form, the callback and middleware all use it.
+- Middleware builds its redirect URLs from `APP_ORIGIN` (D10), not from `request.url`'s host.
 
-### D3. The tRPC proxy: one path for browser and server
+### D3. The two API paths: the browser proxy and the server-only client
 **`app/api/trpc/[trpc]/route.ts`** exports `GET` and `POST`. For each request it:
-1. On `POST`, rejects with 403 unless the `Origin` header equals the app's own origin. (A missing `Origin` on `POST` is also rejected. Browsers send it on cross-site and same-site fetches.)
+1. On `POST`, rejects with 403 unless the `Origin` header equals `APP_ORIGIN` (D10). The comparison is exact on scheme, host and port. A missing `Origin` on `POST` is also rejected; browsers send it on cross-site and same-site fetches. `Host` and `X-Forwarded-*` are never consulted.
 2. Reads the session with the server client (`getSession()` after middleware has refreshed it) to get the access token.
 3. Builds the upstream URL as `${API_ORIGIN}/trpc/${params.trpc}${request.nextUrl.search}`, so the path segment (comma-separated procedures in a batch) and the query string (`batch=1`, `input=…`) are kept exactly.
 4. Forwards only `content-type`, `accept`, and `trpc-accept` if present, plus `authorization: Bearer <token>` when there's a session, and `x-request-id` for correlation. It never forwards `cookie`, `host`, or client `authorization`.
-5. Streams the POST body through unchanged (`duplex: 'half'`), forwards the upstream status and body, and copies `content-type`. Any cookies the server client set during this request (a refresh) are applied to the outgoing response.
-6. Never logs headers, the token or the body; it logs method, procedure path, status and request id.
+5. Calls upstream with `fetch(url, { cache: 'no-store', … })`, so neither Next's data cache nor any fetch cache stores a personalized response. The route also sets `export const dynamic = 'force-dynamic'`.
+6. Streams the POST body through unchanged (`duplex: 'half'`), forwards the upstream status and body, and copies `content-type`. It **always sets `Cache-Control: private, no-store`** (overriding anything upstream sent) and `Vary: Cookie`. Any cookies the server client set during this request (a refresh) are applied to the outgoing response.
+7. Never logs headers, the token or the body; it logs method, procedure path, status and request id.
 
 - **`API_ORIGIN`** comes from the existing `NEXT_PUBLIC_API_URL`, with the `/trpc` suffix handled once in `lib/api-origin.ts`. That avoids adding a new environment variable.
-- **The browser** mounts `ApiProvider apiUrl="/api/trpc" getToken={async () => null}`, so `@packages/api-client` is unchanged.
-- **Server Components** call the API through a new React-free subpath export, `@packages/api-client/server`. It exports `createServerApiClient({ url, getToken })`, a vanilla `createTRPCClient<AppRouter>` with `httpLink` and `superjson`. That's client config, which the package contract allows; it uses only `@trpc/client` and `superjson`, which the package already depends on. `apps/web/lib/server-api.ts` creates one per request with the server session's token and calls the API origin directly (no hop through the proxy).
+- **The browser** mounts `ApiProvider apiUrl="/api/trpc" getToken={async () => null} onUnauthorized={…}` (D11).
+- **Server Components** call the API through a new React-free subpath export, `@packages/api-client/server`. It exports `createServerApiClient({ url, getToken })`, a vanilla `createTRPCClient<AppRouter>` with `httpLink` and `superjson`, whose `fetch` passes `cache: 'no-store'`. That's client config, which the package contract allows; it uses only `@trpc/client` and `superjson`, which the package already depends on. `apps/web/lib/server-api.ts` creates one per request with the server session's token and calls the API origin directly (no hop through the proxy). It's imported only from Server Components, server actions and route handlers. A task checks that no `'use client'` module imports it, so no new dependency such as `server-only` is needed.
   - It's used only where a server-side decision is needed: the admin layout guard (`admin.whoAmI`) and the post-sign-in landing.
   - The invitations page reads the session email from the Supabase server client, not the API.
   - *Why a subpath:* the package index re-exports `ApiProvider` and the React hooks, and a Server Component must not pull those in.
   - *Alternative rejected:* importing `superjson` or `@trpc/client` in `apps/web`. That breaks the `@app/web` import contract.
+- **Both paths are tested** (D9): the proxy, and a `server-api` test proving the bearer comes from the session, the fetch is `no-store`, and no token appears in the rendered HTML of the admin layout.
 - *Alternatives rejected:*
   - Forwarding only the body. That breaks GET queries and batches (review finding).
   - `createCallerFactory` (forbidden import).
@@ -117,7 +121,7 @@ Ported from the prototype into `apps/web/components/`, typed, styled with Tailwi
 - **`clubs/[clubId]/page.tsx`:** `admin.getClub` plus an edit form (`admin.updateClub`, slug shown read-only), and Deactivate/Reactivate with `ConfirmDialog`. The deactivate result shows the counts from `deactivateClubOutput`. `NOT_FOUND` shows "Club not found" with a link back.
 - **`clubs/[clubId]/trainers/page.tsx`:**
   - Two tables: `admin.listClubTrainers` ("Invited as <email>" or "Provisioned before invitations") and `admin.listClubTrainerInvitations` (the state chip from the derived `state`).
-  - An invite dialog (`admin.inviteTrainer`). On success it shows `InviteInstructions`: "No email is sent. Ask <email> to sign in at <origin>/trainer/invitations using this exact address before <expiresAt>," with a Copy link button (`navigator.clipboard`, with a selectable fallback).
+  - An invite dialog (`admin.inviteTrainer`). On success it shows `InviteInstructions`: "No email is sent. Ask <email> to sign in at <APP_ORIGIN>/trainer/invitations using this exact address before <expiresAt>," with a Copy link button (`navigator.clipboard`, with a selectable fallback). The trainers page's server component passes `APP_ORIGIN` to it as a prop, so the client bundle never reads `WEB_URL`.
   - Revoke invitation and revoke trainer use `ConfirmDialog`.
   - When the club is deactivated, the invite button is disabled with an explanation.
 
@@ -126,14 +130,30 @@ Ported from the prototype into `apps/web/components/`, typed, styled with Tailwi
 - **`invitations/page.tsx`:**
   - A Server Component reads the session user (email and `email_confirmed_at`) from the server client to show "Showing invitations for <email>", or the unconfirmed-email message.
   - A Client Component lists `trainerInvitation.listMine` with Accept and Decline (decline uses `ConfirmDialog`).
-  - **Error mapping:** `FORBIDDEN` → the separate-account message; `NOT_FOUND` or `BAD_REQUEST` → "This invitation is no longer available", then refetch.
+  - **Error mapping:**
+    - `FORBIDDEN` → the separate-account message. After the admin change's D4 fix, it means only "this account is an athlete or admin account".
+    - `NOT_FOUND` or `BAD_REQUEST` → "This invitation is no longer available", then refetch. That covers expired, revoked, and a club deactivated in the meantime (deactivation revokes the invitation, and `accept` then returns `NOT_FOUND`).
+
+**Refreshing after mutations:** every admin mutation hook from `@packages/api-client` invalidates its queries (the admin change's task 6.5). The pages rely on that, plus these page-level invalidations where a mutation affects another screen's data:
+| Mutation | Invalidated |
+| --- | --- |
+| `createClub` | `admin.listClubs` (all filters) |
+| `updateClub` | `admin.getClub(id)`, `admin.listClubs` |
+| `deactivateClub`, `reactivateClub` | `admin.getClub(id)`, `admin.listClubs`, `admin.listClubTrainerInvitations(id)` |
+| `inviteTrainer`, `revokeTrainerInvitation` | `admin.listClubTrainerInvitations(id)` |
+| `revokeTrainer` | `admin.listClubTrainers(id)`, `admin.listClubs` (trainer count), `admin.getClub(id)` |
+| `trainerInvitation.accept`, `decline` | `trainerInvitation.listMine` |
+
+If the admin change's hooks already cover a row, the page doesn't repeat it. A unit test per page checks the right keys are invalidated, using a test `QueryClient`.
 
 **Shared:**
-- A client-side `onError` in the providers sends `UNAUTHORIZED` responses to `/login?next=<current path>`.
+- Expired sessions are handled by `onUnauthorized` (D11).
 - Errors show user-facing copy only, never the raw message.
 
 ### D8. Removing the placeholders
-Delete `app/(protected)/` (layout and four pages), `app/(auth)/` (replaced by `app/login` and `app/auth/callback`), `lib/get-token.ts` and `lib/supabase.ts` (the browser client). `app/page.tsx` stays as the placeholder landing for Change 9. No test files exist there.
+Delete `app/(protected)/` (layout and four pages), `app/(auth)/` (replaced by `app/login` and `app/auth/callback`), `lib/get-token.ts` and `lib/supabase.ts` (the browser client). No test files exist there.
+
+**`app/page.tsx` currently redirects to `/dashboard`, which this change deletes.** It becomes a Server Component placeholder for Change 9: the AP mark, "The Athlete Passport", and a "Sign in to the portal" link to `/login`. There's no redirect, so it can never point at a removed route.
 
 ### D9. Tests
 - Add Vitest to `apps/web` (dependency approval) with `vitest.config.ts`, and change `"test"` to `vitest run`.
@@ -147,13 +167,36 @@ Delete `app/(protected)/` (layout and four pages), `app/(auth)/` (replaced by `a
     - no `authorization` without a session; `authorization` present with one
     - `cookie` never forwarded
     - a cross-origin POST and a missing-`Origin` POST → 403
+    - a POST whose `Host`/`X-Forwarded-Host` is spoofed but whose `Origin` matches `APP_ORIGIN` passes, and one whose `Origin` matches the spoofed host fails
     - refreshed cookies copied onto the response
-  - the middleware redirect carries the refreshed cookies
-  - `InviteInstructions` renders the exact address and the expiry
+    - the upstream fetch uses `cache: 'no-store'`, and every response (200, 4xx, 5xx) has `Cache-Control: private, no-store`
+  - the middleware redirect carries the refreshed cookies and targets `APP_ORIGIN`, even with a spoofed `Host`
+  - `lib/app-origin.ts` rejects a missing value, a path, or a non-http(s) scheme
+  - `server-api`: bearer from the session, `no-store`, and no token in the admin layout's rendered HTML
+  - `ApiProvider` `onUnauthorized`: called once for an `UNAUTHORIZED` query and once for an `UNAUTHORIZED` mutation, and not for `FORBIDDEN` or network errors
+  - per-page invalidation (D7)
+  - `InviteInstructions` renders the exact address, `APP_ORIGIN` and the expiry
 - **Manual end-to-end checks** (E2E automation is deferred to Sprint 7+ by AGENTS.md) are listed in tasks with their exact steps.
+
+### D10. One configured origin: `WEB_URL`
+- **`lib/app-origin.ts`** reads `process.env.WEB_URL` on the server, parses it with `new URL`, requires `http:` or `https:` with no path beyond `/`, and exports `APP_ORIGIN` (`url.origin`). It throws at first use with a clear message if the value is missing or invalid, so a misconfigured deployment fails loudly instead of trusting request headers.
+- **Used for:** `emailRedirectTo` (D1), the callback redirect, middleware redirects and `safeNext` (D2), the proxy's CSRF `Origin` check (D3), and the invite link (D7).
+- **Never derived** from `Host`, `X-Forwarded-Host` or `request.url`.
+- **Why `WEB_URL`:** it already exists in `env.example`, described as "Public web URL (for CORS, Magic Link redirects, OG images)", and nothing uses it yet. No environment file changes. The deployment must set it, and `apps/web/README.md` documents that.
+- **`turbo.json`:** add `WEB_URL` to the `@app/web#build` task's `env`. Server code reads it at runtime, but adding it keeps Turbo's cache key correct if any build output ever depends on it (for example, statically rendered pages that embed the link).
+- *Alternative rejected:* `NEXT_PUBLIC_WEB_URL`. It would inline the origin into client bundles at build time, and a new variable is unnecessary.
+
+### D11. `ApiProvider` gains an optional `onUnauthorized`
+- `@packages/api-client` `ApiProviderProps` gains `onUnauthorized?: () => void`.
+- The provider builds its `QueryClient` with `queryCache: new QueryCache({ onError })` and `mutationCache: new MutationCache({ onError })`. `onError` calls `onUnauthorized` when the error is a `TRPCClientError` whose `data?.code === 'UNAUTHORIZED'`.
+- Queries don't retry on `UNAUTHORIZED`: the existing `retry: 1` becomes a function that returns `false` for that code.
+- **Backward-compatible:** mobile doesn't pass the prop, and its behavior is unchanged apart from not retrying unauthorized queries once.
+- **The web app** passes a handler that navigates to `/login?next=<current path + search>` with `window.location.assign`. A full navigation lets middleware run again and clears client caches.
+- *Alternative rejected:* a custom `QueryClient` prop. It would move `QueryClient` configuration into each app, so the two apps' defaults would drift.
 
 ## Risks / Trade-offs
 
+- **[`WEB_URL` misconfigured in a deployment]** → `lib/app-origin.ts` fails at first use with a clear error, rather than silently trusting request headers. The README lists it as required.
 - **[The proxy is new, security-critical code]** → It's small, forwards an explicit header allow-list, never logs secrets, and has unit tests for each finding. The API still verifies every JWT.
 - **[Server actions and the callback must share one cookie policy]** → One `lib/supabase-server.ts` factory forces the options, and it's unit-tested.
 - **[`shouldCreateUser: true` lets anyone create an account by signing in on the web]** → That's already true on mobile. A web account without an invitation or admin role sees nothing and gets no access.
@@ -163,10 +206,11 @@ Delete `app/(protected)/` (layout and four pages), `app/(auth)/` (replaced by `a
 
 ## Migration Plan
 
-1. Apply `add-admin-club-trainer-management` first (API routers and hooks).
-2. Get approval for and install Tailwind, PostCSS, Autoprefixer and Vitest in `apps/web`.
-3. The owner adds `http://localhost:3000/auth/callback` and the deployed origin's `/auth/callback` to Supabase Auth redirect URLs, and confirms the Magic Link template includes `{{ .Token }}`.
-4. Deploy web after the API.
+1. Apply `add-admin-club-trainer-management` first (API routers and hooks), including its D4 contract fix: `accept`/`decline` return `NOT_FOUND` for a club that's no longer active.
+2. Set `WEB_URL` in each web deployment's environment (local uses the `env.example` default). No environment file in the repo changes.
+3. Get approval for and install Tailwind, PostCSS, Autoprefixer and Vitest in `apps/web`.
+4. The owner adds `http://localhost:3000/auth/callback` and the deployed origin's `/auth/callback` to Supabase Auth redirect URLs, and confirms the Magic Link template includes `{{ .Token }}`.
+5. Deploy web after the API.
 
 **Rollback:** redeploy the previous web build. The API is unaffected.
 

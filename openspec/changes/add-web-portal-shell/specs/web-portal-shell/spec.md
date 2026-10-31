@@ -69,8 +69,26 @@ The web app SHALL send every API call from the browser to its own origin, which 
 - **THEN** it is forwarded without credentials and the API answers as for an unauthenticated caller
 
 #### Scenario: Cross-site mutation
-- **WHEN** a mutation reaches the forwarder from another site's origin
+- **WHEN** a mutation reaches the forwarder from an origin other than the site's configured origin
 - **THEN** it is rejected and nothing is forwarded
+
+#### Scenario: Spoofed host headers
+- **WHEN** a request arrives with a `Host` or forwarded-host header naming another site
+- **THEN** sign-in redirects, invitation links, and the cross-site check still use the site's configured origin
+
+### Requirement: Authenticated responses are never cached
+The web app SHALL fetch API responses without caching and SHALL mark every response it forwards so that no browser or shared cache may store or reuse it.
+
+#### Scenario: Personalized query
+- **WHEN** a signed-in user's API query is forwarded
+- **THEN** the response is marked private and not storable, and the forwarder did not serve or store a cached copy
+
+### Requirement: The root page leads to sign-in
+The web app's root page SHALL load successfully and offer a link to sign in, and SHALL NOT redirect to a page that does not exist.
+
+#### Scenario: Open the site root
+- **WHEN** anyone opens `/`
+- **THEN** the page loads and links to the sign-in page
 
 ### Requirement: The admin area is shown only to admins
 The web app SHALL show the `/admin` area only to a user the API recognizes as an admin, and SHALL show a "not authorized" page to any other signed-in user. Data access SHALL be enforced by the API regardless of what the page shows.

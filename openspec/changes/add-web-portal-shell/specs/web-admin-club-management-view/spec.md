@@ -95,6 +95,21 @@ The admin area SHALL ask for confirmation before revoking a pending invitation o
 - **WHEN** an admin confirms revoking a pending invitation
 - **THEN** the invitation shows as Revoked
 
+### Requirement: The console reflects each change without a reload
+The admin area SHALL, after any successful create, edit, deactivate, reactivate, invite, or revoke, update every affected list, detail, count, and status on screen without the admin reloading the page.
+
+#### Scenario: Deactivate from the detail page
+- **WHEN** an admin deactivates a club and then returns to the club list
+- **THEN** the club shows as Deactivated under the current filter without a reload
+
+#### Scenario: Invite and revoke
+- **WHEN** an admin invites a trainer and later revokes that invitation
+- **THEN** the invitations table shows the new Pending row and then the Revoked state without a reload
+
+#### Scenario: Trainer count
+- **WHEN** an admin revokes a club's only active trainer
+- **THEN** the club's active trainer count in the list shows 0 without a reload
+
 ### Requirement: The console shows no athlete data or unsupported controls
 The admin area SHALL NOT display athlete records, metrics, certification requests, audit history, documents, or trainer permission controls, and SHALL NOT offer actions the API does not support.
 
