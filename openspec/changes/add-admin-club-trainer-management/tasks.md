@@ -122,7 +122,7 @@
   - another user's email, or an unconfirmed email → `NOT_FOUND` or an empty list
   - athlete or `ADMIN` account accepting → `FORBIDDEN`, invitation still `PENDING`
   - accepting grants trainer access; return after revocation clears `revokedAt`
-  - accepting for a club deactivated meanwhile is rejected
+  - accepting or declining for a club deactivated meanwhile → `NOT_FOUND` (never `FORBIDDEN`)
   - `invitedEmail` shows the original address
 - [ ] 6.4 Create `router/admin.ts` (`whoAmI` plus the D9 procedures) and `router/trainerInvitation.ts`, and merge both in `router/index.ts`. Verify: each procedure has success, Zod-invalid, 401, and 404 (where it takes an id) integration coverage, and `admin.updateClub` with a `slug` key is `BAD_REQUEST`.
 - [ ] 6.5 Add typed hooks to `@packages/api-client` (`admin.*`, `trainerInvitation.*`, with invalidation on mutations). Verify: `turbo typecheck` passes for `@packages/api-client`, `@app/web` and `@app/mobile`.

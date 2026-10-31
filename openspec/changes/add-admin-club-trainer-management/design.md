@@ -84,12 +84,12 @@ Add `ADMIN` to `UserRole` (Prisma and `userRoleEnum`). `adminProcedure = protect
 A new `trainerInvitation` router (`protectedProcedure`) holds `listMine`, `accept` and `decline`. The caller isn't an admin, and the `club` router is about memberships.
 
 `accept` runs in one transaction:
-1. `lockActiveClub` (D7), then lock the invitation `FOR UPDATE`.
+1. `lockActiveClub` (D7), then lock the invitation `FOR UPDATE`. If the club is no longer active, return `NOT_FOUND` ("invitation no longer available"), not `FORBIDDEN`. Deactivation has already revoked every pending trainer invitation of the club, so the invitation really is gone, and `FORBIDDEN` stays reserved for step 3.
 2. Require `ctx.userEmail !== null`, `email = ctx.userEmail`, `status = PENDING` and `expiresAt > now()`. A mismatch or null email returns `NOT_FOUND`, so invitation ids can't be probed.
 3. Require that the caller's account has no athlete profile and `role !== 'ADMIN'`; otherwise `FORBIDDEN` (D12).
 4. Upsert `ClubTrainer(clubId, userAccountId)`, clearing `revokedAt` on an existing revoked row. That's "return after revocation", and it keeps one row per (club, user). Set the invitation to `ACCEPTED` with `acceptedByUserAccountId`.
 
-`decline` repeats steps 1–2 and sets `DECLINED`. `listMine` returns `PENDING`, unexpired invitations for `ctx.userEmail` with club L0 fields, or an empty list when the email is null.
+`decline` repeats steps 1–2 (with the same `NOT_FOUND` for an inactive club) and sets `DECLINED`. Error codes are therefore unambiguous for clients: `NOT_FOUND` means the invitation isn't available to this caller (wrong or unconfirmed email, expired, revoked, or club deactivated), and `FORBIDDEN` means this account can't be a trainer (athlete or admin account). `listMine` returns `PENDING`, unexpired invitations for `ctx.userEmail` with club L0 fields, or an empty list when the email is null.
 
 ### D5. Revocation and the club lifecycle columns
 - **`ClubTrainer.revokedAt` (L1).** It's set by `admin.revokeTrainer` and cleared only by D4's accept.
