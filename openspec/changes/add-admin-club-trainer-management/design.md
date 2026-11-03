@@ -117,7 +117,7 @@ The global lock order becomes **club → club_trainer → membership → achieve
 - **`deactivateClub`** locks the club `FOR UPDATE`, sets `deactivatedAt`, then cancels in lock order: memberships (`PENDING_ATHLETE_CONFIRMATION` → `REJECTED`), certification requests (achievements through `lockAchievements`, then `CANCELLED` and `UNVERIFIED`), and trainer invitations (`PENDING` → `REVOKED`).
 - **`revokeTrainer`** locks the club `FOR SHARE`, then the trainer row `FOR UPDATE`, and sets `revokedAt`.
 - **Effect:** a trainer write either commits before the revocation or deactivation (which then waits on its lock), or finds the row gone and fails. **Reads** (`listRoster`, `listPendingCertifications`) take no lock: one already past `requireClubTrainer` may finish, as the spec allows.
-- These are raw-SQL lock helpers next to the approved ones in `services/certification.ts`. AGENTS.md requires explicit `$queryRaw` approval.
+- These are raw-SQL lock helpers next to the approved ones in `services/certification.ts`. AGENTS.md requires explicit `$queryRaw` approval; the owner approved it on 2026-11-03 for the whole D7 lock family (`lockActiveClub`, `lockActiveTrainer`, `lockTrainerAuthority`, `lockClubForShare`, `lockTrainerForUpdate`, `lockClubForUpdate`) and for the parameterized lock-holder and `pg_stat_activity` SQL in `trainer-lock-races.int.test.ts`.
 
 ### D8. `AdminActionLog`
 | Field | Level | Notes |
