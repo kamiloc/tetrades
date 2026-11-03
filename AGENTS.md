@@ -281,6 +281,7 @@ Habeas Data grants athletes the right to deletion; legal obligations may require
 - [ ] RLS policies prevent cross-tenant access (verified by deny-tests)
 - [ ] Audit log is append-only
 - [ ] Retention periods are enforced by scheduled jobs, not ad-hoc deletion
+- [ ] Trainer invitation emails are redacted 90 days after the invitation ends, and on deletion of the athlete with that confirmed email (ADR-017)
 - [ ] Break-glass access is database-only, pre-approved, and audit-logged
 
 ## Dependency rules

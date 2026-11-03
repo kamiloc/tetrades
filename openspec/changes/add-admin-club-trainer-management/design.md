@@ -179,7 +179,7 @@ The logic lives in `services/adminClubs.ts` and `services/trainerInvitations.ts`
   - `DECLINED` or `REVOKED` with `respondedAt` more than 90 days ago, or
   - `PENDING` with `expiresAt` more than 90 days ago, or
   - `ACCEPTED` whose `ClubTrainer` row (by club and `acceptedByUserAccountId`) has `revokedAt` more than 90 days ago.
-- **How:** set `email = 'redacted:' || id` and `redacted_at = now()` with one set-based update per category, so a failed run leaves already-redacted rows marked and is safe to re-run. It logs counts with `requestId`.
+- **How:** set `email = 'redacted:' || id` and `redacted_at = now()` with one set-based update per category, so a failed run leaves already-redacted rows marked and is safe to re-run. It logs counts with `requestId`. Prisma can't set a column from another column, so these are `$executeRaw` statements; the owner approved that raw SQL on 2026-11-03.
 
 ### D14. Deletion
 - `deletePII` reads the auth user's confirmed email through the Supabase admin client **before** it deletes the auth user. In the same transaction as the other deletes, it sets every invitation with that email to `REVOKED` (if `PENDING`) and redacts its email.

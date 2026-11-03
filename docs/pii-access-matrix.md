@@ -1,12 +1,13 @@
 # PII Access Matrix
 
-Trainer and club rows follow [ADR-013](adr/013-pivot-clubs-metrics-trainer-portal-and-visibility.md); achievement visibility follows [ADR-014](adr/014-achievement-visibility-default.md); achievement certification follows [ADR-016](adr/016-achievement-certification-by-club-trainers.md). They are enforced in the API services (`membership`, `metrics`, `visibility`) and, as defense in depth, in RLS (`supabase/policies/`).
+Trainer and club rows follow [ADR-013](adr/013-pivot-clubs-metrics-trainer-portal-and-visibility.md); achievement visibility follows [ADR-014](adr/014-achievement-visibility-default.md); achievement certification follows [ADR-016](adr/016-achievement-certification-by-club-trainers.md); the platform admin, trainer provisioning and the club lifecycle follow [ADR-017](adr/017-platform-admin-trainer-provisioning-and-club-lifecycle.md). They are enforced in the API services (`membership`, `metrics`, `visibility`) and, as defense in depth, in RLS (`supabase/policies/`).
 
 ## Roles
 
 - Public Visitor
 - Athlete
-- Trainer (scoped per club through `ClubTrainer`; three cases: `ACTIVE` membership, pending membership, no membership)
+- Trainer (scoped per club through a non-revoked `ClubTrainer` row of an active club; three cases: `ACTIVE` membership, pending membership, no membership). A revoked trainer, or any trainer of a deactivated club, has no trainer access (ADR-017).
+- Platform Admin (`UserRole.ADMIN`, set only by the project owner; manages clubs and trainer access only, ADR-017)
 - Support Admin (not an application role; break-glass only)
 - API Server
 - Job Worker
@@ -16,6 +17,8 @@ Trainer and club rows follow [ADR-013](adr/013-pivot-clubs-metrics-trainer-porta
 - Public Visitor gets L0 data the athlete's visibility settings allow.
 - Athlete may access their own data.
 - Trainer access exists only through an `ACTIVE` `ClubMembership` between the athlete and the trainer's club. It never extends to L2 data.
+- Platform Admin acts on clubs, trainer invitations and trainer assignments only. Everywhere else a Platform Admin is treated exactly like any other non-owner, and never gets L2 data, private profiles, metric entries, certification requests, visibility settings, legal holds or `audit_log`.
+- An account holds one capacity: athlete, trainer or admin (ADR-017 §3).
 - Support Admin has no default right to restricted data; any exceptional access requires break-glass handling.
 - API Server and Job Worker use least privilege and only for the workflow they are executing.
 - Visibility filtering applies equally to list and detail endpoints.
@@ -88,9 +91,41 @@ Summaries (`AthleteMetricSummary`) aggregate every club, so the active-club trai
 
 ### Club membership (L0/L1)
 
-- Athlete: read own; confirm or decline invitations
-- Trainer: invite for their own club; cannot activate a membership without athlete confirmation
+- Athlete: read own; confirm or decline invitations; leave an `ACTIVE` membership, also of a deactivated club
+- Trainer: invite for their own active club; cannot activate a membership without athlete confirmation
+- API Server (club deactivation): closes the club's pending invitations as `REJECTED` (ADR-017 amends ADR-013 §5)
 - Public Visitor: only `ACTIVE` memberships the athlete's visibility allows; pending memberships are never visible
+
+### Clubs (L0; `deactivated_at`, `created_at` L1)
+
+| Actor                                   | Read                                                     | Write |
+| --------------------------------------- | -------------------------------------------------------- | ----- |
+| Public Visitor / Athlete / Trainer      | L0 fields plus the derived `isActive`, through the API; direct client reads limited to `id, slug, name, country_code, city` by column grants | deny |
+| Platform Admin                          | every field, plus the active trainer count               | create; edit name, country, city (never the slug); deactivate; reactivate. Never delete |
+| API Server                              | allow                                                    | admin router only; deactivation cascade |
+
+### Trainer invitations (`ClubTrainerInvitation`, L1)
+
+| Actor                                   | Read                                                     | Write |
+| --------------------------------------- | -------------------------------------------------------- | ----- |
+| Platform Admin                          | a club's invitations with their derived state and the invited email (null once redacted) | invite; revoke `PENDING` |
+| Invitee (confirmed session email matches) | own `PENDING`, unexpired invitations to active clubs, through the API | accept (not as an athlete or admin account), decline |
+| Anyone else, including an unconfirmed email | deny (`NOT_FOUND`)                                   | deny |
+| Any client, direct database read        | deny (no client policies or privileges)                  | deny |
+| Job Worker (`trainer-invitation-redaction`) | ids and dates                                        | redact emails 90 days after the invitation ends |
+| Job Worker (`deletePII`)                | invitations to the deleted athlete's confirmed email     | revoke and redact |
+
+### Trainer assignments (`ClubTrainer`, L1)
+
+- Platform Admin: list a club's trainers (status, dates, the originally invited email); revoke. Rows are never deleted.
+- Trainer: read own rows through RLS, revoked ones included.
+- Invitee: a row is created, or a revoked one restored, by accepting an invitation.
+
+### Admin action log (`admin_action_log`, L1)
+
+- API Server: insert, in the same transaction as each successful admin write (ids, counts, field names; never an email or L2)
+- Every client, Platform Admin included: deny (no client policies or privileges)
+- Project owner: database access only
 
 ### Visibility settings (L1)
 
