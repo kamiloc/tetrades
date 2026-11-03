@@ -19,9 +19,12 @@ datasource db {
 // Enums
 // ============================================================================
 
+/// ADMIN is set only by the project owner with SQL (ADR-017); no procedure
+/// writes `role`.
 enum UserRole {
   ATHLETE
   SYSTEM
+  ADMIN
 
   @@map("user_role")
 }
@@ -137,6 +140,32 @@ enum CertificationRequestStatus {
   @@map("certification_request_status")
 }
 
+/// Trainer invitation lifecycle (ADR-017). Only PENDING is open; ACCEPTED,
+/// DECLINED and REVOKED are terminal. EXPIRED is derived (PENDING and
+/// expires_at <= now()), never stored. Enforced for every writer by
+/// supabase/constraints/club_trainer_invitation_transitions.sql.
+enum TrainerInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  REVOKED
+
+  @@map("trainer_invitation_status")
+}
+
+/// Every admin write recorded in admin_action_log (ADR-017).
+enum AdminAction {
+  CLUB_CREATED
+  CLUB_UPDATED
+  CLUB_DEACTIVATED
+  CLUB_REACTIVATED
+  TRAINER_INVITED
+  TRAINER_INVITATION_REVOKED
+  TRAINER_REVOKED
+
+  @@map("admin_action")
+}
+
 /// Which way a metric improves. NEUTRAL metrics get no personal best.
 enum MetricDirection {
   HIGHER_IS_BETTER
@@ -171,11 +200,14 @@ model UserAccount {
   /// L1-INTERNAL
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
-  athlete                Athlete?
-  auditEvents            AuditEvent[]
-  submittedLifecycleReqs DataLifecycleRequest[] @relation("LifecycleRequester")
-  clubTrainerRoles       ClubTrainer[]
-  deviceTokens           DeviceToken[]
+  athlete                    Athlete?
+  auditEvents                AuditEvent[]
+  submittedLifecycleReqs     DataLifecycleRequest[]  @relation("LifecycleRequester")
+  clubTrainerRoles           ClubTrainer[]
+  deviceTokens               DeviceToken[]
+  sentTrainerInvitations     ClubTrainerInvitation[] @relation("TrainerInvitationInvitedBy")
+  acceptedTrainerInvitations ClubTrainerInvitation[] @relation("TrainerInvitationAcceptedBy")
+  adminActions               AdminActionLog[]
 
   @@map("user_accounts")
 }
@@ -510,21 +542,26 @@ model DataLifecycleRequest {
 
 model Club {
   /// L0-PUBLIC
-  id          String   @id @default(cuid())
+  id            String    @id @default(cuid())
   /// L0-PUBLIC
-  slug        String   @unique
+  slug          String    @unique
   /// L0-PUBLIC
-  name        String
+  name          String
   /// L0-PUBLIC
-  countryCode String   @map("country_code")
+  countryCode   String    @map("country_code")
   /// L0-PUBLIC
-  city        String?
+  city          String?
+  /// L1-INTERNAL — set by admin.deactivateClub, cleared by admin.reactivateClub
+  /// (ADR-017). Clubs are never deleted. Not client-readable (column grants
+  /// in supabase/policies/clubs.sql); outputs carry the derived L0 `isActive`.
+  deactivatedAt DateTime? @map("deactivated_at")
   /// L1-INTERNAL
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
 
   trainers              ClubTrainer[]
   memberships           ClubMembership[]
   certificationRequests AchievementCertificationRequest[]
+  trainerInvitations    ClubTrainerInvitation[]
 
   @@map("clubs")
 }
@@ -532,13 +569,16 @@ model Club {
 /// A user is a trainer of a club only through a row here; there is no global trainer role.
 model ClubTrainer {
   /// L1-INTERNAL
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   /// L1-INTERNAL
-  clubId        String   @map("club_id")
+  clubId        String    @map("club_id")
   /// L1-INTERNAL
-  userAccountId String   @map("user_account_id")
+  userAccountId String    @map("user_account_id")
+  /// L1-INTERNAL — set by admin.revokeTrainer; cleared only when the user
+  /// accepts a new invitation to the same club (ADR-017). Never deleted.
+  revokedAt     DateTime? @map("revoked_at")
   /// L1-INTERNAL
-  createdAt     DateTime @default(now()) @map("created_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
 
   club                  Club                              @relation(fields: [clubId], references: [id], onDelete: Restrict)
   userAccount           UserAccount                       @relation(fields: [userAccountId], references: [id], onDelete: Restrict)
@@ -553,6 +593,72 @@ model ClubTrainer {
 
 /// At most one PENDING_ATHLETE_CONFIRMATION/ACTIVE row per (club, athlete):
 /// enforced by a partial unique index in supabase/constraints/ (not expressible in Prisma).
+/// An admin invites an email to be a trainer of one club (ADR-017). Only the
+/// API reads and writes these rows (no client policies). Case-insensitive
+/// uniqueness of open invitations is a database guarantee: CHECK
+/// (email = lower(email)) and UNIQUE (club_id, lower(email)) WHERE status =
+/// 'PENDING', hand-written into the migration and mirrored in
+/// supabase/constraints/club_trainer_invitation_open_unique.sql.
+model ClubTrainerInvitation {
+  /// L1-INTERNAL
+  id                      String                  @id @default(cuid())
+  /// L1-INTERNAL
+  clubId                  String                  @map("club_id")
+  /// L1-INTERNAL — lowercased; replaced by `redacted:<id>` on redaction
+  email                   String
+  /// L1-INTERNAL
+  status                  TrainerInvitationStatus @default(PENDING)
+  /// L1-INTERNAL — the admin who sent it
+  invitedByUserAccountId  String                  @map("invited_by_user_account_id")
+  /// L1-INTERNAL — set on accept
+  acceptedByUserAccountId String?                 @map("accepted_by_user_account_id")
+  /// L1-INTERNAL — createdAt + 14 days
+  expiresAt               DateTime                @map("expires_at")
+  /// L1-INTERNAL — accept, decline or revoke time
+  respondedAt             DateTime?               @map("responded_at")
+  /// L1-INTERNAL — set when the email is redacted (90-day retention)
+  redactedAt              DateTime?               @map("redacted_at")
+  /// L1-INTERNAL
+  createdAt               DateTime                @default(now()) @map("created_at")
+
+  club       Club         @relation(fields: [clubId], references: [id], onDelete: Restrict)
+  invitedBy  UserAccount  @relation("TrainerInvitationInvitedBy", fields: [invitedByUserAccountId], references: [id], onDelete: Restrict)
+  acceptedBy UserAccount? @relation("TrainerInvitationAcceptedBy", fields: [acceptedByUserAccountId], references: [id], onDelete: Restrict)
+
+  @@index([clubId, status])
+  @@index([email, status])
+  @@map("club_trainer_invitations")
+}
+
+/// Append-only record of every successful admin write (ADR-017), inserted in
+/// the same transaction as the write. Only the API's connection writes it;
+/// client roles have no access (supabase/policies/admin_action_log.sql).
+/// Retained 5 years like audit_log.
+model AdminActionLog {
+  /// L1-INTERNAL
+  id                 String      @id @default(cuid())
+  /// L1-INTERNAL — the acting admin
+  actorUserAccountId String      @map("actor_user_account_id")
+  /// L1-INTERNAL
+  action             AdminAction
+  /// L1-INTERNAL — club | club_trainer | club_trainer_invitation
+  targetType         String      @map("target_type")
+  /// L1-INTERNAL
+  targetId           String      @map("target_id")
+  /// L1-INTERNAL
+  requestId          String      @map("request_id")
+  /// L1-INTERNAL — ids, counts and changed field names only; never an email or L2
+  metadata           Json        @default("{}")
+  /// L1-INTERNAL
+  createdAt          DateTime    @default(now()) @map("created_at")
+
+  actor UserAccount @relation(fields: [actorUserAccountId], references: [id], onDelete: Restrict)
+
+  @@index([actorUserAccountId, createdAt])
+  @@index([targetType, targetId])
+  @@map("admin_action_log")
+}
+
 model ClubMembership {
   /// L1-INTERNAL
   id                     String               @id @default(cuid())

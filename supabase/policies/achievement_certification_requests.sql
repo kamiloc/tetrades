@@ -20,6 +20,9 @@
 --   Achievement details (title, organization, date) stay in
 --   athlete_achievements, whose RLS remains owner-only (ADR-014); trainers
 --   get them only through the API.
+--   Trainer authority (ADR-017): every club_trainers subquery requires
+--   `ct.revoked_at IS NULL AND public.club_is_active(ct.club_id)`, so a revoked
+--   trainer, or any trainer of a deactivated club, is treated as no trainer.
 -- ============================================
 
 ALTER TABLE public.achievement_certification_requests ENABLE ROW LEVEL SECURITY;
@@ -39,6 +42,7 @@ ALTER TABLE public.achievement_certification_requests FORCE ROW LEVEL SECURITY;
 --              a broad TRUE, so the union is exactly {athlete, club trainers
 --              while PENDING}.
 -- ────────────────────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "achievement_certification_requests_select_athlete" ON public.achievement_certification_requests;
 CREATE POLICY "achievement_certification_requests_select_athlete"
   ON public.achievement_certification_requests
   FOR SELECT
@@ -64,7 +68,12 @@ CREATE POLICY "achievement_certification_requests_select_athlete"
 -- NULL safety: club_id and status are NOT NULL. decided_by_club_trainer_id is
 --              NULL on every PENDING row and is not referenced.
 -- Composition: 2 SELECT policies, see ..._select_athlete.
+-- Trainer row: only a non-revoked row of an active club counts (ADR-017).
+--              ct.revoked_at is nullable: NULL means active, so `IS NULL` is
+--              the grant and a revoked row matches nothing.
+--              public.club_is_active() returns FALSE for a deactivated club.
 -- ────────────────────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "achievement_certification_requests_select_club_trainer" ON public.achievement_certification_requests;
 CREATE POLICY "achievement_certification_requests_select_club_trainer"
   ON public.achievement_certification_requests
   FOR SELECT
@@ -77,5 +86,7 @@ CREATE POLICY "achievement_certification_requests_select_club_trainer"
       JOIN public.user_accounts ua ON ua.id = ct.user_account_id
       WHERE ct.club_id = achievement_certification_requests.club_id
         AND ua.supabase_user_id = auth.uid()::text
+        AND ct.revoked_at IS NULL
+        AND public.club_is_active(ct.club_id)
     )
   );

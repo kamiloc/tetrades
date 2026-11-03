@@ -35,8 +35,12 @@ import {
 import {
   CERTIFICATIONS,
   CLUBS,
+  DEACTIVATED_CLUB_SLUGS,
+  DEV_ADMIN_SUPABASE_USER_ID,
   MEMBERSHIPS,
   METRICS,
+  REVOKED_TRAINERS,
+  TRAINER_INVITATIONS,
   VISIBILITY,
 } from './seed-data/clubs-metrics.js';
 
@@ -578,6 +582,9 @@ async function wipe(): Promise<void> {
   await prisma.athleteMetricSummary.deleteMany();
   await prisma.athleteVisibilitySettings.deleteMany();
   await prisma.clubMembership.deleteMany();
+  // ADR-017: invitations and the admin log reference clubs and accounts.
+  await prisma.clubTrainerInvitation.deleteMany();
+  await prisma.adminActionLog.deleteMany();
   await prisma.clubTrainer.deleteMany();
   await prisma.club.deleteMany();
   await prisma.metricDefinition.deleteMany();
@@ -617,7 +624,9 @@ async function seedClubsAndMetrics(
     });
     const trainerIds: string[] = [];
     for (const supabaseUserId of club.trainerSupabaseUserIds) {
-      // Trainer accounts have no athlete profile; ClubTrainer is their only authority.
+      // Trainer accounts have no athlete profile; ClubTrainer is their only
+      // authority. There is no TRAINER role (ADR-017 §3): role stays the
+      // ATHLETE default and only means "not SYSTEM or ADMIN".
       const account = await prisma.userAccount.create({
         data: { supabaseUserId, role: UserRole.ATHLETE, status: AccountStatus.ACTIVE },
         select: { id: true },
@@ -865,6 +874,131 @@ async function seedClubsAndMetrics(
         achievementsAudience: v.achievementsAudience,
       },
       select: { athleteId: true },
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Platform admin, club lifecycle, trainer provisioning (ADR-017)
+// Data lives in ./seed-data/clubs-metrics.ts. Every trainer stays a
+// trainer-only account (supabase/constraints/account_single_capacity.sql).
+// ---------------------------------------------------------------------------
+
+const SEED_DAY_MS = 24 * 60 * 60 * 1000;
+const seedDaysAgo = (days: number): Date => new Date(Date.now() - days * SEED_DAY_MS);
+const TRAINER_INVITATION_TTL_MS = 14 * SEED_DAY_MS;
+
+async function clubIdOf(slug: string): Promise<string> {
+  const club = await prisma.club.findUnique({ where: { slug }, select: { id: true } });
+  if (club === null) throw new Error(`Club "${slug}" was not seeded.`);
+  return club.id;
+}
+
+async function seedAdminAndProvisioning(): Promise<void> {
+  console.log('Seed: creating the dev-only admin, a deactivated club, trainer invitations...');
+
+  // DEV-ONLY: no auth user behind it, so it can't sign in.
+  const admin = await prisma.userAccount.create({
+    data: {
+      supabaseUserId: DEV_ADMIN_SUPABASE_USER_ID,
+      role: UserRole.ADMIN,
+      status: AccountStatus.ACTIVE,
+    },
+    select: { id: true },
+  });
+
+  // A revoked trainer keeps the row (attribution), with the accepted
+  // invitation that created it. Invitations start PENDING (transition trigger).
+  for (const revoked of REVOKED_TRAINERS) {
+    const clubId = await clubIdOf(revoked.clubSlug);
+    const acceptedAt = seedDaysAgo(revoked.acceptedDaysAgo);
+    // Role ATHLETE by design: no TRAINER role exists (ADR-017 §3).
+    const account = await prisma.userAccount.create({
+      data: { supabaseUserId: revoked.supabaseUserId, role: UserRole.ATHLETE, status: AccountStatus.ACTIVE },
+      select: { id: true },
+    });
+    const invitation = await prisma.clubTrainerInvitation.create({
+      data: {
+        clubId,
+        email: revoked.invitedEmail,
+        invitedByUserAccountId: admin.id,
+        createdAt: seedDaysAgo(revoked.acceptedDaysAgo + 2),
+        expiresAt: new Date(seedDaysAgo(revoked.acceptedDaysAgo + 2).getTime() + TRAINER_INVITATION_TTL_MS),
+      },
+      select: { id: true },
+    });
+    await prisma.clubTrainer.create({
+      data: { clubId, userAccountId: account.id, createdAt: acceptedAt },
+      select: { id: true },
+    });
+    await prisma.clubTrainerInvitation.update({
+      where: { id: invitation.id },
+      data: { status: 'ACCEPTED', acceptedByUserAccountId: account.id, respondedAt: acceptedAt },
+      select: { id: true },
+    });
+    const trainer = await prisma.clubTrainer.update({
+      where: { clubId_userAccountId: { clubId, userAccountId: account.id } },
+      data: { revokedAt: seedDaysAgo(revoked.revokedDaysAgo) },
+      select: { id: true },
+    });
+    await prisma.adminActionLog.create({
+      data: {
+        actorUserAccountId: admin.id,
+        action: 'TRAINER_REVOKED',
+        targetType: 'club_trainer',
+        targetId: trainer.id,
+        requestId: 'seed',
+        metadata: { clubId },
+        createdAt: seedDaysAgo(revoked.revokedDaysAgo),
+      },
+      select: { id: true },
+    });
+  }
+
+  // Pending and expired invitations (expired = PENDING past expiresAt).
+  for (const invitation of TRAINER_INVITATIONS) {
+    const clubId = await clubIdOf(invitation.clubSlug);
+    const sentAt = seedDaysAgo(invitation.invitedDaysAgo);
+    const created = await prisma.clubTrainerInvitation.create({
+      data: {
+        clubId,
+        email: invitation.email,
+        invitedByUserAccountId: admin.id,
+        createdAt: sentAt,
+        expiresAt: new Date(sentAt.getTime() + TRAINER_INVITATION_TTL_MS),
+      },
+      select: { id: true },
+    });
+    await prisma.adminActionLog.create({
+      data: {
+        actorUserAccountId: admin.id,
+        action: 'TRAINER_INVITED',
+        targetType: 'club_trainer_invitation',
+        targetId: created.id,
+        requestId: 'seed',
+        metadata: { clubId },
+        createdAt: sentAt,
+      },
+      select: { id: true },
+    });
+  }
+
+  // Deactivated clubs: only the flag. They hold no open items in the seed.
+  for (const slug of DEACTIVATED_CLUB_SLUGS) {
+    const clubId = await clubIdOf(slug);
+    const deactivatedAt = seedDaysAgo(15);
+    await prisma.club.update({ where: { id: clubId }, data: { deactivatedAt }, select: { id: true } });
+    await prisma.adminActionLog.create({
+      data: {
+        actorUserAccountId: admin.id,
+        action: 'CLUB_DEACTIVATED',
+        targetType: 'club',
+        targetId: clubId,
+        requestId: 'seed',
+        metadata: { cancelledCertificationRequests: 0, rejectedMembershipInvitations: 0, revokedTrainerInvitations: 0 },
+        createdAt: deactivatedAt,
+      },
+      select: { id: true },
     });
   }
 }
@@ -1231,6 +1365,7 @@ async function main(): Promise<void> {
   }
 
   await seedClubsAndMetrics(athleteId, sportRecords);
+  await seedAdminAndProvisioning();
 
   const counts = {
     userAccounts: await prisma.userAccount.count(),

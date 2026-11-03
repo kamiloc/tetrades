@@ -6,7 +6,9 @@
  *     and the club that the performance fixture reports metrics from);
  *   - 2 pending invitations (Clubs tab badge "2", Accept/Decline);
  *   - 1 COMPLETED membership (ended history row);
- *   - 1 REJECTED invitation (must NOT appear anywhere in the app).
+ *   - 1 REJECTED invitation (must NOT appear anywhere in the app);
+ *   - 1 ACTIVE membership of a deactivated club (ADR-017: shows the
+ *     "Inactive club" chip, with Leave still available).
  *
  *   yarn db:fixture:clubs [--athlete <slug>]
  *
@@ -51,6 +53,8 @@ const PLANS: readonly Plan[] = [
     endedDaysAgo: 420,
   },
   { clubSlug: 'liga-tejo-boyaca', status: 'REJECTED', invitedDaysAgo: 60, respondedDaysAgo: 58 },
+  // Seeded deactivated (DEACTIVATED_CLUB_SLUGS); the membership predates it.
+  { clubSlug: 'liga-futbol-cundinamarca', status: 'ACTIVE', invitedDaysAgo: 300, respondedDaysAgo: 298 },
 ];
 
 async function main(): Promise<void> {

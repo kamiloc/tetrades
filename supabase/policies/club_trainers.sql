@@ -17,7 +17,18 @@
 --     visibility; it would need a self-referencing policy or a SECURITY
 --     DEFINER helper, and no client read path needs it (the API reads via
 --     Prisma). Narrower is the safe default.
---   - Mutations are service_role only (trainers are provisioned out-of-band).
+--   - Mutations are service_role / API only. A row is created when the
+--     invitee accepts a trainer invitation (ADR-017). Rows are never deleted:
+--     admin.revokeTrainer sets revoked_at, and accepting a new invitation to
+--     the same club clears it.
+--   - Revoked rows stay visible to their owner here (history). A revoked row,
+--     or any row of a deactivated club, grants nothing: every policy that
+--     resolves trainer authority from this table also requires
+--     `ct.revoked_at IS NULL AND public.club_is_active(ct.club_id)`
+--     (club_memberships, athlete_metric_entries,
+--     achievement_certification_requests, and the metric-entry trigger).
+--   - One capacity per account: supabase/constraints/account_single_capacity.sql
+--     rejects a row for an account with an athlete profile or role ADMIN.
 -- ============================================
 
 ALTER TABLE public.club_trainers ENABLE ROW LEVEL SECURITY;
@@ -27,10 +38,12 @@ ALTER TABLE public.club_trainers FORCE ROW LEVEL SECURITY;
 -- Policy:      club_trainers_select_own
 -- Command:     SELECT
 -- Role:        authenticated
--- Purpose:     A trainer can read their own club_trainers rows.
+-- Purpose:     A trainer can read their own club_trainers rows, revoked ones
+--              included.
 -- NULL safety: user_account_id is NOT NULL.
 -- Composition: ONLY SELECT policy on this table. No OR-composition risk.
 -- ────────────────────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "club_trainers_select_own" ON public.club_trainers;
 CREATE POLICY "club_trainers_select_own"
   ON public.club_trainers
   FOR SELECT
@@ -44,5 +57,5 @@ CREATE POLICY "club_trainers_select_own"
     )
   );
 
--- INSERT / UPDATE / DELETE: intentionally omitted. Trainer provisioning is a
--- service_role operation.
+-- INSERT / UPDATE / DELETE: intentionally omitted. Trainer provisioning and
+-- revocation go through the API on its own connection.
