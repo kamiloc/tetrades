@@ -5,6 +5,8 @@ export * from './enums.js';
 export * from './common.js';
 
 // Models (alphabetical)
+export * from './admin-access.js';
+export * from './admin-action-log.js';
 export * from './athlete.js';
 export * from './athlete-achievement.js';
 export * from './achievement-certification.js';
@@ -18,6 +20,7 @@ export * from './audit-event.js';
 export * from './club.js';
 export * from './club-membership.js';
 export * from './club-trainer.js';
+export * from './club-trainer-invitation.js';
 export * from './data-lifecycle-request.js';
 export * from './device-token.js';
 export * from './metric-definition.js';

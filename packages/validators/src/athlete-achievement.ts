@@ -52,7 +52,7 @@ export const athleteAchievementPublicOutput = z.object({
   verificationStatus: verificationStatusEnum,
   // The club whose trainer approved it. null when there is none (legacy) or
   // when the athlete's club-memberships audience hides it from the caller.
-  certifyingClub: z.object({ name: z.string() }).nullable(), /// L0-PUBLIC
+  certifyingClub: z.object({ name: z.string(), isActive: z.boolean() }).nullable(), /// L0-PUBLIC
 });
 export type AthleteAchievementPublicOutput = z.infer<typeof athleteAchievementPublicOutput>;
 

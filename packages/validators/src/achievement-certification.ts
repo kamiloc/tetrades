@@ -85,7 +85,7 @@ export const myCertificationRequestOutput = achievementCertificationRequestSchem
     rejectionReason: true,
   })
   .extend({
-    club: z.object({ id: cuidSchema, name: z.string() }), /// L0-PUBLIC
+    club: z.object({ id: cuidSchema, name: z.string(), isActive: z.boolean() }), /// L0-PUBLIC
   });
 export type MyCertificationRequestOutput = z.infer<typeof myCertificationRequestOutput>;
 

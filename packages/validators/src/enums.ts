@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-export const userRoleEnum = z.enum(['ATHLETE', 'SYSTEM']);
+// ADMIN is set only by the project owner in the database (ADR-017); no
+// procedure writes `role`.
+export const userRoleEnum = z.enum(['ATHLETE', 'SYSTEM', 'ADMIN']);
 export type UserRole = z.infer<typeof userRoleEnum>;
 
 export const accountStatusEnum = z.enum(['PENDING', 'ACTIVE', 'SUSPENDED', 'DEACTIVATED']);
@@ -70,3 +72,32 @@ export const certificationRequestStatusEnum = z.enum([
   'CANCELLED',
 ]);
 export type CertificationRequestStatus = z.infer<typeof certificationRequestStatusEnum>;
+
+// Trainer invitations (ADR-017). Only PENDING is open; the other three are
+// terminal. EXPIRED is never stored: it is derived from PENDING + expiresAt.
+export const trainerInvitationStatusEnum = z.enum(['PENDING', 'ACCEPTED', 'DECLINED', 'REVOKED']);
+export type TrainerInvitationStatus = z.infer<typeof trainerInvitationStatusEnum>;
+
+export const trainerInvitationStateEnum = z.enum([
+  'PENDING',
+  'EXPIRED',
+  'ACCEPTED',
+  'DECLINED',
+  'REVOKED',
+]);
+export type TrainerInvitationState = z.infer<typeof trainerInvitationStateEnum>;
+
+// Every admin write recorded in admin_action_log (ADR-017).
+export const adminActionEnum = z.enum([
+  'CLUB_CREATED',
+  'CLUB_UPDATED',
+  'CLUB_DEACTIVATED',
+  'CLUB_REACTIVATED',
+  'TRAINER_INVITED',
+  'TRAINER_INVITATION_REVOKED',
+  'TRAINER_REVOKED',
+]);
+export type AdminAction = z.infer<typeof adminActionEnum>;
+
+export const adminActionTargetTypeEnum = z.enum(['club', 'club_trainer', 'club_trainer_invitation']);
+export type AdminActionTargetType = z.infer<typeof adminActionTargetTypeEnum>;

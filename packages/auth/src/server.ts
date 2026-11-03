@@ -41,6 +41,12 @@ export function createTokenVerifier(config: TokenVerifierConfig): SupabaseClient
 
 export interface VerifiedUser {
   userId: string;
+  /**
+   * The user's email, ONLY when Supabase reports it confirmed
+   * (`email_confirmed_at` set); otherwise null. An unconfirmed address does
+   * not prove inbox ownership, so it is never returned (ADR-017, D2).
+   * L1-INTERNAL: never log it or put it in an error.
+   */
   email: string | null;
 }
 
@@ -66,9 +72,11 @@ export async function verifyAccessToken(
       status: error?.status,
     });
   }
+  const { email, email_confirmed_at: emailConfirmedAt } = data.user;
+  const confirmed = typeof emailConfirmedAt === 'string' && emailConfirmedAt.length > 0;
   return {
     userId: data.user.id,
-    email: data.user.email ?? null,
+    email: confirmed && typeof email === 'string' && email.length > 0 ? email : null,
   };
 }
 
