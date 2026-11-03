@@ -33,9 +33,11 @@ import {
   cleanupAthleteRows,
   cleanupAuthedUser,
   cleanupFixtureAthlete,
+  cleanupFixtureTrainer,
   cleanupTestClub,
   createAuthedUser,
   createFixtureAthlete,
+  createFixtureTrainer,
   createTestClub,
   createTestMembership,
   createTestMetricDefinition,
@@ -47,6 +49,7 @@ import {
   startServer,
   type AuthedUser,
   type FixtureAthlete,
+  type FixtureTrainer,
   type TestServer,
 } from './helpers/setup.js';
 
@@ -263,26 +266,24 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
   let sportId: string;
   let definitionId: string;
   let clubId: string;
-  let ownClubId: string;
-  let trainer: FixtureAthlete; // trains clubId
-  let friend: FixtureAthlete; // ACCEPTED connection; also coached by the deleted athlete
+  let trainer: FixtureTrainer; // trains clubId (trainer-only account, ADR-017)
+  let friend: FixtureAthlete; // ACCEPTED connection
   let trainerRow: string;
   const real = createSupabaseDeletionExternals();
 
   beforeAll(async () => {
     sportId = await createTestSport();
     definitionId = await createTestMetricDefinition();
-    [trainer, friend] = await Promise.all([createFixtureAthlete(sportId), createFixtureAthlete(sportId)]);
+    [trainer, friend] = await Promise.all([createFixtureTrainer(), createFixtureAthlete(sportId)]);
     clubId = await createTestClub('del');
-    ownClubId = await createTestClub('del-own');
     trainerRow = await addClubTrainer(clubId, trainer.userAccountId);
   });
 
   afterAll(async () => {
     await cleanupTestClub(clubId);
-    await cleanupTestClub(ownClubId);
     await deleteTestMetricDefinition(definitionId);
-    for (const fx of [trainer, friend]) await cleanupFixtureAthlete(fx);
+    await cleanupFixtureAthlete(friend);
+    await cleanupFixtureTrainer(trainer);
     await deleteTestSport(sportId);
   });
 
@@ -360,15 +361,9 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
       }
     }
 
-    // As trainer: the deleted athlete coaches `friend` in their own club.
-    const ownTrainerRow = await addClubTrainer(ownClubId, user.userAccountId);
-    const friendMembership = await createTestMembership({
-      clubId: ownClubId, athleteId: friend.athleteId, clubTrainerId: ownTrainerRow, status: 'ACTIVE',
-    });
-    const reportedForFriend = await prisma.athleteMetricEntry.create({
-      data: { athleteId: friend.athleteId, metricDefinitionId: definitionId, clubMembershipId: friendMembership, reportedByClubTrainerId: ownTrainerRow, value: 12.1, measuredAt: new Date() },
-      select: { id: true },
-    });
+    // An athlete account never holds trainer rows (ADR-017 one capacity per
+    // account, account_single_capacity.sql), so deletion has no trainer
+    // records of the deleted athlete to keep.
 
     await prisma.deviceToken.create({
       data: { userAccountId: user.userAccountId, token: `ExponentPushToken[del${randomUUID().slice(0, 8)}]`, platform: 'IOS' },
@@ -380,13 +375,9 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
     await uploadPhoto('profile-photos', athleteId, '1760400000000/thumb-150.webp');
 
     const requestId = await createDeletionRequest(athleteId, user.userAccountId);
-    return { user, athleteId, requestId, ownTrainerRow, reportedForFriendId: reportedForFriend.id, trainerRow };
+    return { user, athleteId, requestId, trainerRow };
   }
 
-  async function cleanupFriendSide(ownTrainerRow: string) {
-    await prisma.athleteMetricEntry.deleteMany({ where: { reportedByClubTrainerId: ownTrainerRow } });
-    await prisma.clubMembership.deleteMany({ where: { invitedByClubTrainerId: ownTrainerRow } });
-  }
 
   it('6.3/6.4: deletes every athlete-owned record, keeps retained rows, tombstones, and verifies', async () => {
     const a = await populatedAthlete('del-full');
@@ -447,11 +438,8 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
         (await prisma.dataLifecycleRequest.findUniqueOrThrow({ where: { id: a.requestId }, select: { status: true } })).status,
       ).toBe('COMPLETED');
 
-      // Trainers' own records unaffected (spec): the club trainer row of the
-      // other club, and entries the deleted athlete reported for `friend`.
+      // Trainers' own records unaffected (spec): the reporting trainer's row.
       expect(await prisma.clubTrainer.count({ where: { id: a.trainerRow } })).toBe(1);
-      expect(await prisma.athleteMetricEntry.count({ where: { id: a.reportedForFriendId } })).toBe(1);
-      expect(await prisma.clubTrainer.count({ where: { id: a.ownTrainerRow } })).toBe(1);
 
       // The friend's cached connection count followed the deleted connection.
       expect(
@@ -465,7 +453,6 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
       expect(log.lines.length).toBeGreaterThan(0);
       for (const line of log.lines) expect(line.obj['requestId']).toBe('req-full');
     } finally {
-      await cleanupFriendSide(a.ownTrainerRow);
       await purgeAthlete(a.athleteId, a.user.userAccountId);
     }
   });
@@ -492,8 +479,103 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
         'storage profile-photo-originals',
       ]);
     } finally {
-      await cleanupFriendSide(a.ownTrainerRow);
       await purgeAthlete(a.athleteId, a.user.userAccountId);
+    }
+  });
+
+  // ── Trainer invitations to the athlete's email (ADR-017, D14) ──────────────
+
+  async function inviteAddress(email: string, inviterId: string, status: 'PENDING' | 'DECLINED') {
+    const invitation = await prisma.clubTrainerInvitation.create({
+      data: { clubId, email, invitedByUserAccountId: inviterId, expiresAt: new Date(Date.now() + 14 * 86_400_000) },
+      select: { id: true },
+    });
+    if (status === 'DECLINED') {
+      await prisma.clubTrainerInvitation.update({
+        where: { id: invitation.id },
+        data: { status: 'DECLINED', respondedAt: new Date() },
+        select: { id: true },
+      });
+    }
+    return invitation.id;
+  }
+
+  async function adminAccount(): Promise<string> {
+    return (
+      await prisma.userAccount.create({
+        data: { supabaseUserId: randomUUID(), role: 'ADMIN', status: 'ACTIVE' },
+        select: { id: true },
+      })
+    ).id;
+  }
+
+  async function purgeInvitationsBy(inviterId: string) {
+    await prisma.clubTrainerInvitation.deleteMany({ where: { invitedByUserAccountId: inviterId } });
+    await prisma.userAccount.deleteMany({ where: { id: inviterId } });
+  }
+
+  it('D14: revokes and redacts invitations to the deleted athlete\'s email, logging no email', async () => {
+    const a = await populatedAthlete('del-inv');
+    const email = a.user.email.toLowerCase();
+    const inviterId = await adminAccount();
+    const log = captureLogger();
+    try {
+      // Declined first: one PENDING row per (club, email) at a time.
+      const declinedId = await inviteAddress(email, inviterId, 'DECLINED');
+      const pendingId = await inviteAddress(email, inviterId, 'PENDING');
+      const outcome = await runPiiDeletion(
+        { prisma, externals: real, log },
+        { dataLifecycleRequestId: a.requestId, athleteId: a.athleteId, requestId: 'req-del-inv' },
+      );
+      expect(outcome).toBe('COMPLETED');
+
+      const rows = await prisma.clubTrainerInvitation.findMany({
+        where: { id: { in: [pendingId, declinedId] } },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, status: true, email: true, redactedAt: true, clubId: true },
+      });
+      expect(rows).toEqual([
+        { id: declinedId, status: 'DECLINED', email: `redacted:${declinedId}`, redactedAt: expect.any(Date), clubId },
+        { id: pendingId, status: 'REVOKED', email: `redacted:${pendingId}`, redactedAt: expect.any(Date), clubId },
+      ]);
+      expect(await prisma.clubTrainerInvitation.count({ where: { email } })).toBe(0);
+      expect(JSON.stringify(log.lines)).not.toContain(email);
+    } finally {
+      await purgeAthlete(a.athleteId, a.user.userAccountId);
+      await purgeInvitationsBy(inviterId);
+    }
+  });
+
+  it('D14: verification fails when an invitation to the email remains after deletion', async () => {
+    const a = await populatedAthlete('del-inv-residue');
+    const email = a.user.email.toLowerCase();
+    const inviterId = await adminAccount();
+    // Planted after the deletion transaction committed and before verification.
+    const planting: DeletionExternals = {
+      ...real,
+      deleteAuthUser: async (supabaseUserId) => {
+        await inviteAddress(email, inviterId, 'PENDING');
+        await real.deleteAuthUser(supabaseUserId);
+      },
+    };
+    const log = captureLogger();
+    try {
+      const outcome = await runPiiDeletion(
+        { prisma, externals: planting, log },
+        { dataLifecycleRequestId: a.requestId, athleteId: a.athleteId, requestId: 'req-del-inv-residue' },
+      );
+      expect(outcome).toBe('FAILED');
+      expect(
+        (await prisma.dataLifecycleRequest.findUniqueOrThrow({ where: { id: a.requestId }, select: { status: true } })).status,
+      ).toBe('FAILED');
+      const incomplete = log.lines.find((l) => l.obj['event'] === 'pii_deletion_incomplete');
+      expect(incomplete?.level).toBe('error');
+      expect(incomplete?.obj['requestId']).toBe('req-del-inv-residue');
+      expect(incomplete?.obj['residue']).toEqual(['club_trainer_invitations']);
+      expect(JSON.stringify(log.lines)).not.toContain(email);
+    } finally {
+      await purgeAthlete(a.athleteId, a.user.userAccountId);
+      await purgeInvitationsBy(inviterId);
     }
   });
 
@@ -530,7 +612,6 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
       ).not.toBe(tombstoneSlug(a.athleteId));
     } finally {
       await prisma.athlete.update({ where: { id: a.athleteId }, data: { isUnderLegalHold: false }, select: { id: true } });
-      await cleanupFriendSide(a.ownTrainerRow);
       await purgeAthlete(a.athleteId, a.user.userAccountId, a.user.supabaseUserId);
     }
   });
@@ -574,7 +655,6 @@ describe.skipIf(!authReady)('runPiiDeletion', { timeout: 180_000 }, () => {
         ),
       ).toBe('SKIPPED');
     } finally {
-      await cleanupFriendSide(a.ownTrainerRow);
       await purgeAthlete(a.athleteId, a.user.userAccountId, a.user.supabaseUserId);
     }
   });

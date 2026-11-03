@@ -19,7 +19,8 @@ import {
 import { requireViewer, requireViewerAthlete } from '../services/viewer.js';
 import { protectedProcedure, router, trainerProcedure } from '../trpc.js';
 
-// Clubs and trainers are provisioned out-of-band; there is no create procedure.
+// Memberships and the trainer roster. Clubs and trainer access are managed by
+// platform admins through the admin router (ADR-017).
 export const clubRouter = router({
   inviteAthlete: trainerProcedure
     .input(inviteAthleteToClubInput)

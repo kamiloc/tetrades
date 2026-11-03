@@ -24,6 +24,13 @@ export type AuthResult =
       authenticated: true;
       userId: string;
       /**
+       * The session email, ONLY when Supabase reports it confirmed; null
+       * otherwise (@packages/auth verifyAccessToken, ADR-017 D2).
+       * L1-INTERNAL: read only by the trainer-invitation procedures and
+       * deletePII. Never log it and never put it in an error or response.
+       */
+      email: string | null;
+      /**
        * `UserAccount.role`, resolved by the rate-limit onRequest hook via a
        * TTL-cached lookup (lib/userRole.ts). Used ONLY for tier-based rate
        * limiting (SYSTEM → admin tier, see rateLimit.ts ADMIN_ROLES) — never
@@ -86,6 +93,7 @@ export async function verifyAuthToken(
     return {
       authenticated: true,
       userId: user.userId,
+      email: user.email,
     };
   } catch (err: unknown) {
     return {

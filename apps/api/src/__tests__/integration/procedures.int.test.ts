@@ -357,18 +357,18 @@ describe.skipIf(!authReady)('achievement correctness', () => {
 
       it('shows the club to an anonymous caller when both audiences are PUBLIC', async () => {
         await setAudiences('PUBLIC', 'PUBLIC');
-        expect(await clubOf(certifiedId)).toEqual({ name: CLUB_NAME });
+        expect(await clubOf(certifiedId)).toEqual({ name: CLUB_NAME, isActive: true });
       });
 
       it('CONNECTIONS club audience: a connection sees the club, a stranger does not', async () => {
         await setAudiences('PUBLIC', 'CONNECTIONS');
-        expect(await clubOf(certifiedId, friend)).toEqual({ name: CLUB_NAME });
+        expect(await clubOf(certifiedId, friend)).toEqual({ name: CLUB_NAME, isActive: true });
         expect(await clubOf(certifiedId, visitor)).toBeNull();
       });
 
       it('the owner always sees the club', async () => {
         await setAudiences('PRIVATE', 'PRIVATE');
-        expect(await clubOf(certifiedId, owner)).toEqual({ name: CLUB_NAME });
+        expect(await clubOf(certifiedId, owner)).toEqual({ name: CLUB_NAME, isActive: true });
       });
 
       it('a legacy VERIFIED achievement has no certifying club', async () => {

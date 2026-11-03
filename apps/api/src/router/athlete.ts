@@ -1,5 +1,9 @@
 import { decryptPII, encryptPII } from '@packages/crypto';
 import {
+  NON_ATHLETE_ACCOUNT_ONBOARDING_MESSAGE,
+  TRAINER_ACCOUNT_ONBOARDING_MESSAGE,
+} from '@packages/shared-logic';
+import {
   athletePrivateProfileOwnerOutput,
   athletePublicProfileListOutput,
   athletePublicProfileSchema,
@@ -390,7 +394,12 @@ export const athleteRouter = router({
           status:         'PENDING',
         },
         update: {},
-        select: { id: true, athlete: { select: { id: true } } },
+        select: {
+          id: true,
+          role: true,
+          athlete: { select: { id: true } },
+          clubTrainerRoles: { select: { id: true }, take: 1 },
+        },
       });
 
       if (userAccount.athlete) {
@@ -414,6 +423,17 @@ export const athleteRouter = router({
           }),
         ]);
         return { athleteId };
+      }
+
+      // One capacity per account (ADR-017, D12): admins, system accounts and
+      // trainer accounts (any trainer row, revoked included) never get an
+      // athlete profile. supabase/constraints/account_single_capacity.sql
+      // enforces the same rule for every writer.
+      if (userAccount.clubTrainerRoles.length > 0) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: TRAINER_ACCOUNT_ONBOARDING_MESSAGE });
+      }
+      if (userAccount.role !== 'ATHLETE') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: NON_ATHLETE_ACCOUNT_ONBOARDING_MESSAGE });
       }
 
       const sport = await ctx.prisma.sport.findUnique({

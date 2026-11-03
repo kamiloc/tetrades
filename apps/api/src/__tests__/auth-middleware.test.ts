@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import type { Context } from '../context.js';
+import { normalizeEmail, type Context } from '../context.js';
 import { setEnvForTests } from '../env.js';
 import { verifyAuthToken, _setVerifierForTest } from '../middleware/auth.js';
 import { router, publicProcedure, protectedProcedure } from '../trpc.js';
@@ -11,7 +11,7 @@ import { router, publicProcedure, protectedProcedure } from '../trpc.js';
 // ---------------------------------------------------------------------------
 
 function makeVerifier(response: {
-  user: { id: string } | null;
+  user: { id: string; email?: string; email_confirmed_at?: string | null } | null;
   error: { status?: number; message?: string } | null;
 }): SupabaseClient {
   return {
@@ -32,6 +32,7 @@ function makeCtx(overrides: Partial<Context> = {}): Context {
   return {
     prisma: {} as Context['prisma'],
     userId: null,
+    userEmail: null,
     supabase: {} as Context['supabase'],
     requestId: 'test-request-id',
     // The procedure-logging middleware (trpc.ts) calls ctx.log.debug on
@@ -239,5 +240,73 @@ describe('security — no token leakage in logs', () => {
       // err.name is 'Error' — never the message
       expect(String(result.errorCode ?? '')).not.toContain(SENSITIVE_TOKEN);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CONFIRMED EMAIL (ADR-017 D2)
+// ---------------------------------------------------------------------------
+
+describe('verifyAuthToken — confirmed email only', () => {
+  it('carries the email when Supabase reports it confirmed', async () => {
+    _setVerifierForTest(
+      makeVerifier({
+        user: { id: VALID_USER_ID, email: 'ana@club.co', email_confirmed_at: '2026-10-01T12:00:00Z' },
+        error: null,
+      }),
+    );
+    const result = await verifyAuthToken('Bearer valid.jwt.token');
+    expect(result).toEqual({ authenticated: true, userId: VALID_USER_ID, email: 'ana@club.co' });
+  });
+
+  it('drops an unconfirmed email', async () => {
+    _setVerifierForTest(
+      makeVerifier({
+        user: { id: VALID_USER_ID, email: 'ana@club.co', email_confirmed_at: null },
+        error: null,
+      }),
+    );
+    const result = await verifyAuthToken('Bearer valid.jwt.token');
+    expect(result).toEqual({ authenticated: true, userId: VALID_USER_ID, email: null });
+  });
+});
+
+describe('ctx.userEmail', () => {
+  it('is trimmed and lowercased', () => {
+    expect(normalizeEmail('  Ana.Restrepo@Club.CO ')).toBe('ana.restrepo@club.co');
+  });
+
+  it('is null without an email', () => {
+    expect(normalizeEmail(null)).toBeNull();
+    expect(normalizeEmail('   ')).toBeNull();
+  });
+
+  it('is null without a session, and never appears in error output', async () => {
+    const { createContext } = await import('../context.js');
+    const fakeReq = {
+      authResult: { authenticated: false, userId: null },
+      headers: {},
+      id: 'req-ctx-1',
+      log: { debug: vi.fn() },
+    };
+    const ctx = await createContext({
+      req: fakeReq,
+      res: {},
+      info: {},
+    } as unknown as Parameters<typeof createContext>[0]);
+    expect(ctx.userEmail).toBeNull();
+
+    const authed = await createContext({
+      req: { ...fakeReq, authResult: { authenticated: true, userId: VALID_USER_ID, email: 'Ana@Club.co' } },
+      res: {},
+      info: {},
+    } as unknown as Parameters<typeof createContext>[0]);
+    expect(authed.userEmail).toBe('ana@club.co');
+
+    const testRouter = router({ secret: protectedProcedure.query(() => 'ok') });
+    const anonymous = testRouter.createCaller(makeCtx({ userEmail: 'ana@club.co' }));
+    const failure: unknown = await anonymous.secret().catch((e: unknown) => e);
+    expect(JSON.stringify(failure)).not.toContain('ana@club.co');
+    expect(String(failure)).not.toContain('ana@club.co');
   });
 });

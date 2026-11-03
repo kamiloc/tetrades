@@ -28,6 +28,8 @@ import type { JobEnqueuer } from '../lib/jobs.js';
 import { cursorArgs, toPage, type Page } from '../lib/pagination.js';
 
 import { lockAchievements } from './certification.js';
+import { withIsActive } from './clubOutput.js';
+import { lockTrainerAuthority, NOT_A_TRAINER_MESSAGE } from './locks.js';
 import type { Viewer } from './viewer.js';
 
 const UNIQUE_VIOLATION = 'P2002';
@@ -38,26 +40,36 @@ export interface ClubTrainerRef {
   clubId: string;
 }
 
+
+
 /**
  * The caller's ClubTrainer row for `clubId` (ADR-013: the only source of
- * trainer authority). NOT_FOUND for an unknown club, FORBIDDEN when the
- * caller does not train it. Used by trainerProcedure.
+ * trainer authority). NOT_FOUND for an unknown club. FORBIDDEN, with one
+ * message that does not reveal which, when the caller has no row, their row
+ * is revoked, or the club is deactivated (ADR-017). Used by trainerProcedure.
+ *
+ * This is a check at the start of the call. Trainer WRITES also take
+ * lockActiveClub + lockActiveTrainer inside their transaction, so a
+ * revocation or deactivation that commits meanwhile still stops them.
  */
 export async function requireClubTrainer(
   prisma: PrismaClient,
   viewer: Viewer,
   clubId: string,
 ): Promise<ClubTrainerRef> {
-  const club = await prisma.club.findUnique({ where: { id: clubId }, select: { id: true } });
+  const club = await prisma.club.findUnique({
+    where: { id: clubId },
+    select: { deactivatedAt: true },
+  });
   if (club === null) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Club not found' });
   }
   const trainer = await prisma.clubTrainer.findUnique({
     where: { clubId_userAccountId: { clubId, userAccountId: viewer.userAccountId } },
-    select: { id: true },
+    select: { id: true, revokedAt: true },
   });
-  if (trainer === null) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'You are not a trainer of this club' });
+  if (trainer === null || trainer.revokedAt !== null || club.deactivatedAt !== null) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: NOT_A_TRAINER_MESSAGE });
   }
   return { id: trainer.id, clubId };
 }
@@ -100,14 +112,17 @@ export async function inviteAthlete(
 
   let membership: ClubMembershipMutationOutput;
   try {
-    membership = await prisma.clubMembership.create({
-      data: {
-        clubId: trainer.clubId,
-        athleteId: input.athleteId,
-        invitedByClubTrainerId: trainer.id,
-        status: 'PENDING_ATHLETE_CONFIRMATION',
-      },
-      select: { id: true, status: true },
+    membership = await prisma.$transaction(async (tx) => {
+      await lockTrainerAuthority(tx, trainer);
+      return tx.clubMembership.create({
+        data: {
+          clubId: trainer.clubId,
+          athleteId: input.athleteId,
+          invitedByClubTrainerId: trainer.id,
+          status: 'PENDING_ATHLETE_CONFIRMATION',
+        },
+        select: { id: true, status: true },
+      });
     });
   } catch (error) {
     // A concurrent invitation won the race on the partial unique index.
@@ -267,10 +282,23 @@ export async function listMyMemberships(
       createdAt: true,
       respondedAt: true,
       endedAt: true,
-      club: { select: { id: true, slug: true, name: true, countryCode: true, city: true } },
+      club: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          countryCode: true,
+          city: true,
+          deactivatedAt: true,
+        },
+      },
     },
   });
-  return toPage(rows, input.take, (r) => r.id);
+  return toPage(
+    rows.map((r) => ({ ...r, club: withIsActive(r.club) })),
+    input.take,
+    (r) => r.id,
+  );
 }
 
 /**

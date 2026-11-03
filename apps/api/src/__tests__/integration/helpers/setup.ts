@@ -294,7 +294,7 @@ export interface AuthedUser {
 export interface AuthedUserOptions {
   /** Required when withAthlete is true (the default). */
   sportId?: string;
-  role?: 'ATHLETE' | 'SYSTEM';
+  role?: 'ATHLETE' | 'SYSTEM' | 'ADMIN';
   withAthlete?: boolean;
   label?: string;
 }
@@ -378,6 +378,15 @@ export async function cleanupAuthedUser(user: AuthedUser): Promise<void> {
   if (user.athleteId !== null) {
     await cleanupAthleteRows(user.athleteId);
   }
+  await prisma.clubTrainerInvitation.deleteMany({
+    where: {
+      OR: [
+        { invitedByUserAccountId: user.userAccountId },
+        { acceptedByUserAccountId: user.userAccountId },
+      ],
+    },
+  });
+  await prisma.adminActionLog.deleteMany({ where: { actorUserAccountId: user.userAccountId } });
   await prisma.clubTrainer.deleteMany({ where: { userAccountId: user.userAccountId } });
   await prisma.userAccount.deleteMany({ where: { supabaseUserId: user.supabaseUserId } });
   try {
@@ -402,8 +411,46 @@ export async function createTestClub(label = 'club'): Promise<string> {
   return club.id;
 }
 
-/** Makes the account a trainer of the club; returns the ClubTrainer id. */
+// ---------------------------------------------------------------------------
+// Fixture trainers — trainer-only accounts (ADR-017 one capacity per account)
+// ---------------------------------------------------------------------------
+
+export interface FixtureTrainer {
+  userAccountId: string;
+}
+
+/**
+ * A DB-only trainer-only account: a user_accounts row with no athlete
+ * profile. It never authenticates; use createAuthedUser({ withAthlete: false })
+ * for a trainer that calls the API. Role is ATHLETE by design: there is no
+ * TRAINER role, authority comes from ClubTrainer rows (ADR-017 §3).
+ */
+export async function createFixtureTrainer(): Promise<FixtureTrainer> {
+  const userAccount = await prisma.userAccount.create({
+    data: { supabaseUserId: randomUUID(), role: 'ATHLETE', status: 'ACTIVE' },
+    select: { id: true },
+  });
+  return { userAccountId: userAccount.id };
+}
+
+export async function cleanupFixtureTrainer(fixture: FixtureTrainer): Promise<void> {
+  await prisma.clubTrainer.deleteMany({ where: { userAccountId: fixture.userAccountId } });
+  await prisma.userAccount.deleteMany({ where: { id: fixture.userAccountId } });
+}
+
+/**
+ * Makes a trainer-only account a trainer of the club; returns the ClubTrainer
+ * id. An athlete account cannot be a trainer (account_single_capacity.sql);
+ * the guard fails fast with a clear message before the database does.
+ */
 export async function addClubTrainer(clubId: string, userAccountId: string): Promise<string> {
+  const athlete = await prisma.athlete.findUnique({ where: { userAccountId }, select: { id: true } });
+  if (athlete !== null) {
+    throw new Error(
+      'addClubTrainer: the account has an athlete profile; use a trainer-only account ' +
+        '(createFixtureTrainer or createAuthedUser({ withAthlete: false }))',
+    );
+  }
   const trainer = await prisma.clubTrainer.create({
     data: { clubId, userAccountId },
     select: { id: true },
@@ -463,6 +510,8 @@ export async function cleanupTestClub(clubId: string): Promise<void> {
   await prisma.achievementCertificationRequest.deleteMany({ where: { clubId } });
   await prisma.athleteMetricEntry.deleteMany({ where: { clubMembership: { clubId } } });
   await prisma.clubMembership.deleteMany({ where: { clubId } });
+  await prisma.clubTrainerInvitation.deleteMany({ where: { clubId } });
+  await prisma.adminActionLog.deleteMany({ where: { targetId: clubId } });
   await prisma.clubTrainer.deleteMany({ where: { clubId } });
   await prisma.club.deleteMany({ where: { id: clubId } });
 }

@@ -8,7 +8,8 @@
  *
  * startQueueInfrastructure() is called once by buildServer() when
  * UPSTASH_REDIS_URL is configured. It creates the shared Redis connection,
- * the queue registry, and the three workers, and hands back a handle whose
+ * the queue registry and the workers, registers the recurring job schedule
+ * (trainer-invitation-redaction, daily), and hands back a handle whose
  * close() runs the graceful shutdown sequence.
  *
  * Shutdown ORDER MATTERS and is fixed here (and locked by a unit test):
@@ -25,6 +26,10 @@ import type { Redis } from 'ioredis';
 
 import { createDeletePIIWorker } from '../jobs/deletePII.js';
 import { createOptimizeImageWorker } from '../jobs/optimizeImage.js';
+import {
+  createRedactTrainerInvitationsWorker,
+  scheduleTrainerInvitationRedaction,
+} from '../jobs/redactTrainerInvitations.js';
 import { createSendNotificationWorker } from '../jobs/sendNotification.js';
 
 export interface QueueInfrastructure {
@@ -66,7 +71,20 @@ export function startQueueInfrastructure(
     createOptimizeImageWorker(connection, logger),
     createDeletePIIWorker(connection, logger),
     createSendNotificationWorker(connection, logger),
+    createRedactTrainerInvitationsWorker(connection, logger),
   ];
+
+  // Recurring jobs (ADR-017). A failed registration is logged and never stops
+  // the API; the next start registers it again.
+  scheduleTrainerInvitationRedaction(registry, logger).catch((error: unknown) => {
+    logger.error(
+      {
+        event: 'job_scheduler_registration_failed',
+        error: error instanceof Error ? { name: error.name, message: error.message } : 'unknown',
+      },
+      'trainer invitation redaction could not be scheduled',
+    );
+  });
 
   logger.info(
     { event: 'queue_workers_started', queues: workers.map((w) => w.queueName) },

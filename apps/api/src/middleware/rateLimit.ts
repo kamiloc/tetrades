@@ -49,9 +49,12 @@ const TRPC_PREFIX = '/trpc/';
 
 /**
  * Roles that receive the admin tier. SYSTEM is the service-account role in
- * the UserRole enum; Cristian approved mapping it to the admin tier.
+ * the UserRole enum; Cristian approved mapping it to the admin tier. ADMIN
+ * (platform admins, ADR-017) joins it. The role here comes from a cached
+ * lookup and sets the rate-limit tier only; adminProcedure (trpc.ts) re-reads
+ * the role on every call for authorization.
  */
-export const ADMIN_ROLES: ReadonlySet<string> = new Set(['SYSTEM']);
+export const ADMIN_ROLES: ReadonlySet<string> = new Set(['SYSTEM', 'ADMIN']);
 
 /**
  * Procedures throttled at the sensitive tier. Empty for now — register
