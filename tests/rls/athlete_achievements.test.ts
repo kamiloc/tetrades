@@ -41,11 +41,13 @@ import {
   createTestMembership,
   createTestSport,
   createTestUser,
+  createTrainerUser,
   deleteTestSport,
   envReady,
   getAnonClient,
   getServiceClient,
   type TestUser,
+  type TrainerUser,
 } from './helpers/setup.js';
 
 describe.skipIf(!envReady)('athlete_achievements RLS', () => {
@@ -54,7 +56,7 @@ describe.skipIf(!envReady)('athlete_achievements RLS', () => {
   let user1: TestUser;
   let user2: TestUser;
   let friend: TestUser;
-  let trainer: TestUser;
+  let trainer: TrainerUser;
   let clubId: string;
   let clubTrainerId: string;
   let membershipId: string;
@@ -67,7 +69,7 @@ describe.skipIf(!envReady)('athlete_achievements RLS', () => {
       createTestUser(svc, sportId, 'ach-u1'),
       createTestUser(svc, sportId, 'ach-u2'),
       createTestUser(svc, sportId, 'ach-friend'),
-      createTestUser(svc, sportId, 'ach-trainer'),
+      createTrainerUser(svc, 'ach-trainer'),
     ]);
 
     const { error: connErr } = await svc.from('athlete_connections').insert({

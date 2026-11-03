@@ -37,19 +37,23 @@ import {
   createTestMetricDefinition,
   createTestSport,
   createTestUser,
+  createTrainerUser,
   deleteTestMetricDefinition,
   deleteTestSport,
   envReady,
   getServiceClient,
+  setTestTrainerRevoked,
+  setTestClubActive,
   type TestUser,
+  type TrainerUser,
 } from './helpers/setup.js';
 
 describe.skipIf(!envReady)('athlete_metric_entries RLS', () => {
   const svc = getServiceClient();
   let sportId: string;
   let definitionId: string;
-  let trainerA: TestUser;
-  let trainerB: TestUser;
+  let trainerA: TrainerUser;
+  let trainerB: TrainerUser;
   let active: TestUser; // ACTIVE in club A
   let pending: TestUser; // PENDING in club A
   let completed: TestUser; // COMPLETED in club A
@@ -82,8 +86,8 @@ describe.skipIf(!envReady)('athlete_metric_entries RLS', () => {
     sportId = await createTestSport(svc);
     definitionId = await createTestMetricDefinition(svc);
     [trainerA, trainerB, active, pending, completed, rejected, otherClub] = await Promise.all([
-      createTestUser(svc, sportId, 'me-ta'),
-      createTestUser(svc, sportId, 'me-tb'),
+      createTrainerUser(svc, 'me-ta'),
+      createTrainerUser(svc, 'me-tb'),
       createTestUser(svc, sportId, 'me-active'),
       createTestUser(svc, sportId, 'me-pending'),
       createTestUser(svc, sportId, 'me-completed'),
@@ -257,5 +261,66 @@ describe.skipIf(!envReady)('athlete_metric_entries RLS', () => {
       .from('athlete_metric_entries')
       .insert(entry(pending.athleteId, m.pending, trainerARow));
     expect(error).not.toBeNull();
+  });
+
+  // ── ADR-017: revoked trainers and deactivated clubs grant nothing ─────────────
+  // Each scenario applies one condition as service_role, checks the denial,
+  // then restores the row and checks access returns (so the denial is caused
+  // by the condition, not by the fixture).
+  const lostAccess = [
+    {
+      name: 'a revoked trainer',
+      apply: () => setTestTrainerRevoked(svc, trainerARow, true),
+      undo: () => setTestTrainerRevoked(svc, trainerARow, false),
+    },
+    {
+      name: 'a trainer of a deactivated club',
+      apply: () => setTestClubActive(svc, clubA, false),
+      undo: () => setTestClubActive(svc, clubA, true),
+    },
+  ];
+
+  describe.each(lostAccess)('$name', ({ apply, undo }) => {
+    beforeAll(apply);
+    afterAll(undo);
+
+    it('cannot SELECT entries of an ACTIVE membership', async () => {
+      const { data, error } = await trainerA.client
+        .from('athlete_metric_entries')
+        .select('id')
+        .eq('id', activeEntryId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it('cannot INSERT an entry for an ACTIVE membership', async () => {
+      const { error } = await trainerA.client
+        .from('athlete_metric_entries')
+        .insert(entry(active.athleteId, m.active, trainerARow));
+      expect(error).not.toBeNull();
+    });
+
+    it('the trigger rejects a service_role insert signed by that trainer row', async () => {
+      const { error } = await svc
+        .from('athlete_metric_entries')
+        .insert(entry(active.athleteId, m.active, trainerARow));
+      expect(error).not.toBeNull();
+    });
+
+    it('leaves the athlete\'s own entries readable', async () => {
+      const { data, error } = await active.client
+        .from('athlete_metric_entries')
+        .select('id')
+        .eq('id', activeEntryId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+  });
+
+  it('accepts a service_role insert again once revocation and deactivation are undone', async () => {
+    const row = entry(active.athleteId, m.active, trainerARow);
+    const { error } = await svc.from('athlete_metric_entries').insert(row);
+    expect(error).toBeNull();
+    await svc.from('athlete_metric_entries').delete().eq('id', row.id);
   });
 });

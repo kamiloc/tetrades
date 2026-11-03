@@ -14,6 +14,9 @@
  *   (g) a trainer cannot DELETE their row
  *   NULL safety: user_account_id and club_id are NOT NULL; (h) asserts an
  *   INSERT with NULL user_account_id is rejected even for service_role.
+ *   (i) one capacity per account (account_single_capacity.sql): a trainer row
+ *       for an athlete or ADMIN account is rejected for every writer
+ *   (j) a revoked row stays visible to its owner (history)
  */
 
 import { randomUUID } from 'node:crypto';
@@ -25,18 +28,22 @@ import {
   createTestClub,
   createTestSport,
   createTestUser,
+  createTrainerUser,
   deleteTestSport,
   envReady,
   getAnonClient,
   getServiceClient,
+  setTestTrainerRevoked,
+  createAdminUser,
   type TestUser,
+  type TrainerUser,
 } from './helpers/setup.js';
 
 describe.skipIf(!envReady)('club_trainers RLS', () => {
   const svc = getServiceClient();
   let sportId: string;
-  let trainer1: TestUser;
-  let trainer2: TestUser;
+  let trainer1: TrainerUser;
+  let trainer2: TrainerUser;
   let athlete: TestUser;
   let clubA: string;
   let clubB: string;
@@ -46,8 +53,8 @@ describe.skipIf(!envReady)('club_trainers RLS', () => {
   beforeAll(async () => {
     sportId = await createTestSport(svc);
     [trainer1, trainer2, athlete] = await Promise.all([
-      createTestUser(svc, sportId, 'ct-t1'),
-      createTestUser(svc, sportId, 'ct-t2'),
+      createTrainerUser(svc, 'ct-t1'),
+      createTrainerUser(svc, 'ct-t2'),
       createTestUser(svc, sportId, 'ct-ath'),
     ]);
     clubA = await createTestClub(svc, 'ct-a');
@@ -135,5 +142,60 @@ describe.skipIf(!envReady)('club_trainers RLS', () => {
       .from('club_trainers')
       .insert({ id: randomUUID(), club_id: clubA, user_account_id: null });
     expect(error).not.toBeNull();
+  });
+
+  // ── One capacity per account (ADR-017, account_single_capacity.sql) ─────────
+
+  it('(i) rejects a service_role trainer row for an athlete account', async () => {
+    const { error } = await svc
+      .from('club_trainers')
+      .insert({ id: randomUUID(), club_id: clubB, user_account_id: athlete.userAccountId });
+    expect(error).not.toBeNull();
+    expect(error?.message).toContain('athlete account cannot be a club trainer');
+  });
+
+  it('(i) rejects a service_role trainer row for an ADMIN account', async () => {
+    const admin = await createAdminUser(svc, 'ct-admin');
+    try {
+      const { error } = await svc
+        .from('club_trainers')
+        .insert({ id: randomUUID(), club_id: clubB, user_account_id: admin.userAccountId });
+      expect(error).not.toBeNull();
+      expect(error?.message).toContain('admin account cannot be a club trainer');
+    } finally {
+      await cleanupTestUser(svc, admin);
+    }
+  });
+
+  it('(i) rejects moving a trainer row onto an athlete account', async () => {
+    const { error } = await svc
+      .from('club_trainers')
+      .update({ user_account_id: athlete.userAccountId })
+      .eq('id', trainer2RowId);
+    expect(error).not.toBeNull();
+  });
+
+  it('(i) accepts a second club for a trainer-only account', async () => {
+    const id = randomUUID();
+    const { error } = await svc
+      .from('club_trainers')
+      .insert({ id, club_id: clubB, user_account_id: trainer1.userAccountId });
+    expect(error).toBeNull();
+    await svc.from('club_trainers').delete().eq('id', id);
+  });
+
+  it('(j) keeps a revoked row visible to its owner', async () => {
+    await setTestTrainerRevoked(svc, trainer1RowId, true);
+    try {
+      const { data, error } = await trainer1.client
+        .from('club_trainers')
+        .select('id, revoked_at')
+        .eq('id', trainer1RowId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+      expect(data?.[0]?.revoked_at).not.toBeNull();
+    } finally {
+      await setTestTrainerRevoked(svc, trainer1RowId, false);
+    }
   });
 });

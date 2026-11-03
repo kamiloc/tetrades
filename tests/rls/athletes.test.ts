@@ -7,8 +7,10 @@
  *   (c) owner can UPDATE their own row
  *   (d) cross-tenant UPDATE is denied
  *   (e) no INSERT/DELETE policy → client-side INSERT/DELETE are blocked
+ *   (f) one capacity per account: no athletes row for a trainer or ADMIN account
  */
 
+import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   cleanupTestUser,
@@ -17,6 +19,12 @@ import {
   deleteTestSport,
   envReady,
   getServiceClient,
+  setTestTrainerRevoked,
+  createTrainerUser,
+  createTestClub,
+  createAdminUser,
+  cleanupTestClub,
+  addClubTrainer,
   type TestUser,
 } from './helpers/setup.js';
 
@@ -103,5 +111,51 @@ describe.skipIf(!envReady)('athletes RLS', () => {
     });
 
     expect(error).not.toBeNull();
+  });
+
+  // ── One capacity per account (ADR-017, account_single_capacity.sql) ─────────
+
+  const athleteRow = (userAccountId: string) => {
+    const id = randomUUID();
+    return {
+      updated_at: new Date().toISOString(),
+      id,
+      user_account_id: userAccountId,
+      slug: `rls-capacity-${id.slice(0, 8)}`,
+      display_name: 'Valentina Ospina',
+      sport_id: sportId,
+      country_code: 'CO',
+      profile_status: 'ACTIVE',
+      is_under_legal_hold: false,
+    };
+  };
+
+  it('(f) rejects an athletes row for an account with a trainer row, even revoked', async () => {
+    const trainer = await createTrainerUser(svc, 'ath-tr');
+    const clubId = await createTestClub(svc, 'ath-cap');
+    try {
+      const rowId = await addClubTrainer(svc, clubId, trainer);
+      const first = await svc.from('athletes').insert(athleteRow(trainer.userAccountId));
+      expect(first.error).not.toBeNull();
+      expect(first.error?.message).toContain('club trainer account cannot have an athlete profile');
+
+      await setTestTrainerRevoked(svc, rowId, true);
+      const revoked = await svc.from('athletes').insert(athleteRow(trainer.userAccountId));
+      expect(revoked.error).not.toBeNull();
+    } finally {
+      await cleanupTestClub(svc, clubId);
+      await cleanupTestUser(svc, trainer);
+    }
+  });
+
+  it('(f) rejects an athletes row for an ADMIN account', async () => {
+    const admin = await createAdminUser(svc, 'ath-admin');
+    try {
+      const { error } = await svc.from('athletes').insert(athleteRow(admin.userAccountId));
+      expect(error).not.toBeNull();
+      expect(error?.message).toContain('Only an ATHLETE account can have an athlete profile');
+    } finally {
+      await cleanupTestUser(svc, admin);
+    }
   });
 });
