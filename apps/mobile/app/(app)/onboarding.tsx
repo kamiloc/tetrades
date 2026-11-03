@@ -1,4 +1,9 @@
 import { trpc, useBootstrapAthlete, useSports } from '@packages/api-client';
+import {
+  NON_ATHLETE_ACCOUNT_ONBOARDING_MESSAGE,
+  TRAINER_ACCOUNT_ONBOARDING_MESSAGE,
+} from '@packages/shared-logic';
+import { TRPCClientError } from '@trpc/client';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -25,6 +30,20 @@ const COUNTRIES: { code: string; name: string }[] = [
   { code: 'ES', name: 'España' },
   { code: 'US', name: 'Estados Unidos' },
 ];
+
+// One capacity per account (ADR-017): athlete.bootstrap answers FORBIDDEN for
+// trainer and admin accounts. The server message is only compared against
+// the known shared constant to pick fixed copy; it is never shown raw.
+function capacityError(err: unknown): string | null {
+  if (!(err instanceof TRPCClientError)) return null;
+  const data: unknown = err.data;
+  const code =
+    typeof data === 'object' && data !== null && 'code' in data ? (data as { code: unknown }).code : null;
+  if (code !== 'FORBIDDEN') return null;
+  return err.message === TRAINER_ACCOUNT_ONBOARDING_MESSAGE
+    ? TRAINER_ACCOUNT_ONBOARDING_MESSAGE
+    : NON_ATHLETE_ACCOUNT_ONBOARDING_MESSAGE;
+}
 
 function getSpanishError(message: string): string {
   if (message.includes('NOT_FOUND') || message.includes('Sport not available')) {
@@ -76,7 +95,7 @@ export default function OnboardingScreen() {
     } catch (err: unknown) {
       console.warn('[bootstrap] failed:', err);
       const message = err instanceof Error ? err.message : String(err);
-      setError(getSpanishError(message));
+      setError(capacityError(err) ?? getSpanishError(message));
     }
   };
 
