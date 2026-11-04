@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-03 (web portal shell)
+
+- Tokens: added the web-only portal shell colors from `web/index.html` to `tokens/colors.ts` (`ink3`, `inkDeep`, `inkEdge`, `inkLine`, `inkLine2`, `onInk2`, `onInk3`, `roleBlue`, `roleAmber`, `paper2`, `line2`, `tag`, `blue2`, `verified`, `verifiedTint`, `rejected`, `rejectedTint`, `scrim`). Additive keys; mobile maps only the keys it uses.
+- README: added "Web portal" to the intentional production exceptions: A1 replaced by the club list; no applications, documents, activity feed, permissions or search; email-only invite modal; "Suspended" renamed "Deactivated"; `/trainer/invitations` built without an artboard; fixed artboard widths replaced by a 1024 px minimum layout.
+
 ## 2026-11-03 (admin club and trainer management)
 
 - Clubs & trainers: added the "Inactive club" chip (status chip, `pending` tone) for memberships of a deactivated club; Leave stays available for an `ACTIVE` membership (ADR-017, D10).

@@ -1,28 +1,21 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { httpBatchLink } from '@trpc/client';
 import { useState, type ReactNode } from 'react';
 import superjson from 'superjson';
 
 import { trpc } from './client.js';
+import { createApiQueryClient } from './query-client.js';
 
 interface ApiProviderProps {
   children: ReactNode;
   apiUrl: string;
   getToken: () => Promise<string | null>;
+  /** Optional: called once per query or mutation that fails with UNAUTHORIZED. */
+  onUnauthorized?: () => void;
 }
 
-export function ApiProvider({ children, apiUrl, getToken }: ApiProviderProps) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 60 * 1000,
-            retry: 1,
-          },
-        },
-      }),
-  );
+export function ApiProvider({ children, apiUrl, getToken, onUnauthorized }: ApiProviderProps) {
+  const [queryClient] = useState(() => createApiQueryClient({ onUnauthorized }));
 
   const [trpcClient] = useState(() =>
     trpc.createClient({

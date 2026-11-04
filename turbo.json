@@ -14,7 +14,12 @@
     "@app/web#build": {
       "dependsOn": ["@packages/api-client#build"],
       "outputs": [".next/**", "!.next/cache/**"],
-      "env": ["NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+      "env": [
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "WEB_URL"
+      ]
     },
     "@app/mobile#build": {
       "outputs": []
