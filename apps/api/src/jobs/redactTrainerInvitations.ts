@@ -9,7 +9,11 @@
  *   - DECLINED or REVOKED, by responded_at;
  *   - PENDING past expiry (expired), by expires_at;
  *   - ACCEPTED, 90 days after its trainer row was revoked. An accepted
- *     invitation keeps its email while that trainer is active.
+ *     invitation keeps its email while that trainer is active. When a
+ *     revoked trainer is restored by a new invitation, acceptInvitation
+ *     redacts the superseded accepted ones at once (this query only sees the
+ *     row's current revoked_at), so at most one unredacted accepted
+ *     invitation per (club, account) remains for this job.
  *
  * One set-based UPDATE per category (approved raw SQL: Prisma can't set a
  * column from another column). Each statement is atomic and filters on

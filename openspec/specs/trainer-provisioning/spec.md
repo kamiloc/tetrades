@@ -71,10 +71,10 @@ The system SHALL let a signed-in user see and respond to a trainer invitation on
 - **THEN** no rows are returned
 
 ### Requirement: Accepting makes the invitee a trainer
-The system SHALL, when the invitee accepts a `PENDING`, unexpired invitation to an active club, mark it `ACCEPTED` and make the invitee's account a trainer of that club in the same operation. The account SHALL NOT be an athlete or an admin.
+The system SHALL, when the invitee accepts a `PENDING`, unexpired invitation to an active club, mark it `ACCEPTED` and make the invitee's account a trainer of that club in the same operation. The account SHALL NOT be an athlete, an admin, or a system account.
 
 #### Scenario: Accept
-- **WHEN** the invitee, whose account has no athlete profile and is not an admin, accepts a valid invitation
+- **WHEN** the invitee, whose account has no athlete profile and is not an admin or system account, accepts a valid invitation
 - **THEN** the invitation is `ACCEPTED` and the invitee can use trainer procedures for that club
 
 #### Scenario: Decline
@@ -86,7 +86,7 @@ The system SHALL, when the invitee accepts a `PENDING`, unexpired invitation to 
 - **THEN** the request is rejected and no trainer access is granted
 
 #### Scenario: Athlete or admin account
-- **WHEN** the invitee's account has an athlete profile or role `ADMIN`
+- **WHEN** the invitee's account has an athlete profile or role `ADMIN` or `SYSTEM`
 - **THEN** accepting is rejected as forbidden and the invitation stays `PENDING`
 
 ### Requirement: Admins revoke invitations and trainers
@@ -103,6 +103,10 @@ The system SHALL let an admin revoke a `PENDING` trainer invitation and revoke a
 #### Scenario: Return after revocation
 - **WHEN** an admin invites a revoked trainer's email again and they accept
 - **THEN** they regain trainer access to the club
+
+#### Scenario: Old invitation after revocation
+- **WHEN** a revoked trainer accepts a `PENDING` invitation to the same club that was created before the revocation, including while the revocation is in progress
+- **THEN** the request is rejected as not found, the trainer stays revoked, and only an invitation issued after the revocation can restore access
 
 ### Requirement: Revocation stops trainer writes already in progress
 The system SHALL ensure that a trainer write that has not committed when the trainer's revocation commits does not take effect. Trainer reads already in progress MAY finish.
@@ -127,7 +131,7 @@ The system SHALL let an admin list a club's trainers (active and revoked) and it
 - **THEN** the entry shows the originally invited address, labelled as the invited address, even if the trainer's sign-in email has since changed
 
 ### Requirement: Ended invitations lose their email after 90 days
-The system SHALL, on a schedule, replace the email of every invitation that ended (declined, revoked, or expired) more than 90 days ago with a redacted marker, keeping the rest of the record. An `ACCEPTED` invitation SHALL keep its email while the trainer it created is active, and SHALL be redacted 90 days after that trainer is revoked.
+The system SHALL, on a schedule, replace the email of every invitation that ended (declined, revoked, or expired) more than 90 days ago with a redacted marker, keeping the rest of the record. An `ACCEPTED` invitation SHALL keep its email while the trainer it created is active, and SHALL be redacted 90 days after that trainer is revoked. An `ACCEPTED` invitation superseded by a later acceptance for the same club and account SHALL be redacted when the later one is accepted.
 
 #### Scenario: Old declined invitation
 - **WHEN** the scheduled redaction runs and an invitation was declined 91 days ago
@@ -136,6 +140,10 @@ The system SHALL, on a schedule, replace the email of every invitation that ende
 #### Scenario: Active trainer's invitation
 - **WHEN** the scheduled redaction runs and an accepted invitation belongs to a trainer who is still active
 - **THEN** its email is unchanged
+
+#### Scenario: Superseded accepted invitation
+- **WHEN** a revoked trainer accepts a new invitation to the same club
+- **THEN** their earlier accepted invitations to that club are redacted in the same operation, and the new invitation keeps its email
 
 #### Scenario: Redaction failure
 - **WHEN** a redaction run fails

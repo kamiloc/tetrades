@@ -44,7 +44,7 @@ The system SHALL allow an admin-only operation only when the caller's account ro
 - **THEN** the admin's next call to an admin-only procedure is rejected as forbidden
 
 ### Requirement: An account acts in exactly one capacity
-The system SHALL let each account be at most one of: an athlete (has an athlete profile), a trainer (has trainer assignments, active or revoked), or an admin (role `ADMIN`). A person who needs more than one capacity SHALL use a separate account, with a separate email, for each. This SHALL hold for every writer, including server-side ones.
+The system SHALL let each account be at most one of: an athlete (has an athlete profile), a trainer (has trainer assignments, active or revoked), or an admin (role `ADMIN`). A `SYSTEM` service account SHALL be none of them. A person who needs more than one capacity SHALL use a separate account, with a separate email, for each. This SHALL hold for every writer, including server-side ones.
 
 #### Scenario: Admin attempts athlete onboarding
 - **WHEN** an account with role `ADMIN` submits athlete onboarding

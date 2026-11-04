@@ -20,6 +20,7 @@ import { TRPCClientError } from '@trpc/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { AppRouter } from '../../router/index.js';
+import { acceptInvitation } from '../../services/trainerInvitations.js';
 
 import {
   addClubTrainer,
@@ -42,14 +43,17 @@ import {
 
 const LOCK_WAIT_TIMEOUT_MS = 15_000;
 
-/** Resolves once some backend is waiting on a row lock of `table`. */
-async function waitForLockWaiter(table: 'clubs' | 'club_trainers'): Promise<void> {
+/** Resolves once some backend is waiting on a `mode` row lock of `table`. */
+async function waitForLockWaiter(
+  table: 'clubs' | 'club_trainers',
+  mode: 'FOR SHARE' | 'FOR UPDATE' = 'FOR SHARE',
+): Promise<void> {
   const deadline = Date.now() + LOCK_WAIT_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const rows = await prisma.$queryRaw<{ n: number }[]>`
       SELECT count(*)::int AS n FROM pg_stat_activity
       WHERE wait_event_type = 'Lock'
-        AND query ILIKE ${`%FROM ${table}%FOR SHARE%`}`;
+        AND query ILIKE ${`%FROM ${table}%${mode}%`}`;
     if ((rows[0]?.n ?? 0) > 0) return;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -258,6 +262,85 @@ describe.skipIf(!authReady)('trainer writes vs revocation and deactivation (lock
     } finally {
       await prisma.clubMembership.deleteMany({ where: { athleteId: athleteIdOf(invitee) } });
       await cleanupAuthedUser(invitee);
+    }
+  });
+
+  it('a membership accept blocked behind a deactivation is rejected and never becomes ACTIVE', async () => {
+    const { clubId, trainerRow } = await freshClub('race-macc');
+    const invitee = await createAuthedUser({ sportId, label: 'race-macc' });
+    try {
+      const membershipId = await createTestMembership({
+        clubId,
+        athleteId: athleteIdOf(invitee),
+        clubTrainerId: trainerRow,
+        status: 'PENDING_ATHLETE_CONFIRMATION',
+      });
+      const held = deactivate(clubId);
+      await held.applied;
+      const write = as(invitee).club.respondToInvitation.mutate({ membershipId, status: 'ACTIVE' });
+      await waitForLockWaiter('clubs');
+      held.release();
+      await held.committed;
+
+      expect(await codeOf(write)).toBe('BAD_REQUEST');
+      const { status } = await prisma.clubMembership.findUniqueOrThrow({
+        where: { id: membershipId },
+        select: { status: true },
+      });
+      expect(status).not.toBe('ACTIVE');
+    } finally {
+      await prisma.clubMembership.deleteMany({ where: { athleteId: athleteIdOf(invitee) } });
+      await cleanupAuthedUser(invitee);
+    }
+  });
+
+  it('a trainer-invitation accept blocked behind a revocation is NOT_FOUND and the row stays revoked', async () => {
+    const { clubId, trainerRow } = await freshClub('race-tacc');
+    const admin = await prisma.userAccount.create({
+      data: { supabaseUserId: `race-admin-${clubId}`, role: 'ADMIN', status: 'ACTIVE' },
+      select: { id: true },
+    });
+    try {
+      // Issued before the revocation (a direct insert: inviting an active
+      // trainer is otherwise a CONFLICT).
+      const email = `race.tacc.${clubId.slice(-8)}@club.co`;
+      const { id: invitationId } = await prisma.clubTrainerInvitation.create({
+        data: {
+          clubId,
+          email,
+          invitedByUserAccountId: admin.id,
+          expiresAt: new Date(Date.now() + 14 * 86_400_000),
+        },
+        select: { id: true },
+      });
+      const held = revoke(clubId, trainerRow);
+      await held.applied;
+      const write = acceptInvitation(
+        prisma,
+        { supabaseUserId: trainer.supabaseUserId, email },
+        invitationId,
+      ).then(
+        () => 'OK',
+        (e: unknown) => (e instanceof Error && 'code' in e ? String(e.code) : 'ERROR'),
+      );
+      await waitForLockWaiter('club_trainers', 'FOR UPDATE');
+      held.release();
+      await held.committed;
+
+      expect(await write).toBe('NOT_FOUND');
+      const row = await prisma.clubTrainer.findUniqueOrThrow({
+        where: { id: trainerRow },
+        select: { revokedAt: true },
+      });
+      expect(row.revokedAt).not.toBeNull();
+      const invitation = await prisma.clubTrainerInvitation.findUniqueOrThrow({
+        where: { id: invitationId },
+        select: { status: true },
+      });
+      expect(invitation.status).toBe('PENDING');
+    } finally {
+      await prisma.clubTrainerInvitation.deleteMany({ where: { invitedByUserAccountId: admin.id } });
+      await prisma.userAccount.deleteMany({ where: { id: admin.id } });
     }
   });
 });

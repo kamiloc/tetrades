@@ -39,3 +39,31 @@ export async function closeAndRedactInvitationsForEmail(
   }
   return rows.length;
 }
+
+/**
+ * Restore path (trainer-provisioning spec, design D4): when an accepted
+ * invitation brings a revoked trainer back, the earlier ACCEPTED invitations
+ * of that (club, account) are superseded and redacted at once. Otherwise
+ * their email would never be redacted, because the 90-day job reads the
+ * trainer row's current revokedAt, which the restore clears. Runs inside the
+ * accept transaction; returns how many rows were redacted.
+ */
+export async function redactSupersededAcceptedInvitations(
+  tx: Prisma.TransactionClient,
+  clubId: string,
+  userAccountId: string,
+  now: Date,
+): Promise<number> {
+  const rows = await tx.clubTrainerInvitation.findMany({
+    where: { clubId, acceptedByUserAccountId: userAccountId, status: 'ACCEPTED', redactedAt: null },
+    select: { id: true },
+  });
+  for (const row of rows) {
+    await tx.clubTrainerInvitation.update({
+      where: { id: row.id },
+      data: { email: redactedEmail(row.id), redactedAt: now },
+      select: { id: true },
+    });
+  }
+  return rows.length;
+}

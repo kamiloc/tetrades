@@ -13,9 +13,14 @@
  *     other or unconfirmed email, expired, no longer pending, or its club
  *     was deactivated). Ids can't be probed.
  *   - FORBIDDEN: this account cannot be a trainer (it has an athlete profile
- *     or role ADMIN; one capacity per account, D12).
+ *     or its role is not ATHLETE, i.e. ADMIN or SYSTEM; one capacity per
+ *     account, D12).
  * Accepting creates the ClubTrainer row, or clears revokedAt on an existing
  * one ("return after revocation"), so there is one row per (club, user).
+ * A revocation voids every invitation created before it: only an invitation
+ * issued after the revocation can restore access. Restoring redacts the
+ * earlier accepted invitations of that (club, account), which the new one
+ * supersedes, so their emails can't outlive the 90-day rule.
  *
  * Emails are L1: never logged, never in errors, never in the action log.
  */
@@ -40,7 +45,13 @@ import { cursorArgs, toPage } from '../lib/pagination.js';
 
 import { recordAdminAction, type AdminActor } from './adminClubs.js';
 import { withIsActive } from './clubOutput.js';
-import { lockActiveClub, lockClubForShare, lockTrainerForUpdate } from './locks.js';
+import { redactSupersededAcceptedInvitations } from './invitationRedaction.js';
+import {
+  lockActiveClub,
+  lockClubForShare,
+  lockTrainerForUpdate,
+  lockTrainerRowForAccept,
+} from './locks.js';
 
 const UNIQUE_VIOLATION = 'P2002';
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -362,11 +373,11 @@ async function requireOpenInvitation(
   prisma: PrismaClient,
   caller: InvitationCaller,
   invitationId: string,
-): Promise<{ clubId: string }> {
+): Promise<{ clubId: string; createdAt: Date }> {
   if (caller.email === null) throw new TRPCError({ code: 'NOT_FOUND', message: NOT_AVAILABLE });
   const invitation = await prisma.clubTrainerInvitation.findUnique({
     where: { id: invitationId },
-    select: { clubId: true, email: true, status: true, expiresAt: true },
+    select: { clubId: true, email: true, status: true, expiresAt: true, createdAt: true },
   });
   if (
     invitation === null ||
@@ -375,7 +386,7 @@ async function requireOpenInvitation(
   ) {
     throw new TRPCError({ code: 'NOT_FOUND', message: NOT_AVAILABLE });
   }
-  return { clubId: invitation.clubId };
+  return { clubId: invitation.clubId, createdAt: invitation.createdAt };
 }
 
 /**
@@ -401,7 +412,7 @@ export async function acceptInvitation(
   caller: InvitationCaller,
   invitationId: string,
 ): Promise<AcceptTrainerInvitationOutput> {
-  const { clubId } = await requireOpenInvitation(prisma, caller, invitationId);
+  const { clubId, createdAt } = await requireOpenInvitation(prisma, caller, invitationId);
   const email = caller.email ?? '';
 
   await prisma.$transaction(async (tx) => {
@@ -419,8 +430,10 @@ export async function acceptInvitation(
       update: {},
       select: { id: true, role: true, status: true, athlete: { select: { id: true } } },
     });
-    // One capacity per account (D12); the invitation stays PENDING.
-    if (account.athlete !== null || account.role === 'ADMIN') {
+    // One capacity per account (D12): only an ATHLETE-role account with no
+    // athlete profile can be a trainer (not ADMIN, not SYSTEM). The
+    // invitation stays PENDING.
+    if (account.athlete !== null || account.role !== 'ATHLETE') {
       throw new TRPCError({ code: 'FORBIDDEN', message: CANNOT_BE_TRAINER });
     }
     if (account.status === 'PENDING') {
@@ -429,6 +442,18 @@ export async function acceptInvitation(
         data: { status: 'ACTIVE' },
         select: { id: true },
       });
+    }
+
+    // Trainer row next (club → club_trainer, the order revokeTrainer uses),
+    // so an accept and a revocation of the same row serialize.
+    const existing = await lockTrainerRowForAccept(tx, clubId, account.id);
+    if (existing !== null && existing.revokedAt !== null) {
+      // A revocation voids every invitation created before it.
+      if (existing.revokedAt >= createdAt) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: NOT_AVAILABLE });
+      }
+      // Restoring: the earlier accepted invitations are superseded by this one.
+      await redactSupersededAcceptedInvitations(tx, clubId, account.id, new Date());
     }
 
     // One row per (club, user): create it, or restore a revoked one.

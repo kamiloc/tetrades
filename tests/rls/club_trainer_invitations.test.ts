@@ -204,6 +204,25 @@ describe.skipIf(!envReady)('club_trainer_invitations RLS and constraints', () =>
     expect((await update(id, { email: `redacted:${id}`, redacted_at: now() })).error).toBeNull();
   });
 
+  it('(t6) rejects accepting an expired or redacted PENDING invitation; revoking an expired one is allowed', async () => {
+    const accept = {
+      status: 'ACCEPTED',
+      accepted_by_user_account_id: invitee.userAccountId,
+      responded_at: now(),
+    };
+    const expired = await pending({ expires_at: new Date(Date.now() - DAY_MS).toISOString() });
+    const expiredAccept = await update(expired, accept);
+    expect(expiredAccept.error).not.toBeNull();
+    expect(expiredAccept.error?.message).toContain('expired or redacted trainer invitation cannot be accepted');
+
+    const redacted = await pending();
+    expect((await update(redacted, { email: `redacted:${redacted}`, redacted_at: now() })).error).toBeNull();
+    expect((await update(redacted, accept)).error).not.toBeNull();
+
+    // Deactivation and re-invitation still close expired rows as REVOKED.
+    expect((await update(expired, { status: 'REVOKED', responded_at: now() })).error).toBeNull();
+  });
+
   // ── Uniqueness ─────────────────────────────────────────────────────────────
 
   it('(u1) rejects a mixed-case email (lowercase CHECK)', async () => {

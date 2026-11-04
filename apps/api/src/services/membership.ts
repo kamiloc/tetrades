@@ -29,7 +29,7 @@ import { cursorArgs, toPage, type Page } from '../lib/pagination.js';
 
 import { lockAchievements } from './certification.js';
 import { withIsActive } from './clubOutput.js';
-import { lockTrainerAuthority, NOT_A_TRAINER_MESSAGE } from './locks.js';
+import { lockActiveClub, lockTrainerAuthority, NOT_A_TRAINER_MESSAGE } from './locks.js';
 import type { Viewer } from './viewer.js';
 
 const UNIQUE_VIOLATION = 'P2002';
@@ -167,7 +167,7 @@ async function transitionMembership(
 ): Promise<ClubMembershipMutationOutput> {
   const membership = await prisma.clubMembership.findUnique({
     where: { id: membershipId },
-    select: { id: true, status: true, athleteId: true },
+    select: { id: true, status: true, athleteId: true, clubId: true },
   });
   if (membership === null) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Membership not found' });
@@ -188,6 +188,16 @@ async function transitionMembership(
 
   const now = new Date();
   await prisma.$transaction(async (tx) => {
+    // Accepting joins an active club only. Club first (lock order, D7): this
+    // FOR SHARE lock conflicts with deactivateClub's FOR UPDATE, so an accept
+    // commits before a deactivation starts, or waits for it and is rejected
+    // here (the deactivation has closed the invitation as REJECTED).
+    if (to === 'ACTIVE' && !(await lockActiveClub(tx, membership.clubId))) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'This membership can no longer be changed that way',
+      });
+    }
     const { count } = await tx.clubMembership.updateMany({
       where: { id: membershipId, status: membership.status },
       data: {

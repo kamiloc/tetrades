@@ -109,10 +109,11 @@ Summaries (`AthleteMetricSummary`) aggregate every club, so the active-club trai
 | Actor                                   | Read                                                     | Write |
 | --------------------------------------- | -------------------------------------------------------- | ----- |
 | Platform Admin                          | a club's invitations with their derived state and the invited email (null once redacted) | invite; revoke `PENDING` |
-| Invitee (confirmed session email matches) | own `PENDING`, unexpired invitations to active clubs, through the API | accept (not as an athlete or admin account), decline |
+| Invitee (confirmed session email matches) | own `PENDING`, unexpired invitations to active clubs, through the API | accept (not as an athlete, admin or system account; not with an invitation created before the trainer's last revocation), decline |
 | Anyone else, including an unconfirmed email | deny (`NOT_FOUND`)                                   | deny |
 | Any client, direct database read        | deny (no client policies or privileges)                  | deny |
 | Job Worker (`trainer-invitation-redaction`) | ids and dates                                        | redact emails 90 days after the invitation ends |
+| API Server (trainer restored by a new invitation) | the person's earlier accepted invitations to that club | redact them at once (superseded) |
 | Job Worker (`deletePII`)                | invitations to the deleted athlete's confirmed email     | revoke and redact |
 
 ### Trainer assignments (`ClubTrainer`, L1)

@@ -250,7 +250,7 @@ describe.skipIf(!dbReady)('trainer invitation service', () => {
     expect(await prisma.clubTrainer.count({ where: { clubId } })).toBe(0);
   });
 
-  it('rejects an athlete account or an ADMIN account as FORBIDDEN, leaving the invitation PENDING', async () => {
+  it('rejects an athlete, ADMIN or SYSTEM account as FORBIDDEN, leaving the invitation PENDING', async () => {
     const clubId = await newClub('acc-cap');
     const athleteAccount = await prisma.userAccount.findUniqueOrThrow({
       where: { id: athleteFx.userAccountId },
@@ -263,7 +263,14 @@ describe.skipIf(!dbReady)('trainer invitation service', () => {
       ).supabaseUserId,
       email: email('admin'),
     };
-    for (const caller of [athleteCaller, adminCaller]) {
+    const systemSupabaseId = randomUUID();
+    createdSupabaseIds.push(systemSupabaseId);
+    await prisma.userAccount.create({
+      data: { supabaseUserId: systemSupabaseId, role: 'SYSTEM', status: 'ACTIVE' },
+      select: { id: true },
+    });
+    const systemCaller = { supabaseUserId: systemSupabaseId, email: email('sistema') };
+    for (const caller of [athleteCaller, adminCaller, systemCaller]) {
       const { id } = await inviteTrainer(prisma, actor, { clubId, email: caller.email });
       await expectCode(acceptInvitation(prisma, caller, id), 'FORBIDDEN');
       expect(
@@ -322,6 +329,11 @@ describe.skipIf(!dbReady)('trainer invitation service', () => {
     ]);
 
     // Return after revocation: same row, revokedAt cleared.
+    const [first] = await prisma.clubTrainerInvitation.findMany({
+      where: { clubId, status: 'ACCEPTED' },
+      select: { id: true, respondedAt: true },
+    });
+    if (first === undefined) throw new Error('fixture: first accepted invitation missing');
     const again = await inviteTrainer(prisma, actor, { clubId, email: person.address });
     await acceptInvitation(prisma, person, again.id);
     expect(await trainerRefFor(person, clubId)).toEqual({ id: ref.id, clubId });
@@ -329,7 +341,49 @@ describe.skipIf(!dbReady)('trainer invitation service', () => {
     expect((await listClubTrainers(prisma, { clubId, take: 20 })).items[0]).toMatchObject({
       status: 'ACTIVE',
       revokedAt: null,
+      invitedEmail: person.address,
     });
+
+    // The superseded accepted invitation is redacted at once (its status and
+    // dates kept); the new one carries the email.
+    const old = await prisma.clubTrainerInvitation.findUniqueOrThrow({
+      where: { id: first.id },
+      select: { email: true, status: true, redactedAt: true, respondedAt: true },
+    });
+    expect(old).toMatchObject({ email: `redacted:${first.id}`, status: 'ACCEPTED', respondedAt: first.respondedAt });
+    expect(old.redactedAt).not.toBeNull();
+    const current = await prisma.clubTrainerInvitation.findUniqueOrThrow({
+      where: { id: again.id },
+      select: { email: true, redactedAt: true },
+    });
+    expect(current).toEqual({ email: person.address, redactedAt: null });
+  });
+
+  it('a revocation voids invitations created before it: accepting one is NOT_FOUND', async () => {
+    const clubId = await newClub('rev-old');
+    const { person, ref } = await provisionedTrainer(clubId, 'mariana');
+    // Issued while the trainer is active (a direct insert: inviting an active
+    // trainer is otherwise a CONFLICT), then the trainer is revoked.
+    const { id: oldId } = await prisma.clubTrainerInvitation.create({
+      data: {
+        clubId,
+        email: person.address,
+        invitedByUserAccountId: adminAccountId,
+        expiresAt: new Date(Date.now() + 14 * DAY_MS),
+      },
+      select: { id: true },
+    });
+    await revokeTrainer(prisma, actor, ref.id);
+
+    await expectCode(acceptInvitation(prisma, person, oldId), 'NOT_FOUND');
+    await expectCode(trainerRefFor(person, clubId), 'FORBIDDEN');
+    const row = await prisma.clubTrainer.findUniqueOrThrow({ where: { id: ref.id }, select: { revokedAt: true } });
+    expect(row.revokedAt).not.toBeNull();
+    const old = await prisma.clubTrainerInvitation.findUniqueOrThrow({
+      where: { id: oldId },
+      select: { status: true, email: true },
+    });
+    expect(old).toEqual({ status: 'PENDING', email: person.address });
   });
 
   it('shows the originally invited address even if the sign-in email changed', async () => {

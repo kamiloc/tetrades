@@ -161,9 +161,32 @@ describe.skipIf(!envReady)('club_trainers RLS', () => {
         .from('club_trainers')
         .insert({ id: randomUUID(), club_id: clubB, user_account_id: admin.userAccountId });
       expect(error).not.toBeNull();
-      expect(error?.message).toContain('admin account cannot be a club trainer');
+      expect(error?.message).toContain('Only an ATHLETE-role account can be a club trainer');
     } finally {
       await cleanupTestUser(svc, admin);
+    }
+  });
+
+  it('(i) rejects a service_role trainer row for a SYSTEM account', async () => {
+    // A DB-only service account (no auth user): only its role matters here.
+    const systemAccountId = randomUUID();
+    const { error: uaErr } = await svc.from('user_accounts').insert({
+      id: systemAccountId,
+      supabase_user_id: `rls-system-${systemAccountId}`,
+      role: 'SYSTEM',
+      status: 'ACTIVE',
+      updated_at: new Date().toISOString(),
+    });
+    expect(uaErr).toBeNull();
+    try {
+      const { error } = await svc
+        .from('club_trainers')
+        .insert({ id: randomUUID(), club_id: clubB, user_account_id: systemAccountId });
+      expect(error).not.toBeNull();
+      expect(error?.message).toContain('Only an ATHLETE-role account can be a club trainer');
+    } finally {
+      await svc.from('club_trainers').delete().eq('user_account_id', systemAccountId);
+      await svc.from('user_accounts').delete().eq('id', systemAccountId);
     }
   });
 

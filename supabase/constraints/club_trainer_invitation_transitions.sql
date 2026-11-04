@@ -12,6 +12,9 @@
 --   - ACCEPTED needs accepted_by_user_account_id and responded_at; DECLINED and
 --     REVOKED need responded_at and no acceptor; PENDING has neither.
 --   - Terminal rows keep their status, acceptor and response time.
+--   - Only an unexpired (expires_at > now()), unredacted PENDING row can become
+--     ACCEPTED. Expired rows may still be closed as REVOKED (deactivation and
+--     re-invitation do that).
 --   - The only allowed email change, in any status, is the redaction (D13,
 --     D14): email becomes 'redacted:' || id and redacted_at is set, in the
 --     same update. A redacted row's email and redacted_at never change again.
@@ -66,6 +69,9 @@ BEGIN
       RAISE EXCEPTION 'A PENDING trainer invitation has no response';
     END IF;
   ELSIF NEW.status = 'ACCEPTED' THEN
+    IF OLD.expires_at <= now() OR OLD.redacted_at IS NOT NULL THEN
+      RAISE EXCEPTION 'An expired or redacted trainer invitation cannot be accepted';
+    END IF;
     IF NEW.accepted_by_user_account_id IS NULL OR NEW.responded_at IS NULL THEN
       RAISE EXCEPTION 'An ACCEPTED trainer invitation needs the accepting account and time';
     END IF;

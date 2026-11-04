@@ -7,7 +7,8 @@
 --
 -- Enforced for every writer, including service_role and the API:
 --   - club_trainers: reject a row for an account that has an athletes row or
---     role ADMIN.
+--     whose role is not ATHLETE (ADMIN and SYSTEM accounts are never trainers).
+--     Trainer accounts keep role ATHLETE: there is no TRAINER role.
 --   - athletes: reject a row for an account that has any club_trainers row or
 --     whose role is not ATHLETE.
 -- Both fire on INSERT and on any UPDATE that moves the row to another account.
@@ -26,6 +27,10 @@
 -- Before applying, confirm no account already holds both capacities:
 --   SELECT ct.user_account_id
 --   FROM club_trainers ct JOIN athletes a ON a.user_account_id = ct.user_account_id;
+-- Expected: zero rows.
+--   SELECT ct.user_account_id
+--   FROM club_trainers ct JOIN user_accounts ua ON ua.id = ct.user_account_id
+--   WHERE ua.role <> 'ATHLETE';
 -- Expected: zero rows.
 --
 -- Applied after the add_admin_club_trainer_management Prisma migration via:
@@ -51,8 +56,8 @@ BEGIN
   FOR UPDATE;
 
   -- A missing account is left to the foreign key, which rejects it.
-  IF account_role = 'ADMIN' THEN
-    RAISE EXCEPTION 'An admin account cannot be a club trainer';
+  IF account_role IS NOT NULL AND account_role <> 'ATHLETE' THEN
+    RAISE EXCEPTION 'Only an ATHLETE-role account can be a club trainer';
   END IF;
 
   IF EXISTS (SELECT 1 FROM public.athletes a WHERE a.user_account_id = NEW.user_account_id) THEN
