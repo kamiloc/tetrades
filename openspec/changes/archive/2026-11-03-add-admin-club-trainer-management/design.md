@@ -117,7 +117,7 @@ The global lock order becomes **club → club_trainer → membership → achieve
 - **`deactivateClub`** locks the club `FOR UPDATE`, sets `deactivatedAt`, then cancels in lock order: memberships (`PENDING_ATHLETE_CONFIRMATION` → `REJECTED`), certification requests (achievements through `lockAchievements`, then `CANCELLED` and `UNVERIFIED`), and trainer invitations (`PENDING` → `REVOKED`).
 - **`revokeTrainer`** locks the club `FOR SHARE`, then the trainer row `FOR UPDATE`, and sets `revokedAt`.
 - **Effect:** a trainer write either commits before the revocation or deactivation (which then waits on its lock), or finds the row gone and fails. **Reads** (`listRoster`, `listPendingCertifications`) take no lock: one already past `requireClubTrainer` may finish, as the spec allows.
-- These are raw-SQL lock helpers next to the approved ones in `services/certification.ts`. AGENTS.md requires explicit `$queryRaw` approval.
+- These are raw-SQL lock helpers next to the approved ones in `services/certification.ts`. AGENTS.md requires explicit `$queryRaw` approval; the owner approved it on 2026-11-03 for the whole D7 lock family (`lockActiveClub`, `lockActiveTrainer`, `lockTrainerAuthority`, `lockClubForShare`, `lockTrainerForUpdate`, `lockClubForUpdate`) and for the parameterized lock-holder and `pg_stat_activity` SQL in `trainer-lock-races.int.test.ts`.
 
 ### D8. `AdminActionLog`
 | Field | Level | Notes |
@@ -179,7 +179,7 @@ The logic lives in `services/adminClubs.ts` and `services/trainerInvitations.ts`
   - `DECLINED` or `REVOKED` with `respondedAt` more than 90 days ago, or
   - `PENDING` with `expiresAt` more than 90 days ago, or
   - `ACCEPTED` whose `ClubTrainer` row (by club and `acceptedByUserAccountId`) has `revokedAt` more than 90 days ago.
-- **How:** set `email = 'redacted:' || id` and `redacted_at = now()` with one set-based update per category, so a failed run leaves already-redacted rows marked and is safe to re-run. It logs counts with `requestId`.
+- **How:** set `email = 'redacted:' || id` and `redacted_at = now()` with one set-based update per category, so a failed run leaves already-redacted rows marked and is safe to re-run. It logs counts with `requestId`. Prisma can't set a column from another column, so these are `$executeRaw` statements; the owner approved that raw SQL on 2026-11-03.
 
 ### D14. Deletion
 - `deletePII` reads the auth user's confirmed email through the Supabase admin client **before** it deletes the auth user. In the same transaction as the other deletes, it sets every invitation with that email to `REVOKED` (if `PENDING`) and redacts its email.

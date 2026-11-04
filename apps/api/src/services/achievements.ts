@@ -21,6 +21,7 @@ import { TRPCError } from '@trpc/server';
 
 import { cursorArgs, toPage } from '../lib/pagination.js';
 
+import { clubIsActive } from './clubOutput.js';
 import type { Viewer } from './viewer.js';
 import {
   canView,
@@ -41,7 +42,7 @@ const publicAchievementSelect = {
     where: { status: 'APPROVED' },
     orderBy: { decidedAt: 'desc' },
     take: 1,
-    select: { club: { select: { name: true } } },
+    select: { club: { select: { name: true, deactivatedAt: true } } },
   },
 } as const;
 
@@ -101,7 +102,7 @@ export async function listAchievements(
         // Only a currently VERIFIED row is certified; an edit resets it.
         certifyingClub:
           showClub && row.verificationStatus === 'VERIFIED' && club !== undefined
-            ? { name: club.name }
+            ? { name: club.name, isActive: clubIsActive(club) }
             : null,
       };
     }),

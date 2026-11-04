@@ -18,6 +18,9 @@
 --   - DELETE: none (rows are history; deletePII removes them as service_role).
 --   Visibility to other audiences is enforced by the API visibility service;
 --   RLS here only grants the parties to the membership.
+--   Trainer authority (ADR-017): every club_trainers subquery requires
+--   `ct.revoked_at IS NULL AND public.club_is_active(ct.club_id)`, so a revoked
+--   trainer, or any trainer of a deactivated club, is treated as no trainer.
 -- ============================================
 
 ALTER TABLE public.club_memberships ENABLE ROW LEVEL SECURITY;
@@ -33,6 +36,7 @@ ALTER TABLE public.club_memberships FORCE ROW LEVEL SECURITY;
 --              OR-composed. Each is scoped to a party of the row; neither is
 --              a broad TRUE, so the union is exactly {athlete, club trainers}.
 -- ────────────────────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "club_memberships_select_athlete" ON public.club_memberships;
 CREATE POLICY "club_memberships_select_athlete"
   ON public.club_memberships
   FOR SELECT
@@ -56,7 +60,12 @@ CREATE POLICY "club_memberships_select_athlete"
 --              profile data; metric entries are gated separately by ACTIVE.
 -- NULL safety: club_id is NOT NULL.
 -- Composition: 2 SELECT policies, see club_memberships_select_athlete.
+-- Trainer row: only a non-revoked row of an active club counts (ADR-017).
+--              ct.revoked_at is nullable: NULL means active, so `IS NULL` is
+--              the grant and a revoked row matches nothing.
+--              public.club_is_active() returns FALSE for a deactivated club.
 -- ────────────────────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "club_memberships_select_club_trainer" ON public.club_memberships;
 CREATE POLICY "club_memberships_select_club_trainer"
   ON public.club_memberships
   FOR SELECT
@@ -68,6 +77,8 @@ CREATE POLICY "club_memberships_select_club_trainer"
       JOIN public.user_accounts ua ON ua.id = ct.user_account_id
       WHERE ct.club_id = club_memberships.club_id
         AND ua.supabase_user_id = auth.uid()::text
+        AND ct.revoked_at IS NULL
+        AND public.club_is_active(ct.club_id)
     )
   );
 
@@ -82,7 +93,12 @@ CREATE POLICY "club_memberships_select_club_trainer"
 --              responded_at / ended_at are nullable and must be NULL here.
 -- Composition: ONLY INSERT policy on this table.
 -- USING vs WITH CHECK: INSERT has no USING; the predicate goes in WITH CHECK.
+-- Trainer row: only a non-revoked row of an active club counts (ADR-017).
+--              ct.revoked_at is nullable: NULL means active, so `IS NULL` is
+--              the grant and a revoked row matches nothing.
+--              public.club_is_active() returns FALSE for a deactivated club.
 -- ────────────────────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "club_memberships_insert_club_trainer" ON public.club_memberships;
 CREATE POLICY "club_memberships_insert_club_trainer"
   ON public.club_memberships
   FOR INSERT
@@ -98,6 +114,8 @@ CREATE POLICY "club_memberships_insert_club_trainer"
       WHERE ct.id = club_memberships.invited_by_club_trainer_id
         AND ct.club_id = club_memberships.club_id
         AND ua.supabase_user_id = auth.uid()::text
+        AND ct.revoked_at IS NULL
+        AND public.club_is_active(ct.club_id)
     )
   );
 
@@ -115,6 +133,7 @@ CREATE POLICY "club_memberships_insert_club_trainer"
 --   and to land on a status an athlete may set (ACTIVE, REJECTED, COMPLETED).
 --   The exact edge is validated by the transition trigger.
 -- ────────────────────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "club_memberships_update_athlete" ON public.club_memberships;
 CREATE POLICY "club_memberships_update_athlete"
   ON public.club_memberships
   FOR UPDATE

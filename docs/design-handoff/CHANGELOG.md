@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-03 (admin club and trainer management)
+
+- Clubs & trainers: added the "Inactive club" chip (status chip, `pending` tone) for memberships of a deactivated club; Leave stays available for an `ACTIVE` membership (ADR-017, D10).
+- Onboarding: added the trainer-account message "This is a trainer account. Use the web portal to work with your club." and the generic non-athlete message, shown when `athlete.bootstrap` returns `FORBIDDEN` (ADR-017, D10).
+
 # 2026-10-28 (web portal audit)
 
 - Added the admin and trainer web portal prototype inventory to the handoff README.

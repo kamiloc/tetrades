@@ -23,6 +23,7 @@ import { TRPCError } from '@trpc/server';
 
 import { cursorArgs, toPage, type Page } from '../lib/pagination.js';
 
+import { lockTrainerAuthority } from './locks.js';
 import type { ClubTrainerRef } from './membership.js';
 import type { Viewer } from './viewer.js';
 import {
@@ -95,6 +96,9 @@ export async function reportEntry(
   }
 
   return prisma.$transaction(async (tx) => {
+    // Lock order club → trainer row first (ADR-017, D7): a revocation or
+    // deactivation that committed meanwhile makes this FORBIDDEN.
+    await lockTrainerAuthority(tx, trainer);
     const membership = await tx.clubMembership.findFirst({
       where: { clubId: trainer.clubId, athleteId: input.athleteId, status: 'ACTIVE' },
       select: { id: true },

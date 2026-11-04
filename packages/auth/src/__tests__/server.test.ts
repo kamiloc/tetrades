@@ -47,6 +47,7 @@ describe('extractBearerToken', () => {
 interface MockUser {
   id: string;
   email: string | null;
+  email_confirmed_at?: string | null;
 }
 
 interface MockGetUserResult {
@@ -64,9 +65,11 @@ function buildMockVerifier(result: MockGetUserResult): {
 }
 
 describe('verifyAccessToken', () => {
-  it('returns the userId and email from a valid token', async () => {
+  it('returns the userId and a confirmed email from a valid token', async () => {
     const { client, getUser } = buildMockVerifier({
-      data: { user: { id: 'user_123', email: 'a@b.com' } },
+      data: {
+        user: { id: 'user_123', email: 'a@b.com', email_confirmed_at: '2026-10-01T12:00:00Z' },
+      },
       error: null,
     });
 
@@ -74,6 +77,17 @@ describe('verifyAccessToken', () => {
 
     expect(verified).toEqual({ userId: 'user_123', email: 'a@b.com' });
     expect(getUser).toHaveBeenCalledWith('fake.jwt.token');
+  });
+
+  it('returns a null email when the email is not confirmed', async () => {
+    for (const emailConfirmedAt of [undefined, null, '']) {
+      const { client } = buildMockVerifier({
+        data: { user: { id: 'user_789', email: 'a@b.com', email_confirmed_at: emailConfirmedAt } },
+        error: null,
+      });
+      const verified = await verifyAccessToken(client, 'fake.jwt.token');
+      expect(verified).toEqual({ userId: 'user_789', email: null });
+    }
   });
 
   it('normalizes a missing email to null', async () => {

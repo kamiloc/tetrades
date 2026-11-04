@@ -308,6 +308,28 @@ describe.skipIf(!authReady)('notifications', () => {
       expect(message?.['data']).toEqual({ type: 'CERTIFICATION_DECIDED', subjectId: 'ccertrequest0000000000000' });
     });
 
+    it('delivers the closed-invitation copy, naming no club (ADR-017)', async () => {
+      await prisma.deviceToken.deleteMany({ where: { userAccountId: owner.userAccountId } });
+      await prisma.deviceToken.create({
+        data: { userAccountId: owner.userAccountId, token: pushToken(), platform: 'ANDROID' },
+      });
+      const calls: Call[] = [];
+      await sendPushNotification(
+        {
+          prisma,
+          fetch: fakeFetch(calls, (messages) =>
+            Response.json({ data: messages.map(() => ({ status: 'ok', id: randomUUID() })) }),
+          ),
+          log: silent,
+        },
+        { ...job(owner.userAccountId), notificationType: 'CLUB_INVITATION_CLOSED', subjectId: 'cmembership00000000000000' },
+      );
+      const [message] = calls[0]?.body as Record<string, unknown>[];
+      expect(message?.['title']).toBe('Invitación de club cerrada');
+      expect(message?.['body']).toBe('Una invitación de club ya no está disponible.');
+      expect(message?.['data']).toEqual({ type: 'CLUB_INVITATION_CLOSED', subjectId: 'cmembership00000000000000' });
+    });
+
     it('throws on a non-2xx response so the job is retried', async () => {
       await prisma.deviceToken.deleteMany({ where: { userAccountId: owner.userAccountId } });
       await prisma.deviceToken.create({

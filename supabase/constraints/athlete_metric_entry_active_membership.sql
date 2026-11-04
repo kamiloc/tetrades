@@ -1,5 +1,10 @@
 -- A metric entry must reference an ACTIVE membership of the same athlete,
 -- and the reporting trainer must belong to that membership's club (design D4).
+-- The reporting trainer row must not be revoked and the club must be active
+-- (ADR-017): a revoked trainer, or a trainer of a deactivated club, cannot
+-- report, through any writer. The club check goes through
+-- public.club_is_active() (supabase/policies/clubs.sql, apply that first)
+-- because client roles cannot read clubs.deactivated_at.
 -- Applies to every writer, including service_role. Entries are append-only:
 -- UPDATE is rejected outright; DELETE is left to service_role (deletePII),
 -- since no client DELETE policy exists.
@@ -21,8 +26,10 @@ BEGIN
       AND m.athlete_id = NEW.athlete_id
       AND m.status = 'ACTIVE'
       AND ct.id = NEW.reported_by_club_trainer_id
+      AND ct.revoked_at IS NULL
+      AND public.club_is_active(m.club_id)
   ) THEN
-    RAISE EXCEPTION 'Metric entry requires an ACTIVE membership of the same athlete with the reporting trainer''s club';
+    RAISE EXCEPTION 'Metric entry requires an ACTIVE membership of the same athlete with an active club and a non-revoked reporting trainer of that club';
   END IF;
 
   RETURN NEW;

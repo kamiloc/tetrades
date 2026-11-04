@@ -39,6 +39,12 @@ export const PUSH_COPY: Readonly<Record<NotificationType, { title: string; body:
     title: 'Solicitud de certificación respondida',
     body: 'Tu solicitud de certificación fue revisada. Abre la app para ver el resultado.',
   },
+  // Sent when a club's deactivation closes the athlete's pending invitation
+  // (ADR-017). Names no club.
+  CLUB_INVITATION_CLOSED: {
+    title: 'Invitación de club cerrada',
+    body: 'Una invitación de club ya no está disponible.',
+  },
 };
 
 export interface PushLogger {

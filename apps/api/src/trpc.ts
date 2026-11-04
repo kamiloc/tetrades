@@ -79,3 +79,24 @@ export const trainerProcedure = protectedProcedure
     const clubTrainer = await requireClubTrainer(ctx.prisma, viewer, input.clubId);
     return next({ ctx: { ...ctx, viewer, clubTrainer } });
   });
+
+/**
+ * Admin procedure (ADR-017, design D1) — for platform-admin operations on
+ * clubs and trainer access only.
+ *
+ * Authority comes from `UserAccount.role === 'ADMIN'` for ctx.userId, read
+ * fresh from the database on EVERY call: never the rate limiter's TTL-cached
+ * role (lib/userRole.ts), so a role removed by the owner takes effect on the
+ * next call. No procedure ever writes `role`. Not an admin → FORBIDDEN. The
+ * proven account is passed on as `ctx.admin`.
+ */
+export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  const account = await ctx.prisma.userAccount.findUnique({
+    where: { supabaseUserId: ctx.userId },
+    select: { id: true, role: true },
+  });
+  if (account === null || account.role !== 'ADMIN') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required.' });
+  }
+  return next({ ctx: { ...ctx, admin: { userAccountId: account.id } } });
+});

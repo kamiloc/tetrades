@@ -36,18 +36,22 @@ import {
   createTestMembership,
   createTestSport,
   createTestUser,
+  createTrainerUser,
   deleteTestSport,
   envReady,
   getAnonClient,
   getServiceClient,
+  setTestTrainerRevoked,
+  setTestClubActive,
   type TestUser,
+  type TrainerUser,
 } from './helpers/setup.js';
 
 describe.skipIf(!envReady)('achievement_certification_requests RLS', () => {
   const svc = getServiceClient();
   let sportId: string;
-  let trainerA: TestUser;
-  let trainerB: TestUser;
+  let trainerA: TrainerUser;
+  let trainerB: TrainerUser;
   let athleteX: TestUser;
   let athleteY: TestUser;
   let clubA: string;
@@ -64,8 +68,8 @@ describe.skipIf(!envReady)('achievement_certification_requests RLS', () => {
   beforeAll(async () => {
     sportId = await createTestSport(svc);
     [trainerA, trainerB, athleteX, athleteY] = await Promise.all([
-      createTestUser(svc, sportId, 'acr-ta'),
-      createTestUser(svc, sportId, 'acr-tb'),
+      createTrainerUser(svc, 'acr-ta'),
+      createTrainerUser(svc, 'acr-tb'),
       createTestUser(svc, sportId, 'acr-x'),
       createTestUser(svc, sportId, 'acr-y'),
     ]);
@@ -275,5 +279,39 @@ describe.skipIf(!envReady)('achievement_certification_requests RLS', () => {
         .eq('id', id);
       expect(error).not.toBeNull();
     }
+  });
+
+  // ── ADR-017: revoked trainers and deactivated clubs grant nothing ─────────────
+  // Each scenario applies one condition as service_role, checks the denial,
+  // then restores the row and checks access returns (so the denial is caused
+  // by the condition, not by the fixture).
+  const lostAccess = [
+    {
+      name: 'a revoked trainer',
+      apply: () => setTestTrainerRevoked(svc, trainerARow, true),
+      undo: () => setTestTrainerRevoked(svc, trainerARow, false),
+    },
+    {
+      name: 'a trainer of a deactivated club',
+      apply: () => setTestClubActive(svc, clubA, false),
+      undo: () => setTestClubActive(svc, clubA, true),
+    },
+  ];
+
+  describe.each(lostAccess)('$name', ({ apply, undo }) => {
+    beforeAll(apply);
+    afterAll(undo);
+
+    it('cannot read the club\'s PENDING request', async () => {
+      expect(await visibleIds(trainerA.client)).toEqual([]);
+    });
+
+    it('leaves the athlete\'s own requests readable', async () => {
+      expect(await visibleIds(athleteX.client)).toContain(pendingId);
+    });
+  });
+
+  it('restores the trainer\'s read once revocation and deactivation are undone', async () => {
+    expect(await visibleIds(trainerA.client)).toEqual([pendingId]);
   });
 });

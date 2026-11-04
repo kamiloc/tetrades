@@ -44,17 +44,21 @@ import {
   createTestMembership,
   createTestSport,
   createTestUser,
+  createTrainerUser,
   deleteTestSport,
   envReady,
   getServiceClient,
+  setTestTrainerRevoked,
+  setTestClubActive,
   type TestUser,
+  type TrainerUser,
 } from './helpers/setup.js';
 
 describe.skipIf(!envReady)('club_memberships RLS', () => {
   const svc = getServiceClient();
   let sportId: string;
-  let trainerA: TestUser;
-  let trainerB: TestUser;
+  let trainerA: TrainerUser;
+  let trainerB: TrainerUser;
   let athleteX: TestUser;
   let athleteY: TestUser;
   let clubA: string;
@@ -66,8 +70,8 @@ describe.skipIf(!envReady)('club_memberships RLS', () => {
   beforeAll(async () => {
     sportId = await createTestSport(svc);
     [trainerA, trainerB, athleteX, athleteY] = await Promise.all([
-      createTestUser(svc, sportId, 'cm-ta'),
-      createTestUser(svc, sportId, 'cm-tb'),
+      createTrainerUser(svc, 'cm-ta'),
+      createTrainerUser(svc, 'cm-tb'),
       createTestUser(svc, sportId, 'cm-x'),
       createTestUser(svc, sportId, 'cm-y'),
     ]);
@@ -92,7 +96,7 @@ describe.skipIf(!envReady)('club_memberships RLS', () => {
     await deleteTestSport(svc, sportId);
   });
 
-  const selectById = (user: TestUser, id: string) =>
+  const selectById = (user: TestUser | TrainerUser, id: string) =>
     user.client.from('club_memberships').select('id, status').eq('id', id);
 
   // ── SELECT ──────────────────────────────────────────────────────────────────
@@ -344,5 +348,56 @@ describe.skipIf(!envReady)('club_memberships RLS', () => {
     expect(data).toEqual([{ status: 'REJECTED' }]);
 
     await svc.from('club_memberships').delete().in('id', [rejectedId, reinviteId]);
+  });
+
+  // ── ADR-017: revoked trainers and deactivated clubs grant nothing ─────────────
+  // Each scenario applies one condition as service_role, checks the denial,
+  // then restores the row and checks access returns (so the denial is caused
+  // by the condition, not by the fixture).
+  const lostAccess = [
+    {
+      name: 'a revoked trainer',
+      apply: () => setTestTrainerRevoked(svc, trainerARow, true),
+      undo: () => setTestTrainerRevoked(svc, trainerARow, false),
+    },
+    {
+      name: 'a trainer of a deactivated club',
+      apply: () => setTestClubActive(svc, clubA, false),
+      undo: () => setTestClubActive(svc, clubA, true),
+    },
+  ];
+
+  describe.each(lostAccess)('$name', ({ apply, undo }) => {
+    beforeAll(apply);
+    afterAll(undo);
+
+    it('cannot SELECT the club\'s memberships', async () => {
+      const { data, error } = await selectById(trainerA, pendingX);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it('cannot INSERT an invitation', async () => {
+      const { error } = await trainerA.client.from('club_memberships').insert({
+        id: randomUUID(),
+        club_id: clubA,
+        athlete_id: athleteY.athleteId,
+        invited_by_club_trainer_id: trainerARow,
+        status: 'PENDING_ATHLETE_CONFIRMATION',
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it('leaves the athlete\'s own access unchanged', async () => {
+      const { data, error } = await selectById(athleteX, pendingX);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+  });
+
+  it('restores trainer access once revocation and deactivation are undone', async () => {
+    const { data, error } = await selectById(trainerA, pendingX);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
   });
 });

@@ -175,7 +175,8 @@ export function visibleAthleteWhere(
 /**
  * Metric entries `viewer` may see: entries of athletes whose metrics are
  * visible to them, plus — regardless of settings — entries whose authorizing
- * membership is ACTIVE with a club the viewer trains (mirrors RLS
+ * membership is ACTIVE with an active club the viewer trains and is not
+ * revoked from (mirrors RLS
  * athlete_metric_entries_select_active_club_trainer).
  */
 export function metricEntryVisibilityWhere(
@@ -191,7 +192,11 @@ export function metricEntryVisibilityWhere(
       {
         clubMembership: {
           status: 'ACTIVE',
-          club: { trainers: { some: { userAccountId: viewer.userAccountId } } },
+          // Only a non-revoked trainer of an active club (ADR-017).
+          club: {
+            deactivatedAt: null,
+            trainers: { some: { userAccountId: viewer.userAccountId, revokedAt: null } },
+          },
         },
       },
     ],

@@ -9,6 +9,13 @@ import { verifyAuthToken } from './middleware/auth.js';
 
 export interface Context {
   userId: string | null;
+  /**
+   * The caller's CONFIRMED email, trimmed and lowercased; null without a
+   * session or when Supabase has not confirmed the address (ADR-017 D2).
+   * L1-INTERNAL: only the trainer-invitation procedures read it. Never log it
+   * and never include it in an error message or a response.
+   */
+  userEmail: string | null;
   supabase: SupabaseClient;
   prisma: typeof prisma;
   /**
@@ -66,8 +73,16 @@ async function createBaseContext({
   return {
     prisma,
     userId: authResult.userId,
+    userEmail: normalizeEmail(authResult.authenticated ? authResult.email : null),
     supabase,
     requestId: req.id,
     log: req.log,
   };
+}
+
+/** Trimmed and lowercased, so it compares equal to stored invitation emails. */
+export function normalizeEmail(email: string | null): string | null {
+  if (email === null) return null;
+  const normalized = email.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
 }

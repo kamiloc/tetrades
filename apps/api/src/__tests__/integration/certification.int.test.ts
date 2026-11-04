@@ -153,9 +153,9 @@ describe.skipIf(!authReady)('achievement certification', () => {
     failingServer = await startServer(limits, { jobs: failing });
     sportId = await createTestSport();
     [trainerA, trainerA2, trainerB, athlete, other, noAthlete] = await Promise.all([
-      createAuthedUser({ sportId, label: 'cert-ta' }),
-      createAuthedUser({ sportId, label: 'cert-ta2' }),
-      createAuthedUser({ sportId, label: 'cert-tb' }),
+      createAuthedUser({ withAthlete: false, label: 'cert-ta' }),
+      createAuthedUser({ withAthlete: false, label: 'cert-ta2' }),
+      createAuthedUser({ withAthlete: false, label: 'cert-tb' }),
       createAuthedUser({ sportId, label: 'cert-athlete' }),
       createAuthedUser({ sportId, label: 'cert-other' }),
       createAuthedUser({ withAthlete: false, label: 'cert-none' }),
@@ -561,13 +561,9 @@ describe.skipIf(!authReady)('achievement certification', () => {
       ).id;
     });
 
-    it('rejects a trainer or another athlete (FORBIDDEN)', async () => {
-      for (const caller of [trainerA, other]) {
-        await expectTRPCCode(
-          as(caller).achievement.withdrawCertification.mutate({ requestId }),
-          'FORBIDDEN',
-        );
-      }
+    it('rejects another athlete (FORBIDDEN) and a trainer-only account (NOT_FOUND: no athlete profile)', async () => {
+      await expectTRPCCode(as(other).achievement.withdrawCertification.mutate({ requestId }), 'FORBIDDEN');
+      await expectTRPCCode(as(trainerA).achievement.withdrawCertification.mutate({ requestId }), 'NOT_FOUND');
       expect((await requestRow(requestId)).status).toBe('PENDING');
     });
 

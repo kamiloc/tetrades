@@ -1,11 +1,18 @@
 import { trpc, useLeaveClub, useRespondToClubInvitation } from '@packages/api-client';
-import { TAB_STATES, clubsSubtitle, partitionMemberships, selectViewState } from '@packages/shared-logic';
+import {
+  TAB_STATES,
+  clubActivityChip,
+  clubsSubtitle,
+  partitionMemberships,
+  selectViewState,
+} from '@packages/shared-logic';
 import { router } from 'expo-router';
 import { useMemo, useState, type ReactElement } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Avatar } from '../../../components/Avatar';
 import { Card } from '../../../components/Card';
+import { Chip } from '../../../components/Chip';
 import { EmptyRow } from '../../../components/EmptyRow';
 import { PillButton } from '../../../components/PillButton';
 import { ScreenHeader } from '../../../components/ScreenHeader';
@@ -23,6 +30,14 @@ const copy = TAB_STATES.clubs;
 const PAGE_SIZE = 50;
 
 const monthYear = (date: Date): string => date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+// "Inactive club" label for a deactivated club (ADR-017); nothing when active.
+function InactiveClubChip({ isActive }: { isActive: boolean }): ReactElement | null {
+  const chip = clubActivityChip({ isActive });
+  return chip === null ? null : (
+    <Chip label={chip.label} tone={chip.tone} icon={chip.icon} accessibilityLabel={chip.accessibilityLabel} small />
+  );
+}
 
 const RESPOND_ERRORS = {
   BAD_REQUEST: 'This invitation is no longer pending.',
@@ -173,7 +188,10 @@ export default function ClubsScreen(): ReactElement {
                     <View className="flex-row items-center gap-3">
                       <Avatar name={m.club.name} size={40} />
                       <View className="min-w-0 flex-1">
-                        <Text className="text-row-title text-text">{m.club.name}</Text>
+                        <View className="flex-row flex-wrap items-center gap-2">
+                          <Text className="text-row-title text-text">{m.club.name}</Text>
+                          <InactiveClubChip isActive={m.club.isActive} />
+                        </View>
                         <Text className="mt-0.5 text-meta text-muted">Invited {monthYear(m.createdAt)}</Text>
                       </View>
                       <StatusChip status="PENDING" small />
@@ -222,9 +240,11 @@ export default function ClubsScreen(): ReactElement {
                         }}
                       />
                       <View className="flex-1">
-                        <View className="flex-row items-center gap-2">
+                        <View className="flex-row flex-wrap items-center gap-2">
                           <Text className="text-row-title text-text">{m.club.name}</Text>
                           {current ? <Tag tone="blue">Current</Tag> : null}
+                          {/* Leave stays available for an ACTIVE membership of an inactive club. */}
+                          <InactiveClubChip isActive={m.club.isActive} />
                         </View>
                         <Text className="mt-[3px] text-meta text-muted">
                           {current

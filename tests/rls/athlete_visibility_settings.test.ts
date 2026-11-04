@@ -30,10 +30,12 @@ import {
   createTestMembership,
   createTestSport,
   createTestUser,
+  createTrainerUser,
   deleteTestSport,
   envReady,
   getServiceClient,
   type TestUser,
+  type TrainerUser,
 } from './helpers/setup.js';
 
 describe.skipIf(!envReady)('athlete_visibility_settings RLS', () => {
@@ -41,7 +43,7 @@ describe.skipIf(!envReady)('athlete_visibility_settings RLS', () => {
   let sportId: string;
   let owner: TestUser;
   let other: TestUser;
-  let trainer: TestUser;
+  let trainer: TrainerUser;
   let clubId: string;
 
   beforeAll(async () => {
@@ -49,7 +51,7 @@ describe.skipIf(!envReady)('athlete_visibility_settings RLS', () => {
     [owner, other, trainer] = await Promise.all([
       createTestUser(svc, sportId, 'vis-own'),
       createTestUser(svc, sportId, 'vis-oth'),
-      createTestUser(svc, sportId, 'vis-tr'),
+      createTrainerUser(svc, 'vis-tr'),
     ]);
     clubId = await createTestClub(svc, 'vis');
     const trainerRow = await addClubTrainer(svc, clubId, trainer);
@@ -67,7 +69,7 @@ describe.skipIf(!envReady)('athlete_visibility_settings RLS', () => {
     await deleteTestSport(svc, sportId);
   });
 
-  const read = (user: TestUser) =>
+  const read = (user: TestUser | TrainerUser) =>
     user.client
       .from('athlete_visibility_settings')
       .select('metrics_audience, club_memberships_audience, achievements_audience')

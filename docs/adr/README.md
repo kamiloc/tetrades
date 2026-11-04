@@ -22,7 +22,8 @@ This directory contains accepted architecture decisions derived from the active 
 - ADR-010 Background Jobs, Storage, and Image Processing
 - ADR-011 Web/Mobile Runtime Decisions
 - ADR-012 Testing, Logging, and Agent Session Protocol
-- ADR-013 Pivot: Clubs, Sport Metrics, Trainer Portal, and Visibility Controls — §7 default **partially superseded by ADR-014** (achievements only)
+- ADR-013 Pivot: Clubs, Sport Metrics, Trainer Portal, and Visibility Controls — §7 default **partially superseded by ADR-014** (achievements only); §5 **amended by ADR-017** (club deactivation closes pending invitations as `REJECTED`; `ACTIVE` memberships survive it)
 - ADR-014 Achievement Visibility and Its PUBLIC Default — trainer clause **partially superseded by ADR-016** (pending certification requests only)
 - ADR-015 Profile Photo Storage: Split Buckets and Upload Window — amends ADR-010 storage layout
 - ADR-016 Achievement Certification by Club Trainers
+- ADR-017 Platform Admin, Trainer Provisioning, and Club Lifecycle — amends ADR-013 §5

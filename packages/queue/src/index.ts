@@ -25,6 +25,7 @@ export {
   type QueueJobData,
   type QueueLogger,
   type QueueName,
+  type TrainerInvitationRedactionJobData,
 } from './types.js';
 export {
   createQueueWorker,

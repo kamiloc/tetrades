@@ -50,6 +50,27 @@ export {
 
 export { useMyVisibilitySettings, useUpdateVisibilitySettings } from './hooks/visibility';
 
+export {
+  useAdminWhoAmI,
+  useAdminClubs,
+  useAdminClub,
+  useAdminClubTrainers,
+  useAdminClubTrainerInvitations,
+  useCreateClub,
+  useUpdateClub,
+  useDeactivateClub,
+  useReactivateClub,
+  useInviteTrainer,
+  useRevokeTrainerInvitation,
+  useRevokeTrainer,
+} from './hooks/admin';
+
+export {
+  useMyTrainerInvitations,
+  useAcceptTrainerInvitation,
+  useDeclineTrainerInvitation,
+} from './hooks/trainerInvitation';
+
 export { useRegisterDeviceToken, useRemoveDeviceToken } from './hooks/notification';
 
 export { useQueryClient } from '@tanstack/react-query';

@@ -166,7 +166,21 @@ In both branches, never create the root as a side effect: do not run `openspec i
 
    If the sync failed, or any capability does not match, report what differs and stop — do not archive. Nothing has moved and `changeRoot` is intact, so the user can fix the mismatch or re-run the sync and start the archive again.
 
-5. **Perform the archive**
+5. **Audit the branch before archive**
+
+   Before any archive write, invoke the `openspec-branch-auditor` subagent using
+   `.agents/agents/openspec-branch-auditor.md` for the active change. The auditor
+   uses the current branch name to resolve the change and reviews the full branch
+   diff plus staged, unstaged, and untracked changes against its proposal, design,
+   delta specs, and every task. Wait for its complete report.
+
+   If the auditor cannot identify the branch/change/base, cannot inspect all
+   relevant changed files, or recommends `DO NOT ARCHIVE`, stop before moving the
+   change. Show its blockers and task ledger. Do not treat incomplete tasks as
+   audited or override findings through a user confirmation. Only continue when
+   it recommends `READY TO ARCHIVE`; include the audit result in the final summary.
+
+6. **Perform the archive**
 
    Create an `archive` directory under `planningHome.changesDir` if it doesn't exist:
    ```bash
@@ -183,7 +197,7 @@ In both branches, never create the root as a side effect: do not run `openspec i
    mv "<changeRoot>" "<planningHome.changesDir>/archive/<target-name>"
    ```
 
-6. **Display summary**
+7. **Display summary**
 
    Show archive completion summary including:
    - Change name
@@ -218,4 +232,5 @@ In both branches, never create the root as a side effect: do not run `openspec i
 - Consider every guidance entry and explain any inapplicable or conflicting advice
 - Existing CLI checks, resolved paths, prompts, and command contracts are unchanged
 - Artifact rules constrain only the specs being written and are never operation guidance
+- Always complete the branch audit immediately before archiving; do not archive if it is blocked or not ready
 - Never copy runtime context, operation guidance, or artifact-rule text verbatim into output files

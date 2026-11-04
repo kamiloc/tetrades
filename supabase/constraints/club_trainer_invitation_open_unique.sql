@@ -1,0 +1,27 @@
+-- At most one PENDING trainer invitation per club and email, compared
+-- case-insensitively (add-admin-club-trainer-management, design D3; ADR-017).
+-- Accepted, declined and revoked rows stay as history; a re-invite after one
+-- of those inserts a new row. An expired PENDING row is first moved to REVOKED
+-- by admin.inviteTrainer, in the same transaction, so the slot frees up.
+--
+-- Two guarantees, either of which alone makes the uniqueness
+-- case-insensitive:
+--   * the CHECK keeps every stored email lowercased, so lookups stay simple;
+--   * the expression index compares lower(email) regardless.
+-- A redacted row holds `redacted:<id>`, which is lowercase (cuids are
+-- lowercase) and unique per row, so redaction never collides.
+--
+-- NOT applied from this file. Prisma tracks indexes, so an index created
+-- outside its migration history would show up as drift on the next
+-- `prisma migrate dev`. Both statements therefore live in the hand-edited
+-- migration prisma/migrations/20261103020215_add_trainer_invitation_open_unique/
+-- migration.sql. This file documents them next to the other constraints; the
+-- definitions below must stay identical to that migration.
+--
+--   ALTER TABLE club_trainer_invitations
+--     ADD CONSTRAINT club_trainer_invitations_email_lowercase
+--     CHECK (email = lower(email));
+--
+--   CREATE UNIQUE INDEX club_trainer_invitations_open_unique
+--     ON club_trainer_invitations (club_id, lower(email))
+--     WHERE status = 'PENDING';

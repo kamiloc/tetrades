@@ -43,6 +43,7 @@ export function getAnonClient(): SupabaseClient {
 export const PLACEHOLDER_BYTES = Buffer.from('rls-test-placeholder').toString('base64');
 
 export interface TestUser {
+  kind: 'athlete';
   supabaseUserId: string;
   userAccountId: string;
   athleteId: string;
@@ -67,19 +68,25 @@ export async function deleteTestSport(svc: SupabaseClient, sportId: string): Pro
   await svc.from('sports').delete().eq('id', sportId);
 }
 
+interface AuthAccount {
+  supabaseUserId: string;
+  userAccountId: string;
+  email: string;
+  password: string;
+}
+
 /**
- * Creates a full test user stack:
- *   Supabase Auth user → user_accounts row → athletes row → signed-in JWT
+ * Supabase Auth user (confirmed email) → user_accounts row.
  *
  * Uses password auth (email_confirm: true) so tests can sign in immediately
  * without magic-link flow.  Password auth is used ONLY in test infrastructure,
  * not in the application (AGENTS.md Auth Rules).
  */
-export async function createTestUser(
+async function createAuthAccount(
   svc: SupabaseClient,
-  sportId: string,
   label: string,
-): Promise<TestUser> {
+  role: 'ATHLETE' | 'ADMIN' = 'ATHLETE',
+): Promise<AuthAccount & { uid: string }> {
   const uid = randomUUID().slice(0, 8);
   const email = `rls-${label}-${uid}@test.internal`;
   const password = randomUUID();
@@ -90,21 +97,68 @@ export async function createTestUser(
     email_confirm: true,
   });
   if (authErr !== null || authData.user === null) {
-    throw new Error(`createTestUser[auth](${label}): ${authErr?.message ?? 'null user'}`);
+    throw new Error(`createAuthAccount[auth](${label}): ${authErr?.message ?? 'null user'}`);
   }
   const supabaseUserId = authData.user.id;
 
+  // The auth bootstrap trigger may already have created the account row; the
+  // upsert makes the role and status explicit either way.
   const userAccountId = randomUUID();
+  const { data: existing } = await svc
+    .from('user_accounts')
+    .select('id')
+    .eq('supabase_user_id', supabaseUserId)
+    .maybeSingle<{ id: string }>();
+  if (existing !== null) {
+    const { error: upErr } = await svc
+      .from('user_accounts')
+      .update({ role, status: 'ACTIVE', updated_at: new Date().toISOString() })
+      .eq('id', existing.id);
+    if (upErr !== null) {
+      throw new Error(`createAuthAccount[user_accounts](${label}): ${upErr.message}`);
+    }
+    return { supabaseUserId, userAccountId: existing.id, email, password, uid };
+  }
   const { error: uaErr } = await svc.from('user_accounts').insert({
     updated_at: new Date().toISOString(),
     id: userAccountId,
     supabase_user_id: supabaseUserId,
-    role: 'ATHLETE',
+    role,
     status: 'ACTIVE',
   });
   if (uaErr !== null) {
-    throw new Error(`createTestUser[user_accounts](${label}): ${uaErr.message}`);
+    throw new Error(`createAuthAccount[user_accounts](${label}): ${uaErr.message}`);
   }
+  return { supabaseUserId, userAccountId, email, password, uid };
+}
+
+async function signIn(email: string, password: string, label: string): Promise<string> {
+  const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: sessionData, error: signInErr } = await anonClient.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (signInErr !== null || sessionData.session === null) {
+    throw new Error(`signIn(${label}): ${signInErr?.message ?? 'null session'}`);
+  }
+  return sessionData.session.access_token;
+}
+
+/**
+ * Creates a full athlete test user stack:
+ *   Supabase Auth user → user_accounts row → athletes row → signed-in JWT
+ */
+export async function createTestUser(
+  svc: SupabaseClient,
+  sportId: string,
+  label: string,
+): Promise<TestUser> {
+  const { supabaseUserId, userAccountId, email, password, uid } = await createAuthAccount(
+    svc,
+    label,
+  );
 
   const athleteId = randomUUID();
   const { error: athErr } = await svc.from('athletes').insert({
@@ -122,24 +176,69 @@ export async function createTestUser(
     throw new Error(`createTestUser[athletes](${label}): ${athErr.message}`);
   }
 
-  const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data: sessionData, error: signInErr } = await anonClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-  if (signInErr !== null || sessionData.session === null) {
-    throw new Error(`createTestUser[signIn](${label}): ${signInErr?.message ?? 'null session'}`);
-  }
-
+  const accessToken = await signIn(email, password, label);
   return {
+    kind: 'athlete',
     supabaseUserId,
     userAccountId,
     athleteId,
     email,
-    accessToken: sessionData.session.access_token,
-    client: getUserClient(sessionData.session.access_token),
+    accessToken,
+    client: getUserClient(accessToken),
+  };
+}
+
+/**
+ * A trainer-only account (ADR-017 one capacity per account): Supabase Auth
+ * user → user_accounts row (role ATHLETE, no athletes row) → signed-in JWT.
+ * Make it a trainer of a club with addClubTrainer.
+ */
+export interface TrainerUser {
+  kind: 'trainer';
+  supabaseUserId: string;
+  userAccountId: string;
+  email: string;
+  accessToken: string;
+  client: SupabaseClient;
+}
+
+export async function createTrainerUser(svc: SupabaseClient, label: string): Promise<TrainerUser> {
+  const { supabaseUserId, userAccountId, email, password } = await createAuthAccount(svc, label);
+  const accessToken = await signIn(email, password, label);
+  return {
+    kind: 'trainer',
+    supabaseUserId,
+    userAccountId,
+    email,
+    accessToken,
+    client: getUserClient(accessToken),
+  };
+}
+
+/** An account with role ADMIN and no athlete or trainer rows. */
+export interface AdminUser {
+  kind: 'admin';
+  supabaseUserId: string;
+  userAccountId: string;
+  email: string;
+  accessToken: string;
+  client: SupabaseClient;
+}
+
+export async function createAdminUser(svc: SupabaseClient, label: string): Promise<AdminUser> {
+  const { supabaseUserId, userAccountId, email, password } = await createAuthAccount(
+    svc,
+    label,
+    'ADMIN',
+  );
+  const accessToken = await signIn(email, password, label);
+  return {
+    kind: 'admin',
+    supabaseUserId,
+    userAccountId,
+    email,
+    accessToken,
+    client: getUserClient(accessToken),
   };
 }
 
@@ -147,7 +246,27 @@ export async function createTestUser(
  * Removes all test data for a user in reverse FK dependency order.
  * Errors are suppressed so cleanup never hides test failures.
  */
-export async function cleanupTestUser(svc: SupabaseClient, user: TestUser): Promise<void> {
+export async function cleanupTestUser(
+  svc: SupabaseClient,
+  user: TestUser | TrainerUser | AdminUser,
+): Promise<void> {
+  if (user.kind !== 'athlete') {
+    // Trainer and admin accounts own no athlete data. Their club_trainers rows
+    // must already be free of memberships, entries and decisions
+    // (cleanupTestClub runs first).
+    await svc.from('device_tokens').delete().eq('user_account_id', user.userAccountId);
+    await svc
+      .from('club_trainer_invitations')
+      .delete()
+      .or(
+        `invited_by_user_account_id.eq.${user.userAccountId},accepted_by_user_account_id.eq.${user.userAccountId}`,
+      );
+    await svc.from('admin_action_log').delete().eq('actor_user_account_id', user.userAccountId);
+    await svc.from('club_trainers').delete().eq('user_account_id', user.userAccountId);
+    await svc.from('user_accounts').delete().eq('id', user.userAccountId);
+    await svc.auth.admin.deleteUser(user.supabaseUserId);
+    return;
+  }
   // Nullify avatar reference before deleting photo assets (Restrict FK)
   await svc
     .from('athlete_public_profiles')
@@ -194,11 +313,15 @@ export async function createTestClub(svc: SupabaseClient, label: string): Promis
   return id;
 }
 
-/** Makes `user` a trainer of `clubId`; returns the club_trainers.id. */
+/**
+ * Makes trainer-only `user` a trainer of `clubId`; returns the
+ * club_trainers.id. An athlete account cannot be a trainer
+ * (account_single_capacity.sql), hence the TrainerUser type.
+ */
 export async function addClubTrainer(
   svc: SupabaseClient,
   clubId: string,
-  user: TestUser,
+  user: TrainerUser,
 ): Promise<string> {
   const id = randomUUID();
   const { error } = await svc
@@ -206,6 +329,32 @@ export async function addClubTrainer(
     .insert({ id, club_id: clubId, user_account_id: user.userAccountId });
   if (error) throw new Error(`addClubTrainer: ${error.message}`);
   return id;
+}
+
+/** Deactivates (or, with `active`, reactivates) a club as service_role (ADR-017). */
+export async function setTestClubActive(
+  svc: SupabaseClient,
+  clubId: string,
+  active: boolean,
+): Promise<void> {
+  const { error } = await svc
+    .from('clubs')
+    .update({ deactivated_at: active ? null : new Date().toISOString() })
+    .eq('id', clubId);
+  if (error) throw new Error(`setTestClubActive: ${error.message}`);
+}
+
+/** Revokes (or, with `restore`, un-revokes) a club_trainers row as service_role. */
+export async function setTestTrainerRevoked(
+  svc: SupabaseClient,
+  clubTrainerId: string,
+  revoked: boolean,
+): Promise<void> {
+  const { error } = await svc
+    .from('club_trainers')
+    .update({ revoked_at: revoked ? new Date().toISOString() : null })
+    .eq('id', clubTrainerId);
+  if (error) throw new Error(`setTestTrainerRevoked: ${error.message}`);
 }
 
 /**
@@ -271,6 +420,7 @@ export async function cleanupTestClub(svc: SupabaseClient, clubId: string): Prom
     await svc.from('athlete_metric_entries').delete().in('club_membership_id', membershipIds);
   }
   await svc.from('club_memberships').delete().eq('club_id', clubId);
+  await svc.from('club_trainer_invitations').delete().eq('club_id', clubId);
   await svc.from('club_trainers').delete().eq('club_id', clubId);
   await svc.from('clubs').delete().eq('id', clubId);
 }

@@ -25,11 +25,13 @@ import {
   createTestMetricDefinition,
   createTestSport,
   createTestUser,
+  createTrainerUser,
   deleteTestMetricDefinition,
   deleteTestSport,
   envReady,
   getServiceClient,
   type TestUser,
+  type TrainerUser,
 } from './helpers/setup.js';
 
 describe.skipIf(!envReady)('athlete_metric_summaries RLS', () => {
@@ -39,7 +41,7 @@ describe.skipIf(!envReady)('athlete_metric_summaries RLS', () => {
   let otherDefinitionId: string;
   let athlete: TestUser;
   let stranger: TestUser;
-  let trainer: TestUser;
+  let trainer: TrainerUser;
   let clubId: string;
 
   beforeAll(async () => {
@@ -49,7 +51,7 @@ describe.skipIf(!envReady)('athlete_metric_summaries RLS', () => {
     [athlete, stranger, trainer] = await Promise.all([
       createTestUser(svc, sportId, 'ms-ath'),
       createTestUser(svc, sportId, 'ms-str'),
-      createTestUser(svc, sportId, 'ms-tr'),
+      createTrainerUser(svc, 'ms-tr'),
     ]);
     clubId = await createTestClub(svc, 'ms');
     const trainerRow = await addClubTrainer(svc, clubId, trainer);
@@ -78,7 +80,7 @@ describe.skipIf(!envReady)('athlete_metric_summaries RLS', () => {
     await deleteTestSport(svc, sportId);
   });
 
-  const read = (user: TestUser) =>
+  const read = (user: TestUser | TrainerUser) =>
     user.client
       .from('athlete_metric_summaries')
       .select('metric_definition_id')
