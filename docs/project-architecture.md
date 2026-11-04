@@ -57,9 +57,20 @@ Next.js Server Component → tRPC `createCallerFactory` → explicit Prisma `sel
 Two server-held paths; the token comes from the server session and never reaches the browser.
 
 - **Browser proxy:** client hooks call `/api/trpc/[trpc]` on the web origin → the route rejects a `POST` whose `Origin` isn't `WEB_URL` → adds `Authorization: Bearer <access token>` from the cookie session → forwards method, procedure path, query string (`batch=1`, `input=…`) and body unchanged to `NEXT_PUBLIC_API_URL`, with only `content-type`, `accept`, `trpc-accept` and a fresh `x-request-id` (never `cookie`) → `fetch` with `cache: 'no-store'` → response marked `Cache-Control: private, no-store`, refreshed cookies applied.
-- **Server-only client:** Server Components, server actions and route handlers call the API directly through `@packages/api-client/server` (`createServerApiClient`, React-free, `no-store`) via `lib/server-api.ts`. Used for the admin layout guard (`admin.whoAmI`) and the post-sign-in landing.
+- **Server-only client:** Server Components, server actions and route handlers call the API directly through `@packages/api-client/server` (`createServerApiClient`, React-free, `no-store`) via `lib/server-api.ts`. Used for the admin layout guard (`admin.whoAmI`), the trainer club guard (`club.listMyTrainerClubs`) and the post-sign-in landing.
 
 An `UNAUTHORIZED` answer on the browser path triggers `ApiProvider`'s `onUnauthorized`, which navigates to `/login?next=<current page>`.
+
+### Web trainer portal (`apps/web`)
+
+Sign-in lands a non-admin on `/trainer` → server-side `club.listMyTrainerClubs` (the caller's non-revoked trainer assignments at active clubs; never a ClubTrainer id) → the only club's roster, the club picker, or a no-club note → `clubs/[clubId]/layout.tsx` checks the URL's club against that list once per navigation and renders "not a trainer of this club" without loading club data → club pages call the trainer procedures through the browser proxy, and the API re-checks `trainerProcedure` on every call:
+
+- **Roster:** `club.listRoster` and `club.getRosterAthlete` share one filter (`services/trainerWorkspace.ts` `rosterWhere`): `ACTIVE`, or `PENDING_ATHLETE_CONFIRMATION` sent by this trainer. Rows carry L0 identity and sport only, never another club's membership.
+- **Invite lookup:** `club.findAthleteToInvite` is the one trainer read outside the club (trainer-access-boundary exception). By name: searchable `ACTIVE` athletes, case-insensitive, paginated. By exact slug: any `ACTIVE` athlete, searchable or not (the dialog reads it from a pasted profile link or handle). Output is `id`, `slug`, `displayName`, sport and the relation to this club (`MEMBER`, `INVITED_BY_YOU`, or `null`, which also hides another trainer's pending invitation) → `club.inviteAthlete` → membership pending until the athlete confirms.
+- **Metrics:** `metric.getSummaries` and `metric.listEntries` (visibility-filtered as for any viewer), entries attributed to "this club" or "another club", never to a trainer → `metric.reportEntry` with `measuredAt` = now for today, local noon for an earlier day.
+- **Certifications:** `achievement.listPendingCertifications` → `achievement.decideCertification`.
+
+Mutations invalidate the affected queries (`@packages/api-client` hooks): invite → roster and lookup; report → summaries and entries; decide → the queue.
 
 ### Profile photo
 

@@ -28,4 +28,11 @@ export const usePendingCertifications = (
   input: Pick<ListPendingCertificationsInput, 'clubId'> & Partial<ListPendingCertificationsInput>,
 ) => trpc.achievement.listPendingCertifications.useQuery(input);
 
-export const useDecideCertification = () => trpc.achievement.decideCertification.useMutation();
+// Trainer: approve or reject a request. Refreshes the club's queue.
+export const useDecideCertification = () => {
+  const utils = trpc.useUtils();
+  return trpc.achievement.decideCertification.useMutation({
+    onSuccess: (_result, { clubId }) =>
+      utils.achievement.listPendingCertifications.invalidate({ clubId }),
+  });
+};

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-04 (web trainer portal)
+
+- README: added "Trainer portal" to the intentional production exceptions: no T1 dashboard; roster without groups, age or identifiers; athlete page with metrics only (no sessions, attendance, access or achievements tabs); metric logging without conditions or evidence; club-only entry attribution, no trainer names; certification queue without evidence, "Verify" or "ask for info"; athlete-only invitations (no staff invites, email lists or share links); no exports or messages; the club switcher in the sidebar.
+- README: the web portal shell note now points to the trainer portal section instead of `add-trainer-portal`.
+
 ## 2026-11-03 (web portal shell)
 
 - Tokens: added the web-only portal shell colors from `web/index.html` to `tokens/colors.ts` (`ink3`, `inkDeep`, `inkEdge`, `inkLine`, `inkLine2`, `onInk2`, `onInk3`, `roleBlue`, `roleAmber`, `paper2`, `line2`, `tag`, `blue2`, `verified`, `verifiedTint`, `rejected`, `rejectedTint`, `scrim`). Additive keys; mobile maps only the keys it uses.

@@ -290,7 +290,9 @@ describe.skipIf(!authReady)('club, metric, and visibility routers', () => {
         expect(ids).not.toContain(hidden);
         expect(ids).not.toContain(ended);
         for (const row of page.items) {
-          expect(Object.keys(row.athlete).sort()).toEqual(['displayName', 'id', 'slug']);
+          expect(Object.keys(row.athlete).sort()).toEqual(['displayName', 'id', 'slug', 'sport']);
+          expect(row.athlete.sport.id).toBe(sportId);
+          expect(typeof row.athlete.sport.name).toBe('string');
         }
       } finally {
         await prisma.clubMembership.deleteMany({
@@ -355,6 +357,22 @@ describe.skipIf(!authReady)('club, metric, and visibility routers', () => {
       const entry = await as(trainerA).metric.reportEntry.mutate(input(clubA, athleteIdOf(athlete)));
       expect(entry.value).toBe(52.3);
       expect(entry.clubId).toBe(clubA);
+    });
+
+    // Pins the future-time rule the web log-metric dialog relies on (design D4):
+    // the request time is accepted (test above), 10 minutes ahead is not.
+    it('rejects a measuredAt 10 minutes ahead of the request time', async () => {
+      await resetMemberships();
+      await createTestMembership({
+        clubId: clubA, athleteId: athleteIdOf(athlete), clubTrainerId: trainerARow, status: 'ACTIVE',
+      });
+      await expectTRPCCode(
+        as(trainerA).metric.reportEntry.mutate({
+          ...input(clubA, athleteIdOf(athlete)),
+          measuredAt: new Date(Date.now() + 10 * 60_000),
+        }),
+        'BAD_REQUEST',
+      );
     });
 
     it('is FORBIDDEN for a pending member, a non-trainer, and another club', async () => {

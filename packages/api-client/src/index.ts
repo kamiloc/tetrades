@@ -40,7 +40,11 @@ export {
   useLeaveClub,
   useMyClubMemberships,
   useClubRoster,
+  useMyTrainerClubs,
+  useRosterAthlete,
+  useFindAthleteToInvite,
 } from './hooks/club';
+export type { FindAthleteToInviteHookInput } from './hooks/club';
 
 export {
   useMetricDefinitions,
