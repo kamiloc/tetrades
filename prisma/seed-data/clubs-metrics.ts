@@ -131,6 +131,71 @@ export const CLUBS: ReadonlyArray<ClubSeed> = [
     city: 'Bogotá',
     trainerSupabaseUserIds: ['seed-trainer-natalia-forero'],
   },
+  {
+    // Deactivated after seeding (DEACTIVATED_CLUB_SLUGS, ADR-017).
+    slug: 'liga-futbol-cundinamarca',
+    name: 'Liga de Fútbol de Cundinamarca',
+    city: 'Zipaquirá',
+    trainerSupabaseUserIds: ['seed-trainer-german-castiblanco'],
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Platform admin, club lifecycle, trainer provisioning (ADR-017)
+// ---------------------------------------------------------------------------
+
+/**
+ * DEV-ONLY platform admin account. It has no Supabase auth user, so it can't
+ * sign in; it exists to own the seeded invitations and admin log rows. In a
+ * real environment the project owner invites the admin's email in Supabase
+ * Auth and runs `UPDATE user_accounts SET role = 'ADMIN' WHERE ...` by hand.
+ */
+export const DEV_ADMIN_SUPABASE_USER_ID = 'seed-admin-dev-only';
+
+/** Clubs deactivated after seeding: they stay listed, marked inactive. */
+export const DEACTIVATED_CLUB_SLUGS: ReadonlyArray<string> = ['liga-futbol-cundinamarca'];
+
+export type RevokedTrainerSeed = {
+  readonly clubSlug: string;
+  /** A trainer-only account, like every seeded trainer. */
+  readonly supabaseUserId: string;
+  /** The address of the accepted invitation that created the assignment. */
+  readonly invitedEmail: string;
+  readonly acceptedDaysAgo: number;
+  readonly revokedDaysAgo: number;
+};
+
+export const REVOKED_TRAINERS: ReadonlyArray<RevokedTrainerSeed> = [
+  {
+    clubSlug: 'liga-ciclismo-boyaca',
+    supabaseUserId: 'seed-trainer-wilson-avila',
+    invitedEmail: 'wilson.avila@ligaciclismoboyaca.example',
+    acceptedDaysAgo: 210,
+    revokedDaysAgo: 40,
+  },
+];
+
+export type TrainerInvitationSeed = {
+  readonly clubSlug: string;
+  readonly email: string;
+  /** PENDING expires 14 days after it was sent; EXPIRED was sent long ago. */
+  readonly state: 'PENDING' | 'EXPIRED';
+  readonly invitedDaysAgo: number;
+};
+
+export const TRAINER_INVITATIONS: ReadonlyArray<TrainerInvitationSeed> = [
+  {
+    clubSlug: 'liga-atletismo-atlantico',
+    email: 'yuranis.mercado@ligaatletismoatlantico.example',
+    state: 'PENDING',
+    invitedDaysAgo: 3,
+  },
+  {
+    clubSlug: 'liga-patinaje-tolima',
+    email: 'johana.bonilla@ligapatinajetolima.example',
+    state: 'EXPIRED',
+    invitedDaysAgo: 30,
+  },
 ];
 
 export type MetricSeed = {

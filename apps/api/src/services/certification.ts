@@ -10,9 +10,13 @@
  * and one open request per achievement (partial unique index).
  *
  * Concurrent writers serialize on row locks taken in one global order —
- * membership, then achievement, then request — so a racing leaveClub,
- * decision, withdrawal, or second request can neither slip past a check nor
- * deadlock (see lockActiveMembership / lockAchievements).
+ * club, then club_trainer, then membership, then achievement, then request
+ * (ADR-017, design D7) — so a racing leaveClub, decision, withdrawal, second
+ * request, club deactivation or trainer revocation can neither slip past a
+ * check nor deadlock (see lockActiveClub / lockActiveTrainer in locks.ts and
+ * lockActiveMembership / lockAchievements here). A request to a deactivated
+ * club, or a decision by a revoked trainer or for a deactivated club, fails
+ * as FORBIDDEN even when the deactivation or revocation commits mid-call.
  *
  * Error order follows metrics.reportEntry: NOT_FOUND, then FORBIDDEN, then
  * state checks. Notifications are enqueued after commit and never fail the
@@ -35,6 +39,8 @@ import { TRPCError } from '@trpc/server';
 import type { JobEnqueuer } from '../lib/jobs.js';
 import { cursorArgs, toPage, type Page } from '../lib/pagination.js';
 
+import { withIsActive } from './clubOutput.js';
+import { lockActiveClub, lockTrainerAuthority } from './locks.js';
 import type { ClubTrainerRef } from './membership.js';
 
 const UNIQUE_VIOLATION = 'P2002';
@@ -151,6 +157,12 @@ export async function requestCertification(
   let request: CertificationMutationOutput;
   try {
     request = await prisma.$transaction(async (tx) => {
+      if (!(await lockActiveClub(tx, input.clubId))) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'This club is not accepting certification requests',
+        });
+      }
       const membershipId = await lockActiveMembership(tx, input.clubId, caller.athleteId);
       if (membershipId === null) {
         throw new TRPCError({
@@ -194,8 +206,9 @@ export async function requestCertification(
     throw error;
   }
 
+  // Only non-revoked trainers are told (membership-notifications spec).
   const trainers = await prisma.clubTrainer.findMany({
-    where: { clubId: input.clubId },
+    where: { clubId: input.clubId, revokedAt: null },
     select: { userAccountId: true },
   });
   await notify(
@@ -264,10 +277,14 @@ export async function listMyRequests(
       requestedAt: true,
       decidedAt: true,
       rejectionReason: true,
-      club: { select: { id: true, name: true } },
+      club: { select: { id: true, name: true, deactivatedAt: true } },
     },
   });
-  return toPage(rows, input.take, (r) => r.id);
+  return toPage(
+    rows.map((r) => ({ ...r, club: withIsActive(r.club) })),
+    input.take,
+    (r) => r.id,
+  );
 }
 
 /**
@@ -334,6 +351,7 @@ export async function decideCertification(
 
   const status = input.decision === 'APPROVE' ? ('APPROVED' as const) : ('REJECTED' as const);
   const result = await prisma.$transaction(async (tx) => {
+    await lockTrainerAuthority(tx, trainer);
     // ADR-013: club authority over the athlete exists only while ACTIVE.
     const membershipId = await lockActiveMembership(
       tx,

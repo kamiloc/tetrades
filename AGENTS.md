@@ -281,6 +281,7 @@ Habeas Data grants athletes the right to deletion; legal obligations may require
 - [ ] RLS policies prevent cross-tenant access (verified by deny-tests)
 - [ ] Audit log is append-only
 - [ ] Retention periods are enforced by scheduled jobs, not ad-hoc deletion
+- [ ] Trainer invitation emails are redacted 90 days after the invitation ends, and on deletion of the athlete with that confirmed email (ADR-017)
 - [ ] Break-glass access is database-only, pre-approved, and audit-logged
 
 ## Dependency rules
@@ -331,6 +332,7 @@ Habeas Data grants athletes the right to deletion; legal obligations may require
 
 - For every OpenSpec proposal, invoke an `openspec-branch-manager` subagent, before creating proposal artifacts. It creates or selects `feat/<change-name>`; do not create proposal artifacts if branch setup fails.
 - When an OpenSpec proposal is fully implemented (all apply tasks complete), invoke that role as a subagent to review the scoped diff, commit it with a Conventional Commit message, and push the proposal branch. Archive may trigger this step if it has not already happened.
+- Before archiving any OpenSpec change, invoke the `openspec-branch-auditor` subagent (`.agents/agents/openspec-branch-auditor.md` or `.claude/agents/openspec-branch-auditor.md`). It must audit all tasks against the proposal, design, delta specs, and full branch/worktree diff. Do not archive unless it returns `READY TO ARCHIVE` with no blockers.
 - The subagent must leave unrelated or pre-existing work unstaged and uncommitted. It must never force-push or commit directly to `main`. Report blockers instead of guessing which changes belong to the proposal.
 
 ## Explicit confirmation required before you:

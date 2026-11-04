@@ -1,6 +1,7 @@
 import { router } from '../trpc.js';
 
 import { achievementRouter } from './achievement.js';
+import { adminRouter } from './admin.js';
 import { athleteRouter } from './athlete.js';
 import { clubRouter } from './club.js';
 import { connectionRouter } from './connection.js';
@@ -8,6 +9,7 @@ import { metricRouter } from './metric.js';
 import { notificationRouter } from './notification.js';
 import { sportRouter } from './sport.js';
 import { storageRouter } from './storage.js';
+import { trainerInvitationRouter } from './trainerInvitation.js';
 import { visibilityRouter } from './visibility.js';
 
 export const appRouter = router({
@@ -20,6 +22,8 @@ export const appRouter = router({
   metric: metricRouter,
   visibility: visibilityRouter,
   notification: notificationRouter,
+  admin: adminRouter,
+  trainerInvitation: trainerInvitationRouter,
 });
 
 export type AppRouter = typeof appRouter;

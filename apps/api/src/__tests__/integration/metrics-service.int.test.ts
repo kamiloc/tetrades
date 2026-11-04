@@ -20,8 +20,10 @@ import { resolveViewer, type Viewer } from '../../services/viewer.js';
 import {
   addClubTrainer,
   cleanupFixtureAthlete,
+  cleanupFixtureTrainer,
   cleanupTestClub,
   createFixtureAthlete,
+  createFixtureTrainer,
   createTestClub,
   createTestMembership,
   createTestMetricDefinition,
@@ -31,9 +33,10 @@ import {
   deleteTestSport,
   prisma,
   type FixtureAthlete,
+  type FixtureTrainer,
 } from './helpers/setup.js';
 
-async function viewerOf(fx: FixtureAthlete): Promise<Viewer> {
+async function viewerOf(fx: { userAccountId: string }): Promise<Viewer> {
   const account = await prisma.userAccount.findUniqueOrThrow({
     where: { id: fx.userAccountId },
     select: { supabaseUserId: true },
@@ -59,8 +62,8 @@ describe.skipIf(!dbReady)('metrics service', () => {
   let definitionId: string;
   let clubA: string;
   let clubB: string;
-  let trainerA: FixtureAthlete;
-  let trainerB: FixtureAthlete;
+  let trainerA: FixtureTrainer;
+  let trainerB: FixtureTrainer;
   let active: FixtureAthlete; // ACTIVE in club A
   let pending: FixtureAthlete;
   let completed: FixtureAthlete;
@@ -74,8 +77,10 @@ describe.skipIf(!dbReady)('metrics service', () => {
     sportId = await createTestSport();
     definitionId = await createTestMetricDefinition();
     const fx = () => createFixtureAthlete(sportId);
-    [trainerA, trainerB, active, pending, completed, rejected, otherClub, connection, stranger] =
-      await Promise.all([fx(), fx(), fx(), fx(), fx(), fx(), fx(), fx(), fx()]);
+    [trainerA, trainerB] = await Promise.all([createFixtureTrainer(), createFixtureTrainer()]);
+    [active, pending, completed, rejected, otherClub, connection, stranger] = await Promise.all([
+      fx(), fx(), fx(), fx(), fx(), fx(), fx(),
+    ]);
     clubA = await createTestClub('mt-a');
     clubB = await createTestClub('mt-b');
     const rowA = await addClubTrainer(clubA, trainerA.userAccountId);
@@ -100,9 +105,10 @@ describe.skipIf(!dbReady)('metrics service', () => {
     await cleanupTestClub(clubA);
     await cleanupTestClub(clubB);
     await deleteTestMetricDefinition(definitionId);
-    for (const fx of [trainerA, trainerB, active, pending, completed, rejected, otherClub, connection, stranger]) {
+    for (const fx of [active, pending, completed, rejected, otherClub, connection, stranger]) {
       await cleanupFixtureAthlete(fx);
     }
+    for (const fx of [trainerA, trainerB]) await cleanupFixtureTrainer(fx);
     await deleteTestSport(sportId);
   });
 

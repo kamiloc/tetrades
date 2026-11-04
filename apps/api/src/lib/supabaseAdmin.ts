@@ -28,6 +28,12 @@ export interface DeletionExternals {
   removeStorageObjects(objects: StorageObjectRef[]): Promise<void>;
   /** Idempotent: an already-deleted auth user counts as success. */
   deleteAuthUser(supabaseUserId: string): Promise<void>;
+  /**
+   * The auth user's email, lowercased, ONLY when Supabase reports it
+   * confirmed; null otherwise or when the user no longer exists. L1: the
+   * caller keeps it in memory and never logs it (ADR-017, D14).
+   */
+  getConfirmedEmail(supabaseUserId: string): Promise<string | null>;
 }
 
 /** Storage operations for the profile-photo pipeline. Paths are bucket-relative. */
@@ -112,6 +118,18 @@ export function createSupabaseDeletionExternals(): DeletionExternals {
       if (error !== null && error.status !== 404) {
         throw new Error(`auth user delete failed: ${error.message}`);
       }
+    },
+
+    async getConfirmedEmail(supabaseUserId) {
+      const { data, error } = await getAdminClient().auth.admin.getUserById(supabaseUserId);
+      if (error !== null) {
+        if (error.status === 404) return null;
+        // Status only: the message could echo user data.
+        throw new Error(`auth user lookup failed (status ${String(error.status ?? 'unknown')})`);
+      }
+      const { email, email_confirmed_at: confirmedAt } = data.user;
+      if (typeof email !== 'string' || email.length === 0 || !confirmedAt) return null;
+      return email.trim().toLowerCase();
     },
   };
 }

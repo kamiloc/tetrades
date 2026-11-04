@@ -22,12 +22,14 @@ import {
   createTestMembership,
   createTestSport,
   createTestUser,
+  createTrainerUser,
   deleteTestSport,
   envReady,
   getServiceClient,
   PLACEHOLDER_BYTES,
   type MembershipStatus,
   type TestUser,
+  type TrainerUser,
 } from './helpers/setup.js';
 
 const STATUSES: MembershipStatus[] = [
@@ -42,15 +44,15 @@ describe.skipIf(!envReady)('athlete_private_profiles RLS — trainer boundary', 
   let sportId: string;
   let athlete: TestUser;
   let athleteNoProfile: TestUser;
-  let unaffiliatedTrainer: TestUser;
-  const trainers = new Map<MembershipStatus | 'NONE', TestUser>();
+  let unaffiliatedTrainer: TrainerUser;
+  const trainers = new Map<MembershipStatus | 'NONE', TrainerUser>();
   const clubIds: string[] = [];
 
   beforeAll(async () => {
     sportId = await createTestSport(svc);
     athlete = await createTestUser(svc, sportId, 'appt-ath');
     athleteNoProfile = await createTestUser(svc, sportId, 'appt-ath2');
-    unaffiliatedTrainer = await createTestUser(svc, sportId, 'appt-none');
+    unaffiliatedTrainer = await createTrainerUser(svc, 'appt-none');
 
     const { error } = await svc.from('athlete_private_profiles').insert({
       athlete_id: athlete.athleteId,
@@ -63,7 +65,7 @@ describe.skipIf(!envReady)('athlete_private_profiles RLS — trainer boundary', 
 
     // One club per status so the open-membership uniqueness rule is not hit.
     for (const status of STATUSES) {
-      const trainer = await createTestUser(svc, sportId, `appt-${status.slice(0, 4).toLowerCase()}`);
+      const trainer = await createTrainerUser(svc, `appt-${status.slice(0, 4).toLowerCase()}`);
       const clubId = await createTestClub(svc, `appt-${status.toLowerCase()}`);
       clubIds.push(clubId);
       const row = await addClubTrainer(svc, clubId, trainer);
@@ -92,7 +94,7 @@ describe.skipIf(!envReady)('athlete_private_profiles RLS — trainer boundary', 
 
   for (const status of [...STATUSES, 'NONE'] as const) {
     describe(`trainer with membership ${status}`, () => {
-      const trainer = (): TestUser => {
+      const trainer = (): TrainerUser => {
         const t = trainers.get(status);
         if (t === undefined) throw new Error(`no trainer for ${status}`);
         return t;

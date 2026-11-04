@@ -20,6 +20,7 @@ import type {
   NotificationJobData,
   PiiDeletionJobData,
   QueueName,
+  TrainerInvitationRedactionJobData,
 } from '@packages/queue';
 import type { Redis } from 'ioredis';
 import { describe, it, expect } from 'vitest';
@@ -36,11 +37,12 @@ import { makeRecordingLogger, type RecordedLog } from './helpers/recording-logge
 // ---------------------------------------------------------------------------
 
 describe('queue registry', () => {
-  it('exports the three application queue names', () => {
+  it('exports the four application queue names', () => {
     expect(QUEUE_NAMES.IMAGE_OPTIMIZATION).toBe('image-optimization');
     expect(QUEUE_NAMES.PII_DELETION).toBe('pii-deletion');
     expect(QUEUE_NAMES.NOTIFICATIONS).toBe('notifications');
-    expect(Object.values(QUEUE_NAMES)).toHaveLength(3);
+    expect(QUEUE_NAMES.TRAINER_INVITATION_REDACTION).toBe('trainer-invitation-redaction');
+    expect(Object.values(QUEUE_NAMES)).toHaveLength(4);
   });
 
   it('applies the retry/retention policy to every queue', () => {
@@ -71,7 +73,12 @@ describe('queue registry', () => {
       requestId: 'req_4',
     };
 
-    for (const payload of [image, pii, notification]) {
+    // The redaction payload is the correlation id alone: the worker selects
+    // rows itself, so no email or other value travels through Redis.
+    const redaction: TrainerInvitationRedactionJobData = { requestId: 'req_5' };
+    expect(Object.keys(redaction)).toEqual(['requestId']);
+
+    for (const payload of [image, pii, notification, redaction]) {
       expect(payload.requestId.length).toBeGreaterThan(0);
     }
   });

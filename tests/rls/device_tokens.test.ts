@@ -29,11 +29,13 @@ import {
   createTestMembership,
   createTestSport,
   createTestUser,
+  createTrainerUser,
   deleteTestSport,
   envReady,
   getAnonClient,
   getServiceClient,
   type TestUser,
+  type TrainerUser,
 } from './helpers/setup.js';
 
 const token = () => `ExponentPushToken[rls${randomUUID().replace(/-/g, '').slice(0, 16)}]`;
@@ -43,7 +45,7 @@ describe.skipIf(!envReady)('device_tokens RLS', () => {
   let sportId: string;
   let owner: TestUser;
   let other: TestUser;
-  let trainer: TestUser;
+  let trainer: TrainerUser;
   let clubId: string;
   const tokenId = randomUUID();
 
@@ -52,7 +54,7 @@ describe.skipIf(!envReady)('device_tokens RLS', () => {
     [owner, other, trainer] = await Promise.all([
       createTestUser(svc, sportId, 'dt-own'),
       createTestUser(svc, sportId, 'dt-oth'),
-      createTestUser(svc, sportId, 'dt-tr'),
+      createTrainerUser(svc, 'dt-tr'),
     ]);
     clubId = await createTestClub(svc, 'dt');
     const row = await addClubTrainer(svc, clubId, trainer);
@@ -65,7 +67,7 @@ describe.skipIf(!envReady)('device_tokens RLS', () => {
     await deleteTestSport(svc, sportId);
   });
 
-  const read = (user: TestUser) =>
+  const read = (user: TestUser | TrainerUser) =>
     user.client.from('device_tokens').select('id').eq('id', tokenId);
 
   it('(a) allows the owner to INSERT a token for their own account', async () => {

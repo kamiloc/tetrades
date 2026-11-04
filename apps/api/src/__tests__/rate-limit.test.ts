@@ -135,6 +135,19 @@ describe('resolveRateLimit', () => {
     expect(decision.key).toBe('admin:user:admin-1');
   });
 
+  it('ADMIN-role request → admin tier at 10× the authenticated limit (ADR-017)', () => {
+    const decision = resolveRateLimit({
+      url,
+      userId: 'platform-admin-1',
+      role: 'ADMIN',
+      ip: '203.0.113.9',
+      limits: LIMITS,
+    });
+    expect(decision.tier).toBe('admin');
+    expect(decision.max).toBe(2000);
+    expect(decision.key).toBe('admin:user:platform-admin-1');
+  });
+
   it('unknown role string falls back to the authenticated tier', () => {
     const decision = resolveRateLimit({
       url,
@@ -203,8 +216,9 @@ describe('resolveRateLimit', () => {
     expect(SENSITIVE_PROCEDURES.size).toBe(0);
   });
 
-  it('recognizes SYSTEM as the only admin-tier role (per UserRole enum)', () => {
-    expect([...ADMIN_ROLES]).toEqual(['SYSTEM']);
+  it('recognizes SYSTEM and ADMIN as the admin-tier roles (per UserRole enum)', () => {
+    expect([...ADMIN_ROLES]).toEqual(['SYSTEM', 'ADMIN']);
+    expect(ADMIN_ROLES.has('ATHLETE')).toBe(false);
   });
 });
 
@@ -378,6 +392,7 @@ describe('rate limiting integration', () => {
       preAuth: {
         authenticated: true,
         userId: 'admin-1',
+        email: null,
         role: 'SYSTEM',
       },
     });
@@ -462,7 +477,7 @@ describe('createContext reuse of req.authResult', () => {
       id: '9b2e8d3a-4f1c-4a6b-8f0d-1c2e3a4b5c6d',
       headers: { authorization: 'Bearer would-fail-if-reverified' },
       log: { info: vi.fn(), debug: vi.fn() },
-      authResult: { authenticated: true, userId: 'pre-verified-user' } as AuthResult,
+      authResult: { authenticated: true, userId: 'pre-verified-user', email: null } as AuthResult,
     };
 
     const ctx = await createContext({

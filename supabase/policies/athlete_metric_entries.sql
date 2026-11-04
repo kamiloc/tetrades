@@ -18,6 +18,9 @@
 --     as service_role.
 --   Summaries are derived by the API (service role) in the same transaction;
 --   a direct client insert does not update athlete_metric_summaries.
+--   Trainer authority (ADR-017): every club_trainers subquery requires
+--   `ct.revoked_at IS NULL AND public.club_is_active(ct.club_id)`, so a revoked
+--   trainer, or any trainer of a deactivated club, is treated as no trainer.
 -- ============================================
 
 ALTER TABLE public.athlete_metric_entries ENABLE ROW LEVEL SECURITY;
@@ -33,6 +36,7 @@ ALTER TABLE public.athlete_metric_entries FORCE ROW LEVEL SECURITY;
 --              athlete_metric_entries_select_active_club_trainer), OR-composed.
 --              Neither is broad; the union is {athlete, ACTIVE-club trainers}.
 -- ────────────────────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "athlete_metric_entries_select_athlete" ON public.athlete_metric_entries;
 CREATE POLICY "athlete_metric_entries_select_athlete"
   ON public.athlete_metric_entries
   FOR SELECT
@@ -55,7 +59,12 @@ CREATE POLICY "athlete_metric_entries_select_athlete"
 --              membership is ACTIVE; access ends when it becomes COMPLETED.
 -- NULL safety: club_membership_id is NOT NULL.
 -- Composition: 2 SELECT policies, see athlete_metric_entries_select_athlete.
+-- Trainer row: only a non-revoked row of an active club counts (ADR-017).
+--              ct.revoked_at is nullable: NULL means active, so `IS NULL` is
+--              the grant and a revoked row matches nothing.
+--              public.club_is_active() returns FALSE for a deactivated club.
 -- ────────────────────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "athlete_metric_entries_select_active_club_trainer" ON public.athlete_metric_entries;
 CREATE POLICY "athlete_metric_entries_select_active_club_trainer"
   ON public.athlete_metric_entries
   FOR SELECT
@@ -69,6 +78,8 @@ CREATE POLICY "athlete_metric_entries_select_active_club_trainer"
       WHERE m.id = athlete_metric_entries.club_membership_id
         AND m.status = 'ACTIVE'
         AND ua.supabase_user_id = auth.uid()::text
+        AND ct.revoked_at IS NULL
+        AND public.club_is_active(ct.club_id)
     )
   );
 
@@ -82,7 +93,12 @@ CREATE POLICY "athlete_metric_entries_select_active_club_trainer"
 --              are NOT NULL.
 -- Composition: ONLY INSERT policy on this table.
 -- USING vs WITH CHECK: INSERT has no USING; the predicate goes in WITH CHECK.
+-- Trainer row: only a non-revoked row of an active club counts (ADR-017).
+--              ct.revoked_at is nullable: NULL means active, so `IS NULL` is
+--              the grant and a revoked row matches nothing.
+--              public.club_is_active() returns FALSE for a deactivated club.
 -- ────────────────────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "athlete_metric_entries_insert_active_club_trainer" ON public.athlete_metric_entries;
 CREATE POLICY "athlete_metric_entries_insert_active_club_trainer"
   ON public.athlete_metric_entries
   FOR INSERT
@@ -98,6 +114,8 @@ CREATE POLICY "athlete_metric_entries_insert_active_club_trainer"
         AND m.status = 'ACTIVE'
         AND ct.id = athlete_metric_entries.reported_by_club_trainer_id
         AND ua.supabase_user_id = auth.uid()::text
+        AND ct.revoked_at IS NULL
+        AND public.club_is_active(ct.club_id)
     )
   );
 

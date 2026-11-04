@@ -2,6 +2,7 @@
  * RLS tests — clubs table
  * Policies:
  *   clubs_select_public (anon + authenticated, TRUE)
+ *   column grants: SELECT (id, slug, name, country_code, city) only
  *   (no INSERT / UPDATE / DELETE policy — service_role only)
  *
  * Tested criteria:
@@ -11,6 +12,9 @@
  *   (d) authenticated INSERT is denied
  *   (e) authenticated UPDATE affects 0 rows
  *   (f) authenticated DELETE affects 0 rows
+ *   (g) column grants (ADR-017): anon and authenticated read the five L0
+ *       columns, and get a permission error for deactivated_at or created_at
+ *   (h) a deactivated club stays readable (rows are public)
  */
 
 import { randomUUID } from 'node:crypto';
@@ -25,6 +29,7 @@ import {
   envReady,
   getAnonClient,
   getServiceClient,
+  setTestClubActive,
   type TestUser,
 } from './helpers/setup.js';
 
@@ -104,5 +109,51 @@ describe.skipIf(!envReady)('clubs RLS', () => {
       .eq('id', clubId);
     expect(error).toBeNull();
     expect(count).toBe(0);
+  });
+
+  // ── Column grants (ADR-017) ─────────────────────────────────────────────────
+
+  const L0_COLUMNS = 'id, slug, name, country_code, city';
+
+  it('(g1) lets anon and authenticated select the five L0 columns', async () => {
+    for (const client of [getAnonClient(), user1.client]) {
+      const { data, error } = await client.from('clubs').select(L0_COLUMNS).eq('id', clubId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    }
+  });
+
+  it.each(['deactivated_at', 'created_at', '*'])(
+    '(g2) denies anon and authenticated selecting %s',
+    async (column) => {
+      for (const client of [getAnonClient(), user1.client]) {
+        const { data, error } = await client.from('clubs').select(column).eq('id', clubId);
+        expect(error).not.toBeNull();
+        expect(error?.code).toBe('42501'); // insufficient_privilege
+        expect(data).toBeNull();
+      }
+    },
+  );
+
+  it('(g3) denies filtering on deactivated_at from a client', async () => {
+    const { error } = await user1.client
+      .from('clubs')
+      .select('id')
+      .is('deactivated_at', null);
+    expect(error?.code).toBe('42501');
+  });
+
+  it('(h) keeps a deactivated club readable through the L0 columns', async () => {
+    await setTestClubActive(svc, noCityClubId, false);
+    try {
+      const { data, error } = await getAnonClient()
+        .from('clubs')
+        .select('id')
+        .eq('id', noCityClubId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    } finally {
+      await setTestClubActive(svc, noCityClubId, true);
+    }
   });
 });

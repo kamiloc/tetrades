@@ -22,10 +22,13 @@
 import type {
   AudienceValue,
   ClubMembershipStatusValue,
+  TrainerInvitationStateValue,
+  TrainerInvitationStatusValue,
   VerificationStatusValue,
 } from '@packages/shared-logic';
 import type {
   AchievementCertificationRequest,
+  AdminActionLog,
   Athlete,
   AthleteAchievement,
   AthleteMetricEntry,
@@ -36,16 +39,20 @@ import type {
   ClubMembership,
   ClubMembershipStatus,
   ClubTrainer,
+  ClubTrainerInvitation,
   DeviceToken,
   MetricDefinition,
   PiiConsentLog,
   Sport,
+  TrainerInvitationState,
+  TrainerInvitationStatus,
   UserAccount,
   VerificationStatus,
   VisibilityAudience,
 } from '@packages/validators';
 import type {
   AchievementCertificationRequest as PrismaAchievementCertificationRequest,
+  AdminActionLog as PrismaAdminActionLog,
   Athlete as PrismaAthlete,
   AthleteAchievement as PrismaAthleteAchievement,
   AthleteMetricEntry as PrismaAthleteMetricEntry,
@@ -55,6 +62,7 @@ import type {
   Club as PrismaClub,
   ClubMembership as PrismaClubMembership,
   ClubTrainer as PrismaClubTrainer,
+  ClubTrainerInvitation as PrismaClubTrainerInvitation,
   DeviceToken as PrismaDeviceToken,
   MetricDefinition as PrismaMetricDefinition,
   PiiConsentLog as PrismaPiiConsentLog,
@@ -120,6 +128,26 @@ type _deviceToken_ok = Assert<IsAssignable<PrismaDeviceToken, DeviceToken>>;
 type _certificationRequest_ok = Assert<
   IsAssignable<PrismaAchievementCertificationRequest, AchievementCertificationRequest>
 >;
+// Admin, trainer provisioning and club lifecycle (ADR-017).
+type _clubTrainerInvitation_ok = Assert<
+  IsAssignable<PrismaClubTrainerInvitation, ClubTrainerInvitation>
+>;
+// `metadata` is Json (see the AuditEvent note above). `targetType` is a plain
+// String column, like audit_log.target_type; the Zod enum is the contract the
+// services write through. Every other field is bridged.
+type AdminActionLogBridgeKeys = Exclude<keyof AdminActionLog, 'metadata' | 'targetType'>;
+type _adminActionLog_ok = Assert<
+  IsAssignable<
+    Pick<PrismaAdminActionLog, AdminActionLogBridgeKeys>,
+    Pick<AdminActionLog, AdminActionLogBridgeKeys>
+  >
+>;
+type _invitationStatus_ok = Assert<IsAssignable<TrainerInvitationStatusValue, TrainerInvitationStatus>>;
+type _invitationStatus_rev_ok = Assert<
+  IsAssignable<TrainerInvitationStatus, TrainerInvitationStatusValue>
+>;
+type _invitationState_ok = Assert<IsAssignable<TrainerInvitationStateValue, TrainerInvitationState>>;
+type _invitationState_rev_ok = Assert<IsAssignable<TrainerInvitationState, TrainerInvitationStateValue>>;
 // @packages/shared-logic cannot import Zod, so its transition-table literals
 // are checked against the Zod enum in both directions here.
 type _membershipStatus_ok = Assert<IsAssignable<ClubMembershipStatusValue, ClubMembershipStatus>>;

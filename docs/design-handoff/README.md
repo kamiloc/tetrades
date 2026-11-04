@@ -202,6 +202,12 @@ export default function RootLayout() {
 
 The per-tab AuthGate from earlier drafts is **removed** — unauthenticated users never reach the tab UI.
 
+**Trainer accounts in onboarding (ADR-017).** An account is an athlete, a trainer, or an admin, never two. When a trainer account (any trainer assignment, revoked included) submits onboarding, `athlete.bootstrap` answers `FORBIDDEN` and the form shows, inline, with no athlete profile created:
+
+> This is a trainer account. Use the web portal to work with your club.
+
+Any other non-athlete account (e.g. an admin) sees: "This account cannot have an athlete profile." Both strings live in `@packages/shared-logic` (`account-capacity.ts`) and are matched, never shown raw from the server.
+
 ---
 
 ### 0. Sign-in (login screen)
@@ -365,6 +371,7 @@ The prototype shows neutral monogram placeholders so the design ships without tr
 2. **Club invitations** — render `CL_REQ` as invitations from a club/trainer, with clear Accept and Decline actions. Acceptance activates the membership; pending and rejected invitations are never public.
 3. **Active club history** — render `CL_HIST` chronologically. Only active memberships are eligible for public display, subject to the athlete's club-membership audience setting.
 4. **Trainers at your clubs** — render `CL_STAFF` for active clubs. Do not imply that this list grants access to private identity data.
+5. **Inactive clubs (ADR-017)** — a club an admin deactivated keeps appearing wherever the athlete's membership appears, with an **"Inactive club"** chip (the existing status chip, `pending` tone, `alert-circle` icon; accessibility label "This club is inactive"). An `ACTIVE` membership of an inactive club keeps its **Leave** action. Invitations a deactivation closed disappear from both lists.
 
 The collections (`PF_KPI`, `PF_SPEED`, `PF_MONTHS`, `PF_BENCH`, `PF_TESTS`, `CL_REQ`, `CL_HIST`, and `CL_STAFF`) contain illustrative prototype data only. They are not live athlete records or production seed data.
 

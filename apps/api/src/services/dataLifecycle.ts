@@ -8,7 +8,9 @@
  * runPiiDeletion (worker):
  *   legal hold → BLOCKED_LEGAL_HOLD, nothing deleted
  *   claim REQUESTED|FAILED → IN_PROGRESS (a duplicate job becomes a no-op)
- *   delete every athlete-FK table except the retained ones
+ *   read the auth user's confirmed email (kept in memory only)
+ *   delete every athlete-FK table except the retained ones, and revoke +
+ *   redact trainer invitations addressed to that email (ADR-017, D14)
  *   remove Storage under {athleteId}/ and the Supabase auth user
  *   tombstone athlete + user_account (FK anchors for 5-year retention)
  *   verify → COMPLETED, or FAILED + error log
@@ -26,6 +28,8 @@ import { TRPCError } from '@trpc/server';
 
 import type { JobEnqueuer } from '../lib/jobs.js';
 import type { DeletionExternals } from '../lib/supabaseAdmin.js';
+
+import { closeAndRedactInvitationsForEmail } from './invitationRedaction.js';
 
 export interface DeletionLogger {
   info: (obj: Record<string, unknown>, msg?: string) => void;
@@ -180,14 +184,27 @@ export async function runPiiDeletion(
   }
   log.info({ event: 'pii_deletion_started', ...logCtx }, 'deletion started');
 
+  // Read before the auth user is deleted. On a retry after that step, the
+  // earlier attempt's committed transaction already redacted the invitations,
+  // and the lookup returns null (user gone).
+  let email: string | null = null;
   try {
-    await deleteAthleteRows(prisma, input.athleteId, athlete.userAccountId, input.dataLifecycleRequestId);
+    // Only while the account still carries the real id (idempotent on retry).
+    const supabaseUserId = athlete.userAccount.supabaseUserId;
+    if (supabaseUserId !== tombstoneSupabaseUserId(athlete.userAccountId)) {
+      email = await deps.externals.getConfirmedEmail(supabaseUserId);
+    }
+
+    await deleteAthleteRows(prisma, {
+      athleteId: input.athleteId,
+      userAccountId: athlete.userAccountId,
+      keepRequestId: input.dataLifecycleRequestId,
+      email,
+    });
 
     const objects = await deps.externals.listStorageObjects(`${input.athleteId}/`);
     if (objects.length > 0) await deps.externals.removeStorageObjects(objects);
 
-    // Only while the account still carries the real id (idempotent on retry).
-    const supabaseUserId = athlete.userAccount.supabaseUserId;
     if (supabaseUserId !== tombstoneSupabaseUserId(athlete.userAccountId)) {
       await deps.externals.deleteAuthUser(supabaseUserId);
     }
@@ -210,6 +227,7 @@ export async function runPiiDeletion(
     athleteId: input.athleteId,
     userAccountId: athlete.userAccountId,
     dataLifecycleRequestId: input.dataLifecycleRequestId,
+    email,
   });
   if (residue.length > 0) {
     await markFailed(prisma, input.dataLifecycleRequestId);
@@ -238,13 +256,16 @@ async function markFailed(prisma: PrismaClient, id: string): Promise<void> {
   });
 }
 
-/** Every athlete-FK table except the retained ones, in FK order, in one transaction. */
+/**
+ * Every athlete-FK table except the retained ones, in FK order, plus the
+ * trainer invitations addressed to the athlete's confirmed email, in one
+ * transaction.
+ */
 async function deleteAthleteRows(
   prisma: PrismaClient,
-  athleteId: string,
-  userAccountId: string,
-  keepRequestId: string,
+  target: { athleteId: string; userAccountId: string; keepRequestId: string; email: string | null },
 ): Promise<void> {
+  const { athleteId, userAccountId, keepRequestId } = target;
   await prisma.$transaction(async (tx) => {
     const where = { athleteId };
 
@@ -280,8 +301,17 @@ async function deleteAthleteRows(
     await tx.dataLifecycleRequest.deleteMany({ where: { athleteId, id: { not: keepRequestId } } });
     // Account-level personal data (D9): push tokens identify the person's devices.
     await tx.deviceToken.deleteMany({ where: { userAccountId } });
+    // Trainer invitations to the athlete's address (ADR-017, D14). An athlete
+    // account never holds trainer rows (one capacity per account), so there
+    // are no trainer records to remove.
+    if (target.email !== null) {
+      await closeAndRedactInvitationsForEmail(tx, target.email, new Date());
+    }
     // Retained (D8a): audit_log, pii_consent_log, the driving lifecycle request.
-  });
+    // ~17 sequential statements plus one per invitation: Prisma's 5 s default
+    // is too short over the pooler. This runs in the deletePII job, never in a
+    // request, so a longer limit costs no user latency.
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 async function tombstone(prisma: PrismaClient, athleteId: string, userAccountId: string): Promise<void> {
@@ -305,7 +335,13 @@ async function tombstone(prisma: PrismaClient, athleteId: string, userAccountId:
  */
 export async function verifyDeletion(
   deps: { prisma: PrismaClient; externals: DeletionExternals },
-  target: { athleteId: string; userAccountId: string; dataLifecycleRequestId: string },
+  target: {
+    athleteId: string;
+    userAccountId: string;
+    dataLifecycleRequestId: string;
+    /** The deleted athlete's confirmed email; null skips the invitation check. */
+    email: string | null;
+  },
 ): Promise<string[]> {
   const { prisma } = deps;
   const { athleteId } = target;
@@ -330,6 +366,11 @@ export async function verifyDeletion(
       where: { athleteId, id: { not: target.dataLifecycleRequestId } },
     }),
     device_tokens: await prisma.deviceToken.count({ where: { userAccountId: target.userAccountId } }),
+    // Any invitation still carrying the address is residue (ADR-017, D14).
+    club_trainer_invitations:
+      target.email === null
+        ? 0
+        : await prisma.clubTrainerInvitation.count({ where: { email: target.email } }),
   };
   const residue = Object.entries(counts)
     .filter(([, n]) => n > 0)

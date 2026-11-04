@@ -61,8 +61,8 @@ describe.skipIf(!authReady)('club, metric, and visibility routers', () => {
     sportId = await createTestSport();
     definitionId = await createTestMetricDefinition();
     [trainerA, trainerB, athlete, stranger] = await Promise.all([
-      createAuthedUser({ sportId, label: 'cmv-ta' }),
-      createAuthedUser({ sportId, label: 'cmv-tb' }),
+      createAuthedUser({ withAthlete: false, label: 'cmv-ta' }),
+      createAuthedUser({ withAthlete: false, label: 'cmv-tb' }),
       createAuthedUser({ sportId, label: 'cmv-ath' }),
       createAuthedUser({ sportId, label: 'cmv-str' }),
     ]);
@@ -219,6 +219,32 @@ describe.skipIf(!authReady)('club, metric, and visibility routers', () => {
       expect(await as(stranger).club.listMyMemberships.query({})).toEqual({ items: [], nextCursor: null });
     });
 
+    it('marks a deactivated club inactive and an active one active (ADR-017)', async () => {
+      await resetMemberships();
+      await as(trainerA).club.inviteAthlete.mutate({ clubId: clubA, athleteId: athleteIdOf(athlete) });
+      const before = await as(athlete).club.listMyMemberships.query({});
+      expect(before.items[0]?.club.isActive).toBe(true);
+      expect(Object.keys(before.items[0]?.club ?? {})).not.toContain('deactivatedAt');
+
+      await prisma.club.update({
+        where: { id: clubA },
+        data: { deactivatedAt: new Date() },
+        select: { id: true },
+      });
+      try {
+        const after = await as(athlete).club.listMyMemberships.query({});
+        expect(after.items[0]?.club.id).toBe(clubA);
+        expect(after.items[0]?.club.isActive).toBe(false);
+        expect(Object.keys(after.items[0]?.club ?? {})).not.toContain('deactivatedAt');
+      } finally {
+        await prisma.club.update({
+          where: { id: clubA },
+          data: { deactivatedAt: null },
+          select: { id: true },
+        });
+      }
+    });
+
     it('rejects invalid input and is UNAUTHORIZED without a token', async () => {
       await expectTRPCCode(as(athlete).club.listMyMemberships.query({ take: 51 }), 'BAD_REQUEST');
       await expectTRPCCode(as().club.listMyMemberships.query({}), 'UNAUTHORIZED');
@@ -237,7 +263,7 @@ describe.skipIf(!authReady)('club, metric, and visibility routers', () => {
   describe('club.listRoster', () => {
     it('returns ACTIVE members and own pending invitations, with L0 identity only', async () => {
       await resetMemberships();
-      const otherTrainer = await createAuthedUser({ sportId, label: 'cmv-ta2' });
+      const otherTrainer = await createAuthedUser({ withAthlete: false, label: 'cmv-ta2' });
       const otherRow = await addClubTrainer(clubA, otherTrainer.userAccountId);
       const pendingByOther = await createAuthedUser({ sportId, label: 'cmv-pend' });
       const completedAthlete = await createAuthedUser({ sportId, label: 'cmv-comp' });
@@ -500,8 +526,9 @@ describe.skipIf(!authReady)('club, metric, and visibility routers', () => {
       const injected = { metricsAudience: 'PRIVATE' as const, athleteId: athleteIdOf(athlete) };
       await as(stranger).visibility.update.mutate(injected);
       expect((await as(athlete).visibility.get.query()).metricsAudience).toBe('PUBLIC');
-      // A trainer of the athlete's ACTIVE club reads only their own settings.
-      expect((await as(trainerA).visibility.get.query()).metricsAudience).not.toBe('PUBLIC');
+      // A trainer of the athlete's ACTIVE club is a trainer-only account
+      // (ADR-017): it has no settings of its own and can't read the athlete's.
+      await expectTRPCCode(as(trainerA).visibility.get.query(), 'NOT_FOUND');
     });
 
     it('rejects invalid input', async () => {

@@ -17,7 +17,7 @@ Examples:
 - verified achievements
 - public profile photo variants (`profile-photos` bucket)
 - connection count
-- club names and club-level public information: `Club` (except `createdAt`, L1)
+- club names and club-level public information: `Club` (except `createdAt` and `deactivatedAt`, L1), plus the derived `isActive` flag every club output carries ([ADR-017](adr/017-platform-admin-trainer-provisioning-and-club-lifecycle.md))
 - metric catalog: `MetricDefinition`
 - the club a membership belongs to (`ClubMembership.clubId`)
 - the club a certification request is made to (`AchievementCertificationRequest.clubId`); its name is shown on a certified achievement only when the athlete's club-memberships audience allows it
@@ -32,7 +32,11 @@ Examples:
 - profile photo originals (EXIF may contain GPS and device info), stored only in the private `profile-photo-originals` bucket ([ADR-015](adr/015-profile-photo-storage-split-buckets-and-upload-window.md))
 - consent, audit, and data-lifecycle records
 - club membership state and timestamps: `ClubMembership` (all fields except `clubId`)
-- trainer assignments: `ClubTrainer`
+- trainer assignments: `ClubTrainer`, including `revokedAt` (ADR-017)
+- club lifecycle: `Club.deactivatedAt` and `Club.createdAt`; not client-readable (column grants on `clubs`), shown only in admin outputs (ADR-017)
+- trainer invitations: `ClubTrainerInvitation`, all fields. `email` is personal data with a bounded lifetime: replaced by `redacted:<id>` 90 days after the invitation ends, and on the deletion of an athlete with that confirmed address (ADR-017)
+- the admin action log: `AdminActionLog`, all fields; `metadata` holds ids, counts and field names only, never an email or L2 value (ADR-017)
+- the caller's confirmed session email in the API context (`ctx.userEmail`); never logged or returned in errors (ADR-017)
 - athlete metric entries and summaries: `AthleteMetricEntry`, `AthleteMetricSummary`. Not inherently sensitive; exposure is controlled by visibility rules, not by classification.
 - visibility preferences: `AthleteVisibilitySettings`
 - achievement certification requests: `AchievementCertificationRequest` (all fields except `clubId`), including a trainer's rejection reason, which only the athlete reads ([ADR-016](adr/016-achievement-certification-by-club-trainers.md))

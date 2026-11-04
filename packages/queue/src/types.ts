@@ -7,6 +7,10 @@
  *   - image-optimization   → apps/api/src/jobs/optimizeImage.ts    (4.6)
  *   - pii-deletion         → apps/api/src/jobs/deletePII.ts        (4.7)
  *   - notifications        → apps/api/src/jobs/sendNotification.ts (5.10)
+ *   - trainer-invitation-redaction
+ *                          → apps/api/src/jobs/redactTrainerInvitations.ts
+ *                            (ADR-017; the first recurring job, scheduled
+ *                            daily with upsertJobScheduler)
  *
  * Payload rules (AGENTS.md, Background Jobs):
  *   - serializable data only — ids and enums, no Buffers or class instances
@@ -20,6 +24,7 @@ export const QUEUE_NAMES = {
   IMAGE_OPTIMIZATION: 'image-optimization',
   PII_DELETION: 'pii-deletion',
   NOTIFICATIONS: 'notifications',
+  TRAINER_INVITATION_REDACTION: 'trainer-invitation-redaction',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -62,16 +67,25 @@ export interface NotificationJobData extends BaseJobData {
     | 'CONNECTION_ACCEPTED'
     | 'CLUB_INVITATION'
     | 'CERTIFICATION_REQUESTED'
-    | 'CERTIFICATION_DECIDED';
+    | 'CERTIFICATION_DECIDED'
+    | 'CLUB_INVITATION_CLOSED';
   /** Row the notification is about (e.g. connection id). */
   subjectId: string;
 }
+
+/**
+ * trainer-invitation-redaction — redact the email of trainer invitations that
+ * ended more than 90 days ago (ADR-017). The worker selects rows itself, so
+ * the payload carries only the correlation id; no email ever enters Redis.
+ */
+export type TrainerInvitationRedactionJobData = BaseJobData;
 
 /** Payload type per queue — keeps Queue/Worker generics in lockstep. */
 export interface QueueJobData {
   [QUEUE_NAMES.IMAGE_OPTIMIZATION]: ImageOptimizationJobData;
   [QUEUE_NAMES.PII_DELETION]: PiiDeletionJobData;
   [QUEUE_NAMES.NOTIFICATIONS]: NotificationJobData;
+  [QUEUE_NAMES.TRAINER_INVITATION_REDACTION]: TrainerInvitationRedactionJobData;
 }
 
 /**

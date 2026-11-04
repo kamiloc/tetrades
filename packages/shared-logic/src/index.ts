@@ -7,3 +7,6 @@ export * from './visibility.js';
 export * from './membership-view.js';
 export * from './metrics-view.js';
 export * from './chart-geometry.js';
+export * from './trainer-invitation.js';
+export * from './account-capacity.js';
+export * from './club-activity.js';

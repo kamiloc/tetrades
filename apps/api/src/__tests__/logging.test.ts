@@ -53,7 +53,7 @@ async function buildServer(sink: LogSink): Promise<FastifyInstance> {
 
   // Simulates the rate-limit onRequest hook resolving auth + tier.
   server.addHook('onRequest', async (req) => {
-    req.authResult = { authenticated: true, userId: 'user-1' };
+    req.authResult = { authenticated: true, userId: 'user-1', email: null };
     req.rateLimitDecision = { tier: 'authenticated', key: 'authed:user:user-1', max: 200 };
   });
 
