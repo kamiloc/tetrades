@@ -1,0 +1,31 @@
+# Never send local credentials or environment files to a Docker build context.
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Local dependencies and generated build output.
+node_modules
+**/node_modules
+dist
+**/dist
+.turbo
+**/.turbo
+*.tsbuildinfo
+**/*.tsbuildinfo
+.next
+**/.next
+.expo
+**/.expo
+coverage
+**/coverage
+
+# Repository metadata and editor/system files.
+.git
+.github
+.vscode
+.idea
+*.log
+.DS_Store
