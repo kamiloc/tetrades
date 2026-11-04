@@ -1,6 +1,7 @@
 export { trpc } from './client';
 export type { AppRouter } from './client';
 export { ApiProvider } from './provider';
+export { getApiErrorCode } from './errors';
 
 export {
   useAthleteProfile,

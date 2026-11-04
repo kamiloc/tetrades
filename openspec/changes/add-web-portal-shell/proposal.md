@@ -59,6 +59,6 @@
   - An optional, backward-compatible `onUnauthorized` callback on `ApiProvider`, so the web app can send an expired session to sign-in. Mobile doesn't pass it and is unchanged.
 - **Canonical origin:** the existing `WEB_URL` variable (already in `env.example` for Magic Link redirects) becomes the single trusted origin for sign-in redirects, the CSRF check and invitation links. It's added to the `@app/web#build` env in `turbo.json`. No new variable is introduced.
 - **Depends on a contract fix in `add-admin-club-trainer-management`:** `trainerInvitation.accept`/`decline` return `NOT_FOUND` when the club is no longer active, so `FORBIDDEN` means only "this account can't be a trainer".
-- **No changes** to the API, schema, RLS or `@packages/validators`. `@packages/auth` is used through its existing SSR helper.
+- **No changes** to the API, schema, RLS or `@packages/validators`. `@packages/auth` is used through its existing SSR helper, reached through a new `@packages/auth/server` subpath export (no code change), because the package index loads React hooks that Server Components can't import.
 - **Design-handoff tokens:** `docs/design-handoff/tokens/colors.ts` gains the web-only shell colors the prototype uses (additive keys).
 - **Docs:** `apps/web/README.md`, `docs/project-architecture.md` (web auth and proxy flow), `docs/design-handoff/README.md` and CHANGELOG (web exceptions).

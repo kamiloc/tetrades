@@ -41,6 +41,7 @@ See proposal.md for the motivation. The current state that shapes the approach:
 
 ### D1. Supabase auth runs only on the server
 - **`lib/supabase-server.ts`** builds a client per request with `createSsrServerClient`, adapting Next's `cookies()` to `getAll`/`setAll`.
+  - It imports `createSsrServerClient` from a new subpath, `@packages/auth/server` (an `exports` entry for the already-built, React-free `dist/server.js`; no package code changes). The package index also loads `hooks.ts`, whose module-level `createContext` fails the build in Server Components, server actions and route handlers. Approved by the owner during apply (2026-11-03).
   - Every cookie it sets is forced to `httpOnly: true`, `sameSite: 'lax'`, `path: '/'`, and `secure: true` unless the request is to `localhost`.
   - Supabase's own cookie names and max-age are kept.
 - **`/login`** is a Server Component with a form. Its server action `requestSignIn(email, next)` calls `signInWithOtp({ email, options: { emailRedirectTo: <APP_ORIGIN>/auth/callback?next=…, shouldCreateUser: true } })`. `APP_ORIGIN` is the configured origin from D10, never the request's `Host`.

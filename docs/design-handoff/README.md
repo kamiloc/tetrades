@@ -538,6 +538,23 @@ Production deliberately differs from this prototype here:
 - **Performance range options** are 1M, 3M, 6M, and All (the prototype leaves `MSegmented` options empty). All-time charts stop at the latest 200 entries and say so.
 - **Terms and Privacy Policy** are plain text on sign-in until those pages exist.
 
+### Web portal (`apps/web`, `add-web-portal-shell`)
+
+The admin and trainer web portals differ from `web/` here. Each unsupported surface in `WEB-AUDIT.md` is listed.
+
+- **A1 (overview, approval queue, recent activity) is replaced by the club list.** `/admin` opens `/admin/clubs`. There's no KPI strip, approval queue or activity feed.
+- **No club applications or review.** Clubs are created by an admin and start active; there's no application, approve or decline flow, and no owner identity checklist.
+- **No documents.** Club application documents and trainer credential files are not shown or uploaded.
+- **No activity feed or audit log.** `audit_log` stays actor-scoped and isn't shown as admin history.
+- **No trainer permissions.** The `View` / `Log` / `Verify` pills and permission toggles aren't built; trainer access is one assignment per club, enforced by the API.
+- **No global search, exports, messages or sessions.** The top bar has breadcrumbs and one primary action, without the search box or notifications bell.
+- **The invite modal takes an email only.** No role, credentials, email lists or share links. After inviting, the page shows what to pass on (no email is sent) with a Copy link button.
+- **"Suspended" is "Deactivated".** Clubs are deactivated and reactivated, never deleted. Invitation states are Pending, Expired, Accepted, Declined and Revoked; trainers are Active or Revoked.
+- **`/trainer/invitations` has no artboard.** It's built from the shell, table and state components. The trainer work screens (home queue, athlete detail, metric logging, club switcher) come in `add-trainer-portal`.
+- **Fixed 1440×900 artboards become a 1024 px minimum layout.** Pages fit without horizontal scrolling from 1024 px up; smaller widths and dark theme are out of scope.
+- **Sidebar user block** shows the signed-in email and a sign-out button instead of a name, avatar hue and menu.
+- **Sample data is not reused.** The prototype's US clubs, people and counts are illustrative only.
+
 ## Out of scope (this sprint)
 
 - Public athlete profile route and public web rendering

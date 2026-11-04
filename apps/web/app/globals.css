@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    @apply bg-canvas text-text;
+  }
+
+  body {
+    @apply font-sans text-[14px] leading-[1.4] antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+
+  dialog::backdrop {
+    background: theme('colors.scrim');
+  }
+}

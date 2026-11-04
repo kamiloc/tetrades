@@ -43,6 +43,26 @@ export const colors = {
   headerChipBg:     'rgba(255,255,255,0.08)',
   headerChipBorder: 'rgba(255,255,255,0.12)',
   headerHairline:   'rgba(255,255,255,0.06)',
+
+  // ── Web portal shell (web/index.html) — web-only, mobile ignores these ──
+  ink3:         '#1A2238', //  sidebar elevated row hover
+  inkDeep:      '#0A0F1B', //  sidebar gradient end
+  inkEdge:      '#050912', //  sidebar right border
+  inkLine:      'rgba(255,255,255,0.08)', //  sidebar hairlines
+  inkLine2:     'rgba(255,255,255,0.14)', //  sidebar raised borders
+  onInk2:       'rgba(255,255,255,0.62)', //  sidebar secondary text
+  onInk3:       'rgba(255,255,255,0.42)', //  sidebar section titles
+  roleBlue:     '#7FB0FF', //  admin portal role label on ink
+  roleAmber:    '#F5C07A', //  trainer portal role label on ink
+  paper2:       '#FAFBFD', //  table header, dialog footer, subtle inset
+  line2:        '#EEF1F5', //  softer hairlines between table rows
+  tag:          '#F1F4F9', //  neutral chip background (mobile already mirrors it)
+  blue2:        '#155EE0', //  link / primary hover
+  verified:     '#16A34A', //  active / accepted status text
+  verifiedTint: '#E7F6EC', //  active / accepted chip background
+  rejected:     '#DC2626', //  deactivated / revoked status text, danger button
+  rejectedTint: '#FDECEC', //  deactivated / revoked chip background
+  scrim:        'rgba(11,18,32,0.42)', //  modal backdrop
 } as const;
 
 export type ColorToken = keyof typeof colors;
