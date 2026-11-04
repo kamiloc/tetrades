@@ -7,7 +7,17 @@ export const useMetricDefinitions = (input: Partial<ListMetricDefinitionsInput> 
   trpc.metric.listDefinitions.useQuery(input);
 
 // Trainer: report an entry for an athlete with an ACTIVE membership in the club.
-export const useReportMetricEntry = () => trpc.metric.reportEntry.useMutation();
+// Refreshes that athlete's summaries and entries.
+export const useReportMetricEntry = () => {
+  const utils = trpc.useUtils();
+  return trpc.metric.reportEntry.useMutation({
+    onSuccess: (_entry, { athleteId }) =>
+      Promise.all([
+        utils.metric.getSummaries.invalidate({ athleteId }),
+        utils.metric.listEntries.invalidate({ athleteId }),
+      ]),
+  });
+};
 
 // Entries the caller may see under the athlete's visibility settings.
 export const useMetricEntries = (

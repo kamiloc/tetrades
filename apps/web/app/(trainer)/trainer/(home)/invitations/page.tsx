@@ -1,7 +1,7 @@
-import { InlineAlert } from '../../../../components/inline-alert';
-import { PageBody, PageHeader } from '../../../../components/layout';
-import { TopBar } from '../../../../components/portal-shell';
-import { getSessionUser } from '../../../../lib/session';
+import { InlineAlert } from '../../../../../components/inline-alert';
+import { PageBody, PageHeader } from '../../../../../components/layout';
+import { TopBar } from '../../../../../components/portal-shell';
+import { getSessionUser } from '../../../../../lib/session';
 
 import { InvitationsList } from './invitations-list';
 

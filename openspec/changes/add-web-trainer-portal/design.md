@@ -66,7 +66,7 @@ All three use explicit `select`, and their schemas live in `packages/validators/
 | `findAthleteToInvite` | `trainerProcedure` | discriminated union on `by` (below) | `paginatedOutput(athleteToInviteOutput)` |
 
 - **`listMyTrainerClubs`:**
-  - Selects `ClubTrainer` rows where `userAccount.supabaseUserId = ctx.userId`, `revokedAt` null and `club.deactivatedAt` null, ordered by club name, then id. The cursor is the ClubTrainer id.
+  - Selects `ClubTrainer` rows where `userAccount.supabaseUserId = ctx.userId`, `revokedAt` null and `club.deactivatedAt` null, ordered by club name, then id. The cursor is the club id, resolved through the unique `(clubId, userAccountId)` pair, so no ClubTrainer id ever leaves the API.
   - It never returns the ClubTrainer id or the user id.
   - Built on `protectedProcedure`, not `trainerProcedure`, because it has no `clubId` and must answer an empty list to non-trainers.
 - **`getRosterAthlete`:**

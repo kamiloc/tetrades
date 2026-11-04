@@ -9,7 +9,7 @@ import { safeNext } from './safe-next';
 // so they never read Host or request.url.
 
 export const ADMIN_LANDING = '/admin/clubs';
-export const DEFAULT_LANDING = '/trainer/invitations';
+export const DEFAULT_LANDING = '/trainer';
 
 export type SignInRequestResult =
   | { ok: true; email: string }
