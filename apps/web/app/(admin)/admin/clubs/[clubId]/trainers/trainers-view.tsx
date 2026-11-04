@@ -81,13 +81,36 @@ export function TrainersView({ clubId, appOrigin }: { clubId: string; appOrigin:
   const [revokeFailed, setRevokeFailed] = useState(false);
   const revokePending = revokeTrainer.isPending || revokeInvitation.isPending;
 
-  if (club.isError) {
-    const code = getApiErrorCode(club.error);
-    if (code === 'NOT_FOUND' || code === 'BAD_REQUEST') return <ClubNotFound />;
+  if (club.isPending || club.isError) {
+    if (club.isError) {
+      const code = getApiErrorCode(club.error);
+      // An unknown or malformed id.
+      if (code === 'NOT_FOUND' || code === 'BAD_REQUEST') return <ClubNotFound />;
+    }
+    // Nothing club-specific (invite, lists) renders until the club loads, so
+    // a failed load never looks like an active club.
+    return (
+      <>
+        <TopBar
+          crumbs={[
+            { label: 'Clubs', href: '/admin/clubs' },
+            { label: 'Club', href: `/admin/clubs/${clubId}` },
+            { label: 'Trainers' },
+          ]}
+        />
+        <PageBody>
+          {club.isPending ? (
+            <LoadingState label="Loading club…" />
+          ) : (
+            <ErrorState title="We couldn't load this club" onRetry={() => void club.refetch()} />
+          )}
+        </PageBody>
+      </>
+    );
   }
 
-  const clubName = club.data?.name ?? 'Club';
-  const isActive = club.data?.isActive ?? true;
+  const clubName = club.data.name;
+  const isActive = club.data.isActive;
 
   const confirmRevoke = async () => {
     if (revoking === null) return;
@@ -179,12 +202,7 @@ export function TrainersView({ clubId, appOrigin }: { clubId: string; appOrigin:
   ];
 
   const inviteButton = (
-    <Button
-      variant="primary"
-      icon="plus"
-      disabled={!isActive || club.isPending}
-      onClick={() => setInviting(true)}
-    >
+    <Button variant="primary" icon="plus" disabled={!isActive} onClick={() => setInviting(true)}>
       Invite trainer
     </Button>
   );
@@ -203,13 +221,9 @@ export function TrainersView({ clubId, appOrigin }: { clubId: string; appOrigin:
         <PageHeader
           title="Trainers"
           sub="Trainers join only by accepting an invitation sent to their email."
-          right={
-            club.data ? (
-              <StatusChip status={club.data.isActive ? 'active' : 'deactivated'} />
-            ) : undefined
-          }
+          right={<StatusChip status={isActive ? 'active' : 'deactivated'} />}
         />
-        {club.data && !club.data.isActive ? (
+        {!isActive ? (
           <InlineAlert tone="warning" title="This club is deactivated">
             Its trainers have no access and new trainers can&apos;t be invited. Reactivate the club
             first.

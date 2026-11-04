@@ -1,6 +1,6 @@
 'use client';
 
-import { getApiErrorCode, useAdminClub } from '@packages/api-client';
+import { getApiErrorCode, trpc, useAdminClub } from '@packages/api-client';
 import type { AdminClubOutput, DeactivateClubOutput } from '@packages/validators';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -100,6 +100,7 @@ function EditClubForm({ club }: { club: AdminClubOutput }) {
 function StatusPanel({ club }: { club: AdminClubOutput }) {
   const deactivate = useDeactivateClubMutation();
   const reactivate = useReactivateClubMutation();
+  const utils = trpc.useUtils();
   const [confirming, setConfirming] = useState<'deactivate' | 'reactivate' | null>(null);
   const [failed, setFailed] = useState(false);
   const [cancelled, setCancelled] = useState<DeactivateClubOutput | null>(null);
@@ -116,9 +117,18 @@ function StatusPanel({ club }: { club: AdminClubOutput }) {
       }
       setConfirming(null);
     } catch (error) {
-      // Already in the requested state (another admin acted): refresh shows it.
-      if (getApiErrorCode(error) === 'BAD_REQUEST') setConfirming(null);
-      else setFailed(true);
+      // Already in the requested state (another admin acted): reload the
+      // club so the page shows its current status and the right action.
+      if (getApiErrorCode(error) === 'BAD_REQUEST') {
+        setConfirming(null);
+        await Promise.all([
+          utils.admin.getClub.invalidate({ clubId: club.id }),
+          utils.admin.listClubs.invalidate(),
+          utils.admin.listClubTrainerInvitations.invalidate({ clubId: club.id }),
+        ]);
+      } else {
+        setFailed(true);
+      }
     }
   };
 
