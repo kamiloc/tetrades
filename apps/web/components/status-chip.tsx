@@ -32,6 +32,8 @@ export const STATUS = {
   declined: { tone: 'neutral', label: 'Declined' },
   revoked: { tone: 'rejected', label: 'Revoked' },
   revokedTrainer: { tone: 'rejected', label: 'Revoked trainer' },
+  member: { tone: 'verified', label: 'Member' },
+  waitingAthlete: { tone: 'pending', label: 'Waiting for the athlete' },
 } as const satisfies Record<string, { tone: ChipTone; label: string }>;
 
 export type StatusKey = keyof typeof STATUS;

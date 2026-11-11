@@ -2,22 +2,29 @@
 
 Next.js App Router app for the admin and trainer portals. Public athlete pages come later (Change 9); `/` is a placeholder with a link to sign in.
 
-Architecture: `docs/project-architecture.md` ("Web sign-in and session", "Web API paths"). Change: `openspec/changes/add-web-portal-shell/`.
+Architecture: `docs/project-architecture.md` ("Web sign-in and session", "Web API paths", "Web trainer portal"). Changes: `add-web-portal-shell`, `add-web-trainer-portal` (in `openspec/changes/` or its archive).
 
 ## Routes
 
-| Route                            | What it is                                                                |
-| -------------------------------- | ------------------------------------------------------------------------- |
-| `/`                              | Placeholder, links to `/login`                                            |
-| `/login`                         | Email step, then code step (Magic Link with a one-time code fallback)     |
-| `/auth/callback`                 | Magic Link landing: exchanges the PKCE code, redirects through `safeNext` |
-| `/admin` → `/admin/clubs`        | Club list, create, filter, load more                                      |
-| `/admin/clubs/[clubId]`          | Club details, edit (slug read-only), deactivate and reactivate            |
-| `/admin/clubs/[clubId]/trainers` | Trainers, invitations, invite and revoke                                  |
-| `/trainer/invitations`           | The signed-in user's trainer invitations: accept or decline               |
-| `/api/trpc/[trpc]`               | Same-origin tRPC proxy for browser calls                                  |
+| Route                                                  | What it is                                                                         |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `/`                                                    | Placeholder, links to `/login`                                                     |
+| `/login`                                               | Email step, then code step (Magic Link with a one-time code fallback)              |
+| `/auth/callback`                                       | Magic Link landing: exchanges the PKCE code, redirects through `safeNext`          |
+| `/admin` → `/admin/clubs`                              | Club list, create, filter, load more                                               |
+| `/admin/clubs/[clubId]`                                | Club details, edit (slug read-only), deactivate and reactivate                     |
+| `/admin/clubs/[clubId]/trainers`                       | Trainers, invitations, invite and revoke                                           |
+| `/trainer`                                             | Trainer landing: the only club's roster, the picker for several, or a no-club note |
+| `/trainer/clubs`                                       | Club picker                                                                        |
+| `/trainer/invitations`                                 | The signed-in user's trainer invitations: accept or decline                        |
+| `/trainer/clubs/[clubId]` → `…/athletes`               | Roster (active and own pending invitations), invite an athlete                     |
+| `/trainer/clubs/[clubId]/athletes/[athleteId]`         | Athlete's metric summaries and entries, log a metric                               |
+| `/trainer/clubs/[clubId]/certifications`               | Pending certification requests: approve, or reject with a reason                   |
+| `/api/trpc/[trpc]`                                     | Same-origin tRPC proxy for browser calls                                           |
 
 The admin layout shows the admin shell only when `admin.whoAmI` succeeds; anyone else sees "Not authorized". The API still checks the role on every call.
+
+Trainer routes (`app/(trainer)/trainer/`): the root layout only checks the session. The `(home)` route group (`/trainer`, `/trainer/clubs`, `/trainer/invitations`) uses the generic trainer nav. `clubs/[clubId]/layout.tsx` is the club guard: it reads `club.listMyTrainerClubs` server-side and renders "You're not a trainer of this club" (and no page) for a club the user doesn't train, otherwise the club nav and the club switcher. A club page that later gets `FORBIDDEN` calls `router.refresh()`, so the guard runs again. Error-to-message mapping lives in `lib/trainer/errors.ts` (`trainerErrorNotice`).
 
 ## Auth flow
 
@@ -26,7 +33,7 @@ Every Supabase auth call runs on the server (`app/auth/actions.ts`, `app/auth/ca
 1. `requestSignIn` sends one email with the link and the code. `emailRedirectTo` is `WEB_URL/auth/callback?next=…`. The message is the same whether or not the email has an account.
 2. The user opens the link (`/auth/callback`) or types the code (`verifyCode`).
 3. Cookies are written by `lib/supabase-server.ts`, which forces `httpOnly`, `SameSite=Lax`, `path=/`, and `Secure` everywhere except `localhost`.
-4. The landing is a safe `next` (`lib/safe-next.ts`: same-origin relative paths only), else `/admin/clubs` for admins and `/trainer/invitations` for everyone else.
+4. The landing is a safe `next` (`lib/safe-next.ts`: same-origin relative paths only), else `/admin/clubs` for admins and `/trainer` for everyone else.
 
 `middleware.ts` refreshes the session on every request and sends sessionless `/admin/*` and `/trainer/*` visits to `/login?next=…`, keeping refreshed cookies on redirects. When the API answers `UNAUTHORIZED` in the browser, `components/providers.tsx` sends the user to sign-in with the current page as `next`.
 

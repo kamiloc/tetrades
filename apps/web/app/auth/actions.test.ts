@@ -170,13 +170,13 @@ describe('verifyCode', () => {
       expect(cookie.options).toMatchObject({ httpOnly: true, sameSite: 'lax' });
   });
 
-  it('lands a non-admin on the invitations page, and honours a safe next', async () => {
+  it('lands a non-admin on /trainer, and honours a safe next', async () => {
     stubBackends({ goodCode: '123456', admin: false });
     const toDefault = await verifyCode(
       codeStep,
       form({ email: codeStep.email, code: '123456', next: '' }),
     ).catch((e: unknown) => e);
-    expect((toDefault as RedirectSignal).location).toBe('/trainer/invitations');
+    expect((toDefault as RedirectSignal).location).toBe('/trainer');
     const toNext = await verifyCode(
       codeStep,
       form({ email: codeStep.email, code: '123456', next: '/admin/clubs?status=ALL' }),

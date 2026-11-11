@@ -32,11 +32,14 @@ export function Sidebar({
   tone,
   sections,
   user,
+  header,
 }: {
   role: string;
   tone: RoleTone;
   sections: NavSection[];
   user: PortalUser;
+  /** Shown under the brand, above the nav (the trainer club switcher). */
+  header?: ReactNode;
 }) {
   return (
     <aside className="sticky top-0 flex h-screen w-[252px] shrink-0 flex-col border-r border-ink-edge bg-gradient-to-b from-ink via-ink2 via-60% to-ink-deep text-on-ink">
@@ -51,6 +54,7 @@ export function Sidebar({
           </span>
         </div>
       </div>
+      {header ? <div className="border-b border-ink-line px-3 py-3">{header}</div> : null}
       <SidebarNav sections={sections} />
       <div className="mt-auto p-3">
         <div className="flex items-center gap-2.5 rounded-[10px] border border-ink-line bg-on-ink/[0.02] p-2">
@@ -130,17 +134,19 @@ export function PortalShell({
   tone,
   sections,
   user,
+  header,
   children,
 }: {
   role: string;
   tone: RoleTone;
   sections: NavSection[];
   user: PortalUser;
+  header?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div lang="en" className="flex min-h-screen min-w-portal bg-canvas">
-      <Sidebar role={role} tone={tone} sections={sections} user={user} />
+      <Sidebar role={role} tone={tone} sections={sections} user={user} header={header} />
       <main className="flex min-w-0 flex-1 flex-col">{children}</main>
     </div>
   );

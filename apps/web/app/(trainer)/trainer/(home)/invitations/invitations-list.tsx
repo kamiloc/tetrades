@@ -4,16 +4,16 @@ import { getApiErrorCode, useMyTrainerInvitations } from '@packages/api-client';
 import type { MyTrainerInvitationOutput } from '@packages/validators';
 import { useState } from 'react';
 
-import { Button } from '../../../../components/button';
-import { ConfirmDialog } from '../../../../components/confirm-dialog';
-import { InlineAlert } from '../../../../components/inline-alert';
-import { EmptyState, ErrorState, LoadingState } from '../../../../components/states';
-import { NameCell, Table, type Column } from '../../../../components/table';
-import { formatDateTime } from '../../../../lib/format';
+import { Button } from '../../../../../components/button';
+import { ConfirmDialog } from '../../../../../components/confirm-dialog';
+import { InlineAlert } from '../../../../../components/inline-alert';
+import { EmptyState, ErrorState, LoadingState } from '../../../../../components/states';
+import { NameCell, Table, type Column } from '../../../../../components/table';
+import { formatDateTime } from '../../../../../lib/format';
 import {
   useAcceptTrainerInvitationMutation,
   useDeclineTrainerInvitationMutation,
-} from '../../../../lib/portal-mutations';
+} from '../../../../../lib/portal-mutations';
 
 export type Notice =
   | { kind: 'accepted'; clubName: string }

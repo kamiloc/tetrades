@@ -17,15 +17,22 @@ import {
   updateAthleteVisibilityInput,
 } from './athlete-visibility-settings.js';
 import {
+  athleteToInviteListOutput,
+  athleteToInviteOutput,
   clubMembershipMutationOutput,
   clubMembershipOwnerListOutput,
   clubMembershipOwnerOutput,
   clubRosterEntryOutput,
   clubRosterListOutput,
+  findAthleteToInviteInput,
+  getRosterAthleteInput,
   inviteAthleteToClubInput,
   leaveClubInput,
   listClubRosterInput,
   listMyClubMembershipsInput,
+  listMyTrainerClubsInput,
+  myTrainerClubListOutput,
+  myTrainerClubOutput,
   respondToClubInvitationInput,
 } from './club-membership.js';
 import { clubPublicOutput } from './club.js';
@@ -72,6 +79,10 @@ describe('output schemas carry no L2 fields', () => {
     clubRosterEntryOutput,
     clubRosterListOutput,
     clubMembershipMutationOutput,
+    myTrainerClubOutput,
+    myTrainerClubListOutput,
+    athleteToInviteOutput,
+    athleteToInviteListOutput,
     metricDefinitionPublicOutput,
     metricDefinitionListOutput,
     athleteMetricEntryOutput,
@@ -94,12 +105,93 @@ describe('output schemas carry no L2 fields', () => {
       'displayName',
       'id',
       'slug',
+      'sport',
+    ]);
+    expect(Object.keys(clubRosterEntryOutput.shape.athlete.shape.sport.shape).sort()).toEqual([
+      'id',
+      'name',
     ]);
   });
 
-  it('membership outputs never expose trainer ids', () => {
-    expect(collectKeys(clubMembershipOwnerOutput).has('invitedByClubTrainerId')).toBe(false);
-    expect(collectKeys(clubRosterEntryOutput).has('invitedByClubTrainerId')).toBe(false);
+  it('invite lookup exposes only L0 athlete identity and the relation', () => {
+    expect(Object.keys(athleteToInviteOutput.shape).sort()).toEqual(['athlete', 'relation']);
+    expect(Object.keys(athleteToInviteOutput.shape.athlete.shape).sort()).toEqual([
+      'displayName',
+      'id',
+      'slug',
+      'sport',
+    ]);
+  });
+
+  const INTERNAL_KEY = /^(userAccountId|clubTrainerId|invitedByClubTrainerId|supabaseUserId|email)$/i;
+  const trainerOutputs: Record<string, z.ZodTypeAny> = {
+    clubMembershipOwnerOutput,
+    clubRosterEntryOutput,
+    clubRosterListOutput,
+    myTrainerClubOutput,
+    myTrainerClubListOutput,
+    athleteToInviteOutput,
+    athleteToInviteListOutput,
+  };
+  for (const [name, schema] of Object.entries(trainerOutputs)) {
+    it(`${name} exposes no user, trainer id or email`, () => {
+      const keys = [...collectKeys(schema)];
+      expect(keys.filter((k) => INTERNAL_KEY.test(k) || /email/i.test(k))).toEqual([]);
+    });
+  }
+});
+
+describe('trainer workspace inputs', () => {
+  it('accepts a roster athlete lookup and rejects non-cuid ids', () => {
+    expect(getRosterAthleteInput.safeParse({ clubId: ID_A, athleteId: ID_B }).success).toBe(true);
+    expect(getRosterAthleteInput.safeParse({ clubId: ID_A, athleteId: 'nope' }).success).toBe(false);
+    expect(getRosterAthleteInput.safeParse({ clubId: 'nope', athleteId: ID_B }).success).toBe(false);
+  });
+
+  it('pages my trainer clubs with the standard limits', () => {
+    expect(listMyTrainerClubsInput.parse({}).take).toBe(20);
+    expect(listMyTrainerClubsInput.safeParse({ take: 50 }).success).toBe(true);
+    expect(listMyTrainerClubsInput.safeParse({ take: 51 }).success).toBe(false);
+  });
+
+  it('accepts a name search, trims it, and defaults take', () => {
+    const parsed = findAthleteToInviteInput.parse({ clubId: ID_A, by: 'name', query: '  Ma  ' });
+    expect(parsed).toMatchObject({ by: 'name', query: 'Ma', take: 20 });
+  });
+
+  it('rejects a 1-character and a 101-character name query', () => {
+    expect(findAthleteToInviteInput.safeParse({ clubId: ID_A, by: 'name', query: 'a' }).success).toBe(false);
+    expect(findAthleteToInviteInput.safeParse({ clubId: ID_A, by: 'name', query: ' a ' }).success).toBe(false);
+    expect(
+      findAthleteToInviteInput.safeParse({ clubId: ID_A, by: 'name', query: 'a'.repeat(101) }).success,
+    ).toBe(false);
+    expect(
+      findAthleteToInviteInput.safeParse({ clubId: ID_A, by: 'name', query: 'a'.repeat(100) }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a valid slug and rejects an invalid one', () => {
+    expect(
+      findAthleteToInviteInput.safeParse({ clubId: ID_A, by: 'slug', slug: 'mariana-pajon' }).success,
+    ).toBe(true);
+    for (const slug of ['Mariana Pajon', 'ab', '-bad-', 'UPPER']) {
+      expect(findAthleteToInviteInput.safeParse({ clubId: ID_A, by: 'slug', slug }).success).toBe(false);
+    }
+  });
+
+  it('rejects a non-cuid club id and an unknown mode', () => {
+    expect(findAthleteToInviteInput.safeParse({ clubId: 'x', by: 'slug', slug: 'mariana-pajon' }).success).toBe(
+      false,
+    );
+    expect(findAthleteToInviteInput.safeParse({ clubId: ID_A, by: 'email', query: 'ma' }).success).toBe(false);
+  });
+
+  it('only allows MEMBER, INVITED_BY_YOU or null as the relation', () => {
+    const athlete = { id: ID_B, slug: 'mariana-pajon', displayName: 'Mariana Pajón', sport: { id: ID_C, name: 'BMX' } };
+    for (const relation of ['MEMBER', 'INVITED_BY_YOU', null]) {
+      expect(athleteToInviteOutput.safeParse({ athlete, relation }).success).toBe(true);
+    }
+    expect(athleteToInviteOutput.safeParse({ athlete, relation: 'INVITED' }).success).toBe(false);
   });
 });
 

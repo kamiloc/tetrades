@@ -1,11 +1,17 @@
 import {
+  athleteToInviteListOutput,
   clubMembershipMutationOutput,
   clubMembershipOwnerListOutput,
+  clubRosterEntryOutput,
   clubRosterListOutput,
+  findAthleteToInviteInput,
+  getRosterAthleteInput,
   inviteAthleteToClubInput,
   leaveClubInput,
   listClubRosterInput,
   listMyClubMembershipsInput,
+  listMyTrainerClubsInput,
+  myTrainerClubListOutput,
   respondToClubInvitationInput,
 } from '@packages/validators';
 
@@ -16,6 +22,11 @@ import {
   listRoster,
   respondToInvitation,
 } from '../services/membership.js';
+import {
+  findAthleteToInvite,
+  getRosterAthlete,
+  listMyTrainerClubs,
+} from '../services/trainerWorkspace.js';
 import { requireViewer, requireViewerAthlete } from '../services/viewer.js';
 import { protectedProcedure, router, trainerProcedure } from '../trpc.js';
 
@@ -59,4 +70,22 @@ export const clubRouter = router({
     .input(listClubRosterInput)
     .output(clubRosterListOutput)
     .query(({ ctx, input }) => listRoster(ctx.prisma, ctx.clubTrainer, input)),
+
+  // The caller's own trainer clubs. Not a trainerProcedure: it has no clubId
+  // and answers an empty list to non-trainers.
+  listMyTrainerClubs: protectedProcedure
+    .input(listMyTrainerClubsInput)
+    .output(myTrainerClubListOutput)
+    .query(({ ctx, input }) => listMyTrainerClubs(ctx.prisma, ctx.userId, input)),
+
+  getRosterAthlete: trainerProcedure
+    .input(getRosterAthleteInput)
+    .output(clubRosterEntryOutput)
+    .query(({ ctx, input }) => getRosterAthlete(ctx.prisma, ctx.clubTrainer, input)),
+
+  // Invite lookup: the one trainer read outside the club (trainer-access-boundary).
+  findAthleteToInvite: trainerProcedure
+    .input(findAthleteToInviteInput)
+    .output(athleteToInviteListOutput)
+    .query(({ ctx, input }) => findAthleteToInvite(ctx.prisma, ctx.clubTrainer, input)),
 });

@@ -15,6 +15,8 @@ const EXPECTED: Record<StatusKey, string> = {
   declined: 'Declined',
   revoked: 'Revoked',
   revokedTrainer: 'Revoked trainer',
+  member: 'Member',
+  waitingAthlete: 'Waiting for the athlete',
 };
 
 describe('StatusChip', () => {
