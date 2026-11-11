@@ -30,6 +30,7 @@ import { cursorArgs, toPage, type Page } from '../lib/pagination.js';
 import { lockAchievements } from './certification.js';
 import { withIsActive } from './clubOutput.js';
 import { lockActiveClub, lockTrainerAuthority, NOT_A_TRAINER_MESSAGE } from './locks.js';
+import { rosterSelect, rosterWhere } from './trainerWorkspace.js';
 import type { Viewer } from './viewer.js';
 
 const UNIQUE_VIOLATION = 'P2002';
@@ -315,7 +316,7 @@ export async function listMyMemberships(
  * A trainer's roster (trainer-access-boundary spec): ACTIVE memberships of
  * the club, plus pending invitations this trainer sent. Completed, rejected,
  * and other trainers' pending invitations are excluded. Athlete identity is
- * limited to L0 fields.
+ * limited to L0 fields. Filter and select are shared with getRosterAthlete.
  */
 export async function listRoster(
   prisma: PrismaClient,
@@ -323,22 +324,10 @@ export async function listRoster(
   input: PaginationInput,
 ): Promise<Page<ClubRosterEntryOutput>> {
   const rows = await prisma.clubMembership.findMany({
-    where: {
-      clubId: trainer.clubId,
-      OR: [
-        { status: 'ACTIVE' },
-        { status: 'PENDING_ATHLETE_CONFIRMATION', invitedByClubTrainerId: trainer.id },
-      ],
-    },
+    where: rosterWhere(trainer),
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     ...cursorArgs(input),
-    select: {
-      id: true,
-      status: true,
-      createdAt: true,
-      respondedAt: true,
-      athlete: { select: { id: true, slug: true, displayName: true } },
-    },
+    select: rosterSelect,
   });
   return toPage(rows, input.take, (r) => r.id);
 }

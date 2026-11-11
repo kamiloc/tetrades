@@ -550,10 +550,25 @@ The admin and trainer web portals differ from `web/` here. Each unsupported surf
 - **No global search, exports, messages or sessions.** The top bar has breadcrumbs and one primary action, without the search box or notifications bell.
 - **The invite modal takes an email only.** No role, credentials, email lists or share links. After inviting, the page shows what to pass on (no email is sent) with a Copy link button.
 - **"Suspended" is "Deactivated".** Clubs are deactivated and reactivated, never deleted. Invitation states are Pending, Expired, Accepted, Declined and Revoked; trainers are Active or Revoked.
-- **`/trainer/invitations` has no artboard.** It's built from the shell, table and state components. The trainer work screens (home queue, athlete detail, metric logging, club switcher) come in `add-trainer-portal`.
+- **`/trainer/invitations` has no artboard.** It's built from the shell, table and state components. The trainer work screens are listed under "Trainer portal" below.
 - **Fixed 1440×900 artboards become a 1024 px minimum layout.** Pages fit without horizontal scrolling from 1024 px up; smaller widths and dark theme are out of scope.
 - **Sidebar user block** shows the signed-in email and a sign-out button instead of a name, avatar hue and menu.
 - **Sample data is not reused.** The prototype's US clubs, people and counts are illustrative only.
+
+### Trainer portal (`apps/web`, `add-web-trainer-portal`)
+
+The trainer work screens differ from `web/` here. Each unsupported trainer surface in `WEB-AUDIT.md` is listed.
+
+- **No T1 club dashboard.** `/trainer` opens the only club's roster, or a club picker for several clubs. There are no KPI counts, charts or activity.
+- **The roster (T2) is the API's roster.** Active athletes and the invitations this trainer sent, with name, handle, sport and status ("Waiting for the athlete" for pending). No age, contact data, `AP-…` identifiers, groups or filters.
+- **No groups, sessions, attendance or access management** on the roster or the athlete page.
+- **The athlete page (T3) shows metrics only.** Summaries (latest and best) and entries. No Add achievement, achievements tab, sessions, attendance or access tabs.
+- **Metric logging has no conditions, evidence upload or verification status.** The dialog takes a metric (the athlete's sport plus general metrics), a value and a date, and says the entry is trainer-reported and can't be edited or deleted. Entries are never edited or deleted.
+- **Entries are attributed to a club, never a trainer.** "Reported by <club>" or "Reported by another club"; no trainer names anywhere.
+- **The review queue (T4) holds certification requests only.** Achievement title, organization, date and the athlete's name. No results, honors or tests queue, no evidence files, no generic "Verify" and no "ask for info": Approve (confirmed) or Reject (reason required).
+- **Invitations (T5) invite athletes only.** By profile link, handle or name search. No trainer or staff invites, email lists or share links (admins invite trainers). Pending invitations can't be cancelled.
+- **No exports or messages.** No CSV export, messaging or notifications bell.
+- **Club switcher** is a select in the sidebar under the brand, shown as plain text for a trainer of one club.
 
 ## Out of scope (this sprint)
 

@@ -33,10 +33,12 @@ async function checkAccess(): Promise<Access> {
 // Presentation guard (design D4): only an account the API recognizes as an
 // admin sees the admin shell. Every page still loads its data through the
 // API, which re-checks the role on each call.
+// Signed out: middleware already redirected with the exact `next`; this is
+// a fallback for a session that ended meanwhile.
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const [access, user] = await Promise.all([checkAccess(), getSessionUser()]);
 
-  if (access === 'signed-out' || user === null) redirect('/login?next=%2Fadmin%2Fclubs');
+  if (access === 'signed-out' || user === null) redirect('/login');
   if (access === 'forbidden') return <NotAuthorized email={user.email} />;
   if (access === 'unavailable') return <AccessCheckFailed />;
 
