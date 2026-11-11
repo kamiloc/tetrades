@@ -78,7 +78,10 @@ export async function startServer(
       : {}),
   });
 
-  const server = await buildServer({ logLevel: 'silent', ...(options.jobs ? { jobs: options.jobs } : {}) });
+  const server = await buildServer({
+    logLevel: 'silent',
+    ...(options.jobs ? { jobs: options.jobs } : {}),
+  });
   await server.listen({ port: 0, host: '127.0.0.1' });
 
   const address = server.server.address();
@@ -102,8 +105,7 @@ export function apiClient(baseUrl: string, accessToken?: string) {
       httpBatchLink({
         url: `${baseUrl}/trpc`,
         transformer: superjson,
-        headers:
-          accessToken === undefined ? {} : { authorization: `Bearer ${accessToken}` },
+        headers: accessToken === undefined ? {} : { authorization: `Bearer ${accessToken}` },
       }),
     ],
   });
@@ -134,11 +136,9 @@ function supabaseAdmin(): SupabaseClient {
 }
 
 function supabaseAnon(): SupabaseClient {
-  return createClient(
-    process.env['SUPABASE_URL'] ?? '',
-    process.env['SUPABASE_ANON_KEY'] ?? '',
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
+  return createClient(process.env['SUPABASE_URL'] ?? '', process.env['SUPABASE_ANON_KEY'] ?? '', {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +405,12 @@ export type MembershipStatus = 'PENDING_ATHLETE_CONFIRMATION' | 'ACTIVE' | 'COMP
 export async function createTestClub(label = 'club'): Promise<string> {
   const marker = randomUUID().slice(0, 8);
   const club = await prisma.club.create({
-    data: { slug: `int-${label}-${marker}`, name: `Int Club ${label}`, countryCode: 'CO', city: 'Cali' },
+    data: {
+      slug: `int-${label}-${marker}`,
+      name: `Int Club ${label}`,
+      countryCode: 'CO',
+      city: 'Cali',
+    },
     select: { id: true },
   });
   return club.id;
@@ -444,7 +449,10 @@ export async function cleanupFixtureTrainer(fixture: FixtureTrainer): Promise<vo
  * the guard fails fast with a clear message before the database does.
  */
 export async function addClubTrainer(clubId: string, userAccountId: string): Promise<string> {
-  const athlete = await prisma.athlete.findUnique({ where: { userAccountId }, select: { id: true } });
+  const athlete = await prisma.athlete.findUnique({
+    where: { userAccountId },
+    select: { id: true },
+  });
   if (athlete !== null) {
     throw new Error(
       'addClubTrainer: the account has an athlete profile; use a trainer-only account ' +
@@ -511,7 +519,9 @@ export async function cleanupTestClub(clubId: string): Promise<void> {
   await prisma.athleteMetricEntry.deleteMany({ where: { clubMembership: { clubId } } });
   await prisma.clubMembership.deleteMany({ where: { clubId } });
   await prisma.clubTrainerInvitation.deleteMany({ where: { clubId } });
-  await prisma.adminActionLog.deleteMany({ where: { targetId: clubId } });
+  await prisma.adminActionLog.deleteMany({
+    where: { OR: [{ targetId: clubId }, { metadata: { path: ['clubId'], equals: clubId } }] },
+  });
   await prisma.clubTrainer.deleteMany({ where: { clubId } });
   await prisma.club.deleteMany({ where: { id: clubId } });
 }

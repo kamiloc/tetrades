@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { clubPublicOutput } from './club.js';
+import { adminSearchQuerySchema, clubPublicOutput } from './club.js';
 import { cuidSchema, datetimeSchema, paginatedOutput, paginationInput } from './common.js';
 import { trainerInvitationStateEnum, trainerInvitationStatusEnum } from './enums.js';
 
@@ -67,6 +67,21 @@ export const listClubTrainerInvitationsInput = paginationInput.extend({
   clubId: cuidSchema,
 });
 export type ListClubTrainerInvitationsInput = z.infer<typeof listClubTrainerInvitationsInput>;
+
+// Access of a trainer assignment (ADR-017). A revoked row is REVOKED even at
+// a deactivated club; a non-revoked row at a deactivated club has no access.
+export const adminTrainerAccessEnum = z.enum(['ACTIVE', 'CLUB_DEACTIVATED', 'REVOKED']);
+export type AdminTrainerAccess = z.infer<typeof adminTrainerAccessEnum>;
+
+export const adminTrainerAccessFilterEnum = z.enum([...adminTrainerAccessEnum.options, 'ALL']);
+export type AdminTrainerAccessFilter = z.infer<typeof adminTrainerAccessFilterEnum>;
+
+// Admin: trainer assignments across clubs, newest first.
+export const listAdminTrainersInput = paginationInput.extend({
+  access: adminTrainerAccessFilterEnum.default('ALL'),
+  clubQuery: adminSearchQuerySchema.optional(),
+});
+export type ListAdminTrainersInput = z.infer<typeof listAdminTrainersInput>;
 
 // ──────────────────────────────────────────────
 // OUTPUT SCHEMAS — no L2 fields, no Supabase ids
@@ -141,3 +156,18 @@ export const revokeClubTrainerOutput = adminClubTrainerOutput.pick({
   revokedAt: true,
 });
 export type RevokeClubTrainerOutput = z.infer<typeof revokeClubTrainerOutput>;
+
+// Admin: one row of the cross-club trainer directory. Carries the derived
+// `access`, never the raw status, and never the trainer's user account id.
+export const adminTrainerDirectoryEntryOutput = z.object({
+  id: cuidSchema, /// L1-INTERNAL
+  access: adminTrainerAccessEnum, /// L1-INTERNAL
+  createdAt: datetimeSchema, /// L1-INTERNAL
+  revokedAt: datetimeSchema.nullable(), /// L1-INTERNAL
+  invitedEmail: z.string().nullable(), /// L1-INTERNAL
+  club: clubPublicOutput.pick({ id: true, slug: true, name: true, isActive: true }),
+});
+export type AdminTrainerDirectoryEntryOutput = z.infer<typeof adminTrainerDirectoryEntryOutput>;
+
+export const adminTrainerDirectoryListOutput = paginatedOutput(adminTrainerDirectoryEntryOutput);
+export type AdminTrainerDirectoryListOutput = z.infer<typeof adminTrainerDirectoryListOutput>;

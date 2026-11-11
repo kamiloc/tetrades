@@ -99,7 +99,11 @@ The web app SHALL show the `/admin` area only to a user the API recognizes as an
 
 #### Scenario: Admin opens the admin area
 - **WHEN** an admin opens `/admin`
-- **THEN** they see the admin shell with the clubs page
+- **THEN** they see the admin shell with the overview page
+
+#### Scenario: Admin signs in
+- **WHEN** an admin signs in without a return target
+- **THEN** they land on the overview
 
 ### Requirement: Portal pages show loading, empty, and error states
 Every portal page SHALL show a distinct loading state, an empty state when there is no data, and an error state with a retry action when a request fails. Messages SHALL NOT include internal ids, stack traces, or server details.

@@ -9,8 +9,8 @@ describe('chooseLanding', () => {
     expect(await chooseLanding('', 'token', ORIGIN, async () => false)).toBe('/trainer');
   });
 
-  it('lands an admin on /admin/clubs', async () => {
-    expect(await chooseLanding('', 'token', ORIGIN, async () => true)).toBe('/admin/clubs');
+  it('lands an admin on the /admin overview', async () => {
+    expect(await chooseLanding('', 'token', ORIGIN, async () => true)).toBe('/admin');
   });
 
   it('prefers a safe next over either landing', async () => {

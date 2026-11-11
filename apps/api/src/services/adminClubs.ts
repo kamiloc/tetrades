@@ -190,16 +190,45 @@ export async function updateClub(
   return toAdminClub(club);
 }
 
+/** A club with no non-revoked trainer, whatever its status. */
+const withoutActiveTrainerWhere = {
+  trainers: { none: { revokedAt: null } },
+} satisfies Prisma.ClubWhereInput;
+
+/**
+ * Active clubs with no non-revoked trainer. Shared by the overview count and
+ * listClubs({ status: 'ACTIVE', withoutActiveTrainer: true }) so they agree.
+ */
+export const clubsWithoutActiveTrainerWhere = {
+  deactivatedAt: null,
+  ...withoutActiveTrainerWhere,
+} satisfies Prisma.ClubWhereInput;
+
 export async function listClubs(
   prisma: PrismaClient,
   input: ListAdminClubsInput,
 ): Promise<AdminClubListOutput> {
-  const where: Prisma.ClubWhereInput =
+  const status: Prisma.ClubWhereInput =
     input.status === 'ACTIVE'
       ? { deactivatedAt: null }
       : input.status === 'DEACTIVATED'
         ? { deactivatedAt: { not: null } }
         : {};
+  const where: Prisma.ClubWhereInput = {
+    AND: [
+      status,
+      input.withoutActiveTrainer === true ? withoutActiveTrainerWhere : {},
+      input.query === undefined
+        ? {}
+        : {
+            OR: [
+              { name: { contains: input.query, mode: 'insensitive' } },
+              // Slugs are stored lowercase.
+              { slug: { contains: input.query.toLowerCase() } },
+            ],
+          },
+    ],
+  };
   const rows = await prisma.club.findMany({
     where,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -228,7 +257,11 @@ export async function deactivateClub(
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'This club is already deactivated' });
     }
     const now = new Date();
-    await tx.club.update({ where: { id: clubId }, data: { deactivatedAt: now }, select: { id: true } });
+    await tx.club.update({
+      where: { id: clubId },
+      data: { deactivatedAt: now },
+      select: { id: true },
+    });
 
     // Memberships: close every pending invitation of the club.
     // The conditional update skips a row an athlete answered concurrently;
@@ -294,7 +327,10 @@ export async function deactivateClub(
       targetId: clubId,
       metadata: counts,
     });
-    const club = await tx.club.findUniqueOrThrow({ where: { id: clubId }, select: adminClubSelect });
+    const club = await tx.club.findUniqueOrThrow({
+      where: { id: clubId },
+      select: adminClubSelect,
+    });
     return { club: toAdminClub(club), counts, invitations };
   });
   logAdminAction(actor, 'CLUB_DEACTIVATED', clubId);

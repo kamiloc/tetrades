@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { OverviewView } from './overview-view';
 
-export default function AdminIndex() {
-  redirect('/admin/clubs');
+export default function AdminOverviewPage() {
+  return <OverviewView />;
 }

@@ -258,9 +258,14 @@ export function ClubDetailView({ clubId }: { clubId: string }) {
       <TopBar
         crumbs={[{ label: 'Clubs', href: '/admin/clubs' }, { label: data.name }]}
         action={
-          <Link href={`/admin/clubs/${data.id}/trainers`} className={buttonClasses('secondary')}>
-            Trainers
-          </Link>
+          <div className="flex gap-2">
+            <Link href={`/admin/activity?club=${data.id}`} className={buttonClasses('secondary')}>
+              View activity
+            </Link>
+            <Link href={`/admin/clubs/${data.id}/trainers`} className={buttonClasses('secondary')}>
+              Trainers
+            </Link>
+          </div>
         }
       />
       <PageBody>

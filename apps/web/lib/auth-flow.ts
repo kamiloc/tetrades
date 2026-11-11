@@ -8,7 +8,7 @@ import { safeNext } from './safe-next';
 // D1). Each takes the per-request Supabase client and the configured origin,
 // so they never read Host or request.url.
 
-export const ADMIN_LANDING = '/admin/clubs';
+export const ADMIN_LANDING = '/admin';
 export const DEFAULT_LANDING = '/trainer';
 
 export type SignInRequestResult =

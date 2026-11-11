@@ -92,6 +92,17 @@ Admin account (role `ADMIN`, set by the owner with SQL) → `admin.*` (`adminPro
 
 `admin.deactivateClub` → transaction: club locked `FOR UPDATE`, `deactivatedAt` set → `PENDING_ATHLETE_CONFIRMATION` memberships `REJECTED` → `PENDING` certification requests `CANCELLED`, achievements `UNVERIFIED` → `PENDING` trainer invitations `REVOKED` → admin action logged → after commit, BullMQ `notifications` jobs (`CLUB_INVITATION_CLOSED`, ids only, naming no club). `ACTIVE` memberships, entries, verified achievements and trainer rows are unchanged; every club output reports `isActive: false`. Trainer writes lock club → club_trainer → membership → achievement → request, so in-flight writes either commit first or fail. `admin.reactivateClub` restores access; closed items stay closed.
 
+### Platform admin: insight reads
+
+Read-only `admin.*` procedures (`adminProcedure`, no athlete data, no internal ids in output):
+
+- `admin.getOverview` → six counts (active and deactivated clubs, active clubs with no active trainer, active trainers, pending trainer invitations, those expiring within 48 h) in one array-form `$transaction` at `RepeatableRead`, so all come from one snapshot, plus `generatedAt`. "Active clubs with no active trainer" uses the same `where` as `admin.listClubs({ status: 'ACTIVE', withoutActiveTrainer: true })`.
+- `admin.listTrainers` → `ClubTrainer` rows across clubs, newest first, with the derived ADR-017 `access` (`ACTIVE`, `CLUB_DEACTIVATED`, `REVOKED`; never the raw status), the club, and the "Invited as" email from the latest `ACCEPTED` invitation (shared helper with `admin.listClubTrainers`). Filter by access and club name.
+- `admin.listActions` → the `admin_action_log`, newest first, filtered by action and by club (club targets, plus trainer and invitation rows by `metadata.clubId`). Details keep only changed field names and cancelled counts. The actor is `isYou` or the acting admin's email; `request_id` and actor ids never leave the service. Reading writes no log row, and RLS still denies every client role direct access.
+- `admin.listClubs` accepts `query` (2–100 characters, name or slug, case-insensitive) and `withoutActiveTrainer`.
+
+**Acting-admin email lookup:** `admin.listActions` → `AdminDirectory.getUserEmail` (`lib/supabaseAdmin.ts`, service role, `auth.admin.getUserById`) for each distinct non-self actor on the page, in parallel, behind an in-process cache (`services/adminInsights.ts`: 5-minute TTL, 100 entries, successes only). Any failure gives `email: null` ("An admin" on the web) and a `warn` log with `requestId` and the error name only. This is an owner-approved exception to "no external calls from procedures": the read is on demand and bounded by the cache. Emails are L1, returned to admins only, never logged.
+
 ### Scheduled jobs
 
 `trainer-invitation-redaction` is the first recurring job: registered at API startup with BullMQ's `upsertJobScheduler` (idempotent across restarts and instances), daily, payload `{ requestId }` only. The worker selects its own rows and logs counts with the run's `requestId`. Later recurring jobs (the tombstone purge) follow the same pattern: a fixed scheduler id, a payload of ids or nothing, a worker in `apps/api/src/jobs/`, and re-runnable, set-based work.
