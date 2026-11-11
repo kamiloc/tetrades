@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "expo start",
     "build": "echo 'mobile build handled by EAS'",
+    "eas-build-post-install": "cd ../.. && yarn turbo run build --filter=@app/mobile...",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "echo 'no tests yet'",
@@ -21,7 +22,7 @@
     "@tanstack/react-query": "^5",
     "@trpc/client": "^11",
     "@trpc/react-query": "^11",
-    "expo": "~55.0.31",
+    "expo": "~55.0.32",
     "expo-constants": "~55.0.17",
     "expo-crypto": "~55.0.19",
     "expo-linear-gradient": "~55.0.18",
