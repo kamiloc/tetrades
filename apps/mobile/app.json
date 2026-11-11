@@ -15,6 +15,15 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "51182ca0-e341-4150-8c2f-a58b84c8ac38"
+      }
+    },
+    "android": {
+      "package": "com.tetrades.athletepassport"
     }
   }
 }
