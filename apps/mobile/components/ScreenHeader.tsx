@@ -3,6 +3,7 @@ import type { ReactElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useMobileLocalization } from '../lib/i18n';
 import { Feather } from '../lib/icons';
 import { colors } from '../lib/theme';
 
@@ -21,6 +22,7 @@ interface ScreenHeaderProps {
 // decorative until notifications ship (out of scope), so it is hidden from
 // assistive tech and not pressable.
 export function ScreenHeader({ title, subtitle, onBack, overlap = false }: ScreenHeaderProps): ReactElement {
+  const { t } = useMobileLocalization();
   return (
     <LinearGradient
       colors={[colors.ink, colors.ink2]}
@@ -33,7 +35,7 @@ export function ScreenHeader({ title, subtitle, onBack, overlap = false }: Scree
               <Pressable
                 onPress={onBack}
                 accessibilityRole="button"
-                accessibilityLabel="Back"
+                accessibilityLabel={t('common.back')}
                 hitSlop={12}
                 className="-ml-1 mr-1 h-8 w-8 items-center justify-center"
               >

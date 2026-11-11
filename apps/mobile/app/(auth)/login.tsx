@@ -8,39 +8,31 @@ import { ApMark } from '../../components/ApMark';
 import { AuthButton } from '../../components/AuthButton';
 import { KeyboardAwareScrollView } from '../../components/KeyboardAwareScrollView';
 import { sendLoginMagicLink } from '../../lib/auth-actions';
+import { useMobileLocalization } from '../../lib/i18n';
 import type { IconName } from '../../lib/icons';
 import { Feather } from '../../lib/icons';
 import { colors, shadow } from '../../lib/theme';
+import type { MessageKey } from '../../lib/translations';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const SIGN_IN_FAILED = "Couldn't sign you in. Try again.";
+const SIGN_IN_FAILED: MessageKey = 'auth.signInFailed';
 
-const ERROR_PARAM_MAP: Readonly<Record<string, string>> = {
-  link_expired: 'That sign-in link expired. Request a new one.',
-  link_invalid: "That sign-in link isn't valid. Try again.",
+const ERROR_PARAM_MAP: Readonly<Record<string, MessageKey>> = {
+  link_expired: 'auth.linkExpired',
+  link_invalid: 'auth.linkInvalid',
 };
 
 type Mode = 'signin' | 'create';
 
-const COPY: Record<Mode, { headline: string; body: string; footer: string; footerAction: string }> = {
-  signin: {
-    headline: 'Welcome back,\nathlete.',
-    body: 'Sign in to your verified record, network, and club stats.',
-    footer: 'New to Athlete Passport?',
-    footerAction: 'Create account',
-  },
-  create: {
-    headline: 'Build your verified\nathletic identity.',
-    body: 'Verified achievements, club history, and trainer-reported stats — owned by you, shared on your terms.',
-    footer: 'Already a member?',
-    footerAction: 'Sign in',
-  },
+const COPY: Record<Mode, { headline: MessageKey; body: MessageKey; footer: MessageKey; footerAction: MessageKey }> = {
+  signin: { headline: 'auth.welcomeHeadline', body: 'auth.welcomeBody', footer: 'auth.newToPassport', footerAction: 'auth.createAccount' },
+  create: { headline: 'auth.createHeadline', body: 'auth.createBody', footer: 'auth.alreadyMember', footerAction: 'auth.signIn' },
 };
 
-const VALUE_PROPS: ReadonlyArray<{ icon: IconName; label: string }> = [
-  { icon: 'shield', label: "Stats reported by your club's trainers" },
-  { icon: 'users', label: 'A trusted network of athletes & coaches' },
-  { icon: 'lock', label: 'Secure and athlete-owned' },
+const VALUE_PROPS: ReadonlyArray<{ icon: IconName; label: MessageKey }> = [
+  { icon: 'shield', label: 'auth.clubTrainers' },
+  { icon: 'users', label: 'auth.network' },
+  { icon: 'lock', label: 'auth.security' },
 ];
 
 // Radial ink background, faint diagonal field lines, and a blue glow (handoff §0).
@@ -72,6 +64,7 @@ function Backdrop(): ReactElement {
 // handoff's Apple and Google buttons are intentionally not built.
 export default function LoginScreen(): ReactElement {
   const router = useRouter();
+  const { t } = useMobileLocalization();
   const rawParams = useLocalSearchParams<{ error?: string }>();
   const errorParam = Array.isArray(rawParams.error) ? (rawParams.error[0] ?? undefined) : rawParams.error;
 
@@ -82,13 +75,13 @@ export default function LoginScreen(): ReactElement {
 
   useEffect(() => {
     if (!errorParam) return;
-    setError(ERROR_PARAM_MAP[errorParam] ?? SIGN_IN_FAILED);
+    setError(t(ERROR_PARAM_MAP[errorParam] ?? SIGN_IN_FAILED));
   }, [errorParam]);
 
   const handleSubmit = async (): Promise<void> => {
     const trimmed = email.trim();
     if (!EMAIL_REGEX.test(trimmed)) {
-      setError('Enter a valid email address.');
+      setError(t('auth.invalidEmail'));
       return;
     }
     setError(null);
@@ -97,7 +90,7 @@ export default function LoginScreen(): ReactElement {
       await sendLoginMagicLink({ email: trimmed, emailRedirectTo: 'athletepassport://verify' });
     } catch {
       setIsLoading(false);
-      setError(SIGN_IN_FAILED);
+      setError(t(SIGN_IN_FAILED));
       return;
     }
     setIsLoading(false);
@@ -122,16 +115,16 @@ export default function LoginScreen(): ReactElement {
               </View>
               <Text className="mt-6 text-header-brand uppercase text-on-ink-muted">The Athlete Passport</Text>
               <Text accessibilityRole="header" className="mt-2 text-[32px] font-bold leading-[35px] tracking-[-0.6px] text-white">
-                {copy.headline}
+                {t(copy.headline)}
               </Text>
-              <Text className="mt-3 max-w-[300px] text-body-copy text-white/60">{copy.body}</Text>
+              <Text className="mt-3 max-w-[300px] text-body-copy text-white/60">{t(copy.body)}</Text>
               <View className="mt-6 gap-3">
                 {VALUE_PROPS.map((prop) => (
-                  <View key={prop.label} className="flex-row items-center gap-3">
+                  <View key={t(prop.label)} className="flex-row items-center gap-3">
                     <View className="h-7 w-7 items-center justify-center rounded-[8px] border border-white/10 bg-white/5">
                       <Feather name={prop.icon} size={15} color="rgba(255,255,255,0.78)" />
                     </View>
-                    <Text className="text-[13.5px] text-white/80">{prop.label}</Text>
+                    <Text className="text-[13.5px] text-white/80">{t(prop.label)}</Text>
                   </View>
                 ))}
               </View>
@@ -154,9 +147,9 @@ export default function LoginScreen(): ReactElement {
                 autoCapitalize="none"
                 autoComplete="email"
                 autoCorrect={false}
-                placeholder="you@example.com"
+                placeholder={t('auth.emailPlaceholder')}
                 placeholderTextColor="rgba(255,255,255,0.45)"
-                accessibilityLabel="Email address"
+                accessibilityLabel={t('auth.emailAddress')}
                 value={email}
                 onChangeText={(value) => {
                   setEmail(value);
@@ -166,20 +159,20 @@ export default function LoginScreen(): ReactElement {
                 editable={!isLoading}
                 returnKeyType="send"
               />
-              <AuthButton label="Continue with email" onPress={() => { void handleSubmit(); }} loading={isLoading} disabled={isDisabled} />
+              <AuthButton label={t('auth.continueEmail')} onPress={() => { void handleSubmit(); }} loading={isLoading} disabled={isDisabled} />
               <View className="mt-2 flex-row items-center justify-center">
-                <Text className="text-[13.5px] text-white/60">{copy.footer} </Text>
+                <Text className="text-[13.5px] text-white/60">{t(copy.footer)} </Text>
                 <Pressable
                   onPress={() => setMode(mode === 'signin' ? 'create' : 'signin')}
                   accessibilityRole="button"
                   hitSlop={12}
                   className="min-h-[44px] justify-center"
                 >
-                  <Text className="text-[13.5px] font-bold text-white">{copy.footerAction}</Text>
+                  <Text className="text-[13.5px] font-bold text-white">{t(copy.footerAction)}</Text>
                 </Pressable>
               </View>
               <Text className="text-center text-[11.5px] text-white/40">
-                By continuing you agree to our Terms & Privacy Policy.
+                {t('auth.terms')}
               </Text>
             </View>
         </KeyboardAwareScrollView>

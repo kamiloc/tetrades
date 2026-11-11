@@ -1,10 +1,13 @@
+import type { AppLocale } from './locale-selection';
+import { translate } from './translations';
+
 // User-facing copy for Supabase auth errors on the sign-in screens.
-export function authErrorMessage(message: string): string {
+export function authErrorMessage(message: string, locale: AppLocale): string {
   if (message.includes('Too many requests') || message.includes('Email rate limit exceeded')) {
-    return 'Too many attempts. Wait a moment and try again.';
+    return translate(locale, 'auth.tooManyRequests');
   }
   if (message.includes('Token has expired') || message.includes('token is invalid')) {
-    return 'That code expired or is invalid. Request a new one.';
+    return translate(locale, 'auth.codeExpired');
   }
-  return "Couldn't sign you in. Try again.";
+  return translate(locale, 'auth.signInFailed');
 }

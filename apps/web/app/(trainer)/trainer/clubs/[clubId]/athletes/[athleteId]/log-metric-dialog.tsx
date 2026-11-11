@@ -8,6 +8,8 @@ import { Button } from '../../../../../../../components/button';
 import { Dialog } from '../../../../../../../components/dialog';
 import { describedBy, Field, Select, TextInput } from '../../../../../../../components/field';
 import { InlineAlert } from '../../../../../../../components/inline-alert';
+import { formatNumber } from '../../../../../../../lib/format';
+import { useWebLocalization } from '../../../../../../../lib/i18n';
 import { TRAINER_NOTICE_COPY } from '../../../../../../../lib/trainer/errors';
 import { localDay, measuredAtFor } from '../../../../../../../lib/trainer/measured-at';
 import { catalogForSport } from '../../../../../../../lib/trainer/metric-catalog';
@@ -45,6 +47,7 @@ export function LogMetricDialog({
   athlete: ClubRosterEntryOutput['athlete'];
   definitions: MetricDefinitionPublicOutput[];
 }) {
+  const { locale, t } = useWebLocalization();
   const report = useReportMetricEntry();
   const utils = trpc.useUtils();
   const resolveError = useTrainerErrors(clubId);
@@ -72,14 +75,14 @@ export function LogMetricDialog({
     const value = parseMetricValue(valueText);
     const measuredAt = measuredAtFor(day, new Date());
     const next: Errors = {
-      ...(selected === undefined ? { metric: 'Choose a metric.' } : {}),
+      ...(selected === undefined ? { metric: t('logMetric.chooseMetricError') } : {}),
       ...(valueText.trim() === ''
-        ? { value: 'Enter a value.' }
+        ? { value: t('logMetric.valueRequired') }
         : value === null
-          ? { value: 'Enter a number, like 11.42.' }
+          ? { value: t('logMetric.valueInvalid') }
           : {}),
       ...(measuredAt === null
-        ? { day: day > localDay(new Date()) ? "The date can't be in the future." : 'Enter a valid date.' }
+        ? { day: day > localDay(new Date()) ? t('logMetric.dateFuture') : t('logMetric.dateInvalid') }
         : {}),
     };
     setErrors(next);
@@ -93,11 +96,11 @@ export function LogMetricDialog({
         value,
         measuredAt,
       });
-      onLogged(`${selected.name}: ${value} ${selected.unit}`);
+      onLogged(t('logMetric.logged', { metric: selected.name, value: formatNumber(locale, value, 3), unit: selected.unit }));
       close();
     } catch (error) {
       const notice = await resolveError(error, 'report-entry');
-      setFailure(TRAINER_NOTICE_COPY[notice.kind]);
+      setFailure(t(TRAINER_NOTICE_COPY[notice.kind]));
       // The membership ended meanwhile: refresh the athlete (spec).
       if (notice.kind === 'no-longer-member') {
         void utils.club.getRosterAthlete.invalidate({ clubId, athleteId: athlete.id });
@@ -111,15 +114,15 @@ export function LogMetricDialog({
     <Dialog
       open={open}
       onClose={close}
-      title="Log metric"
-      description={`For ${athlete.displayName}. Trainer-reported entries can't be edited or deleted.`}
+      title={t('athlete.logMetric')}
+      description={t('logMetric.description', { athlete: athlete.displayName })}
       footer={
         <>
           <Button onClick={close} disabled={report.isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button variant="primary" type="submit" form="log-metric-form" disabled={report.isPending}>
-            {report.isPending ? 'Saving…' : 'Save entry'}
+            {report.isPending ? t('common.saving') : t('logMetric.save')}
           </Button>
         </>
       }
@@ -133,7 +136,7 @@ export function LogMetricDialog({
           void submit();
         }}
       >
-        <Field id="log-metric" label="Metric" error={errors.metric}>
+        <Field id="log-metric" label={t('athlete.colMetric')} error={errors.metric}>
           <Select
             id="log-metric"
             value={metricId}
@@ -142,21 +145,21 @@ export function LogMetricDialog({
             aria-describedby={describedBy('log-metric', undefined, errors.metric)}
             disabled={report.isPending}
           >
-            <option value="">Choose a metric</option>
+            <option value="">{t('logMetric.chooseMetric')}</option>
             {catalog.sport.length > 0 ? (
-              <optgroup label={`${athlete.sport.name} metrics`}>
+              <optgroup label={t('logMetric.sportMetrics', { sport: athlete.sport.name })}>
                 {catalog.sport.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.name} ({d.unit})
+                    {t('logMetric.option', { name: d.name, unit: d.unit })}
                   </option>
                 ))}
               </optgroup>
             ) : null}
             {catalog.general.length > 0 ? (
-              <optgroup label="General">
+              <optgroup label={t('logMetric.general')}>
                 {catalog.general.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.name} ({d.unit})
+                    {t('logMetric.option', { name: d.name, unit: d.unit })}
                   </option>
                 ))}
               </optgroup>
@@ -166,7 +169,7 @@ export function LogMetricDialog({
         <div className="grid grid-cols-2 gap-3">
           <Field
             id="log-value"
-            label={selected ? `Value (${selected.unit})` : 'Value'}
+            label={selected ? t('logMetric.valueUnit', { unit: selected.unit }) : t('athlete.colValue')}
             error={errors.value}
           >
             <TextInput
@@ -180,7 +183,7 @@ export function LogMetricDialog({
               autoComplete="off"
             />
           </Field>
-          <Field id="log-day" label="Measured on" error={errors.day}>
+          <Field id="log-day" label={t('logMetric.measuredOn')} error={errors.day}>
             <TextInput
               id="log-day"
               type="date"
@@ -195,8 +198,7 @@ export function LogMetricDialog({
         </div>
       </form>
       <InlineAlert tone="info">
-        This entry is trainer-reported and permanent: it can&apos;t be edited or deleted. It shows
-        as reported by {clubName}.
+        {t('logMetric.permanent', { club: clubName })}
       </InlineAlert>
       {failure ? <InlineAlert tone="error">{failure}</InlineAlert> : null}
     </Dialog>

@@ -15,28 +15,39 @@ import { SegmentedFilter } from '../../../../components/segmented-filter';
 import { EmptyState, ErrorState, LoadingState } from '../../../../components/states';
 import { StatusChip } from '../../../../components/status-chip';
 import { NameCell, Table, type Column } from '../../../../components/table';
+import { formatNumber } from '../../../../lib/format';
+import { useWebLocalization } from '../../../../lib/i18n';
+import type { MessageKey } from '../../../../lib/translations';
 
 import { ClubFormDialog } from './club-form-dialog';
 
-const FILTERS: { value: AdminClubStatusFilter; label: string }[] = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'DEACTIVATED', label: 'Deactivated' },
-  { value: 'ALL', label: 'All' },
+const FILTERS: { value: AdminClubStatusFilter; label: MessageKey }[] = [
+  { value: 'ACTIVE', label: 'admin.clubs.filterActive' },
+  { value: 'DEACTIVATED', label: 'admin.clubs.filterDeactivated' },
+  { value: 'ALL', label: 'admin.clubs.filterAll' },
 ];
 
-const EMPTY_COPY: Record<AdminClubStatusFilter, string> = {
-  ACTIVE: 'No active clubs yet.',
-  DEACTIVATED: 'No deactivated clubs.',
-  ALL: 'No clubs yet.',
+const EMPTY_COPY: Record<AdminClubStatusFilter, MessageKey> = {
+  ACTIVE: 'admin.clubs.emptyActive',
+  DEACTIVATED: 'admin.clubs.emptyDeactivated',
+  ALL: 'admin.clubs.emptyAll',
 };
 
 function parseFilter(value: string | null): AdminClubStatusFilter {
   return value === 'DEACTIVATED' || value === 'ALL' ? value : 'ACTIVE';
 }
 
-const COLUMNS: Column<AdminClubOutput>[] = [
+export function ClubsView() {
+  const { locale, t } = useWebLocalization();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const filter = parseFilter(searchParams.get('status'));
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState<{ id: string; name: string } | null>(null);
+
+  const columns: Column<AdminClubOutput>[] = [
   {
-    header: 'Club',
+    header: t('admin.clubs.colClub'),
     className: 'w-[40%]',
     cell: (club) => (
       <Link
@@ -48,30 +59,23 @@ const COLUMNS: Column<AdminClubOutput>[] = [
     ),
   },
   {
-    header: 'Location',
+    header: t('admin.clubs.colLocation'),
     cell: (club) => (
       <span className="text-muted">
-        {club.city ? `${club.city}, ${club.countryCode}` : club.countryCode}
+        {club.city ? t('common.location', { city: club.city, country: club.countryCode }) : club.countryCode}
       </span>
     ),
   },
   {
-    header: 'Status',
+    header: t('common.status'),
     cell: (club) => <StatusChip status={club.isActive ? 'active' : 'deactivated'} />,
   },
   {
-    header: 'Active trainers',
+    header: t('admin.clubs.colActiveTrainers'),
     align: 'right',
-    cell: (club) => <span className="font-semibold tabular-nums">{club.activeTrainerCount}</span>,
+    cell: (club) => <span className="font-semibold tabular-nums">{formatNumber(locale, club.activeTrainerCount)}</span>,
   },
-];
-
-export function ClubsView() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const filter = parseFilter(searchParams.get('status'));
-  const [creating, setCreating] = useState(false);
-  const [created, setCreated] = useState<{ id: string; name: string } | null>(null);
+  ];
 
   const clubs = trpc.admin.listClubs.useInfiniteQuery(
     { status: filter, take: 20 },
@@ -87,22 +91,22 @@ export function ClubsView() {
   const rows = clubs.data?.pages.flatMap((page) => page.items) ?? [];
   const createButton = (
     <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-      Create club
+      {t('admin.clubs.create')}
     </Button>
   );
 
   return (
     <>
-      <TopBar crumbs={[{ label: 'Admin' }, { label: 'Clubs' }]} action={createButton} />
+      <TopBar crumbs={[{ label: t('admin.crumb') }, { label: t('nav.clubs') }]} action={createButton} />
       <PageBody>
-        <PageHeader title="Clubs" sub="Newest first. Deactivated clubs keep their history." />
+        <PageHeader title={t('nav.clubs')} sub={t('admin.clubs.sub')} />
         {created ? (
           <InlineAlert
             tone="success"
-            title={`${created.name} was created`}
+            title={t('admin.clubs.created', { name: created.name })}
             action={
               <Button size="sm" variant="link" onClick={() => setCreated(null)}>
-                Dismiss
+                {t('common.dismiss')}
               </Button>
             }
           >
@@ -110,33 +114,33 @@ export function ClubsView() {
               href={`/admin/clubs/${created.id}/trainers`}
               className={`rounded-sm text-blue hover:underline ${focusRing}`}
             >
-              Invite its trainers
+              {t('admin.clubs.inviteTrainers')}
             </Link>
           </InlineAlert>
         ) : null}
         <Toolbar
           left={
             <SegmentedFilter
-              label="Club status"
-              options={FILTERS}
+              label={t('admin.clubs.statusFilter')}
+              options={FILTERS.map((option) => ({ value: option.value, label: t(option.label) }))}
               value={filter}
               onChange={setFilter}
             />
           }
         />
         {clubs.isPending ? (
-          <LoadingState label="Loading clubs…" />
+          <LoadingState label={t('admin.clubs.loading')} />
         ) : clubs.isError ? (
-          <ErrorState title="We couldn't load the clubs" onRetry={() => void clubs.refetch()} />
+          <ErrorState title={t('admin.clubs.loadFailed')} onRetry={() => void clubs.refetch()} />
         ) : (
           <Table
-            caption="Clubs"
-            columns={COLUMNS}
+            caption={t('nav.clubs')}
+            columns={columns}
             rows={rows}
             rowKey={(club) => club.id}
             empty={
-              <EmptyState title={EMPTY_COPY[filter]} action={createButton}>
-                Clubs you create appear here. Trainers can join a club only by invitation.
+              <EmptyState title={t(EMPTY_COPY[filter])} action={createButton}>
+                {t('admin.clubs.emptyBody')}
               </EmptyState>
             }
             footer={
@@ -146,7 +150,7 @@ export function ClubsView() {
                     onClick={() => void clubs.fetchNextPage()}
                     disabled={clubs.isFetchingNextPage}
                   >
-                    {clubs.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                    {clubs.isFetchingNextPage ? t('common.loading') : t('common.loadMore')}
                   </Button>
                 </div>
               ) : undefined

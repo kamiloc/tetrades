@@ -9,10 +9,10 @@ import type { SessionUser } from '../../../../lib/session';
 
 export const HOME_SECTIONS: NavSection[] = [
   {
-    title: 'Trainer',
+    title: 'nav.trainer',
     items: [
-      { href: '/trainer/clubs', label: 'Clubs', icon: 'flag' },
-      { href: '/trainer/invitations', label: 'Invitations', icon: 'link' },
+      { href: '/trainer/clubs', label: 'nav.clubs', icon: 'flag' },
+      { href: '/trainer/invitations', label: 'nav.invitations', icon: 'link' },
     ],
   },
 ];
@@ -21,15 +21,15 @@ export function clubSections(clubId: string): NavSection[] {
   const base = `/trainer/clubs/${clubId}`;
   return [
     {
-      title: 'Club',
+      title: 'nav.club',
       items: [
-        { href: `${base}/athletes`, label: 'Athletes', icon: 'users' },
-        { href: `${base}/certifications`, label: 'Certifications', icon: 'check' },
+        { href: `${base}/athletes`, label: 'nav.athletes', icon: 'users' },
+        { href: `${base}/certifications`, label: 'nav.certifications', icon: 'check' },
       ],
     },
     {
-      title: 'Account',
-      items: [{ href: '/trainer/invitations', label: 'Trainer invitations', icon: 'link' }],
+      title: 'nav.account',
+      items: [{ href: '/trainer/invitations', label: 'nav.trainerInvitations', icon: 'link' }],
     },
   ];
 }
@@ -47,11 +47,11 @@ export function TrainerShell({
 }) {
   return (
     <PortalShell
-      role="Trainer portal"
+      role="portal.trainer"
       tone="amber"
       sections={sections}
       header={header}
-      user={{ email: user?.email ?? 'Signed in', sub: 'Trainer access' }}
+      user={{ email: user?.email ?? null, fallback: 'portal.signedIn', sub: 'portal.trainerAccess' }}
     >
       {children}
     </PortalShell>

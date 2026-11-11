@@ -13,7 +13,10 @@ import { EmptyState, ErrorState, LoadingState } from '../../../../../../componen
 import { StatusChip } from '../../../../../../components/status-chip';
 import { NameCell, Table, type Column } from '../../../../../../components/table';
 import { formatDate } from '../../../../../../lib/format';
+import { useWebLocalization } from '../../../../../../lib/i18n';
+import type { AppLocale } from '../../../../../../lib/locale-selection';
 import { useCurrentClub, useRefreshOnLostAccess } from '../../../../../../lib/trainer/use-trainer';
+import type { MessageKey, MessageValues } from '../../../../../../lib/translations';
 import { LoadMore } from '../../../_components/load-more';
 
 import { InviteAthleteDialog } from './invite-athlete-dialog';
@@ -22,10 +25,14 @@ export function athletePath(clubId: string, athleteId: string): string {
   return `/trainer/clubs/${clubId}/athletes/${athleteId}`;
 }
 
-function columns(clubId: string): Column<ClubRosterEntryOutput>[] {
+function columns(
+  clubId: string,
+  locale: AppLocale,
+  t: (key: MessageKey, values?: MessageValues) => string,
+): Column<ClubRosterEntryOutput>[] {
   return [
     {
-      header: 'Athlete',
+      header: t('common.athlete'),
       className: 'w-[38%]',
       cell: (row) => (
         <Link
@@ -36,20 +43,20 @@ function columns(clubId: string): Column<ClubRosterEntryOutput>[] {
         </Link>
       ),
     },
-    { header: 'Sport', cell: (row) => <span className="text-muted">{row.athlete.sport.name}</span> },
+    { header: t('roster.colSport'), cell: (row) => <span className="text-muted">{row.athlete.sport.name}</span> },
     {
-      header: 'Status',
+      header: t('common.status'),
       cell: (row) => (
         <StatusChip status={row.status === 'ACTIVE' ? 'active' : 'waitingAthlete'} />
       ),
     },
     {
-      header: 'Since',
+      header: t('roster.colSince'),
       cell: (row) => (
         <span className="text-muted">
           {row.status === 'ACTIVE'
-            ? `Joined ${formatDate(row.respondedAt ?? row.createdAt)}`
-            : `Invited ${formatDate(row.createdAt)}`}
+            ? t('roster.joined', { date: formatDate(locale, row.respondedAt ?? row.createdAt) })
+            : t('roster.invited', { date: formatDate(locale, row.createdAt) })}
         </span>
       ),
     },
@@ -57,6 +64,7 @@ function columns(clubId: string): Column<ClubRosterEntryOutput>[] {
 }
 
 export function RosterView({ clubId }: { clubId: string }) {
+  const { locale, t } = useWebLocalization();
   const { club } = useCurrentClub(clubId);
   const roster = trpc.club.listRoster.useInfiniteQuery(
     { clubId, take: 20 },
@@ -65,40 +73,39 @@ export function RosterView({ clubId }: { clubId: string }) {
   const lostAccess = useRefreshOnLostAccess(roster.error);
   const [inviting, setInviting] = useState(false);
   const rows = roster.data?.pages.flatMap((page) => page.items) ?? [];
-  const clubName = club?.name ?? 'Club';
+  const clubName = club?.name ?? t('trainer.clubLabel');
 
   const inviteButton = (
     <Button variant="primary" icon="plus" onClick={() => setInviting(true)}>
-      Invite athlete
+      {t('roster.invite')}
     </Button>
   );
 
   return (
     <>
       <TopBar
-        crumbs={[{ label: clubName, href: `/trainer/clubs/${clubId}/athletes` }, { label: 'Athletes' }]}
+        crumbs={[{ label: clubName, href: `/trainer/clubs/${clubId}/athletes` }, { label: t('nav.athletes') }]}
         action={inviteButton}
       />
       <PageBody>
         <PageHeader
-          title="Athletes"
-          sub="Active athletes, and the invitations you sent that are still waiting for the athlete."
+          title={t('nav.athletes')}
+          sub={t('roster.sub')}
         />
         {roster.isPending || lostAccess ? (
-          <LoadingState label="Loading athletes…" />
+          <LoadingState label={t('roster.loading')} />
         ) : roster.isError ? (
-          <ErrorState title="We couldn't load the athletes" onRetry={() => void roster.refetch()} />
+          <ErrorState title={t('roster.loadFailed')} onRetry={() => void roster.refetch()} />
         ) : (
           <>
             <Table
-              caption={`Athletes of ${clubName}`}
-              columns={columns(clubId)}
+              caption={t('roster.caption', { club: clubName })}
+              columns={columns(clubId, locale, t)}
               rows={rows}
               rowKey={(row) => row.id}
               empty={
-                <EmptyState icon="users" title="No athletes yet" action={inviteButton}>
-                  Invite an athlete with their profile link or by name. They join the club when
-                  they confirm.
+                <EmptyState icon="users" title={t('roster.emptyTitle')} action={inviteButton}>
+                  {t('roster.emptyBody')}
                 </EmptyState>
               }
             />
@@ -114,7 +121,7 @@ export function RosterView({ clubId }: { clubId: string }) {
         open={inviting}
         onClose={() => setInviting(false)}
         clubId={clubId}
-        clubName={club?.name ?? 'this club'}
+        clubName={club?.name ?? t('roster.thisClub')}
       />
     </>
   );

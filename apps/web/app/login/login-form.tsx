@@ -6,12 +6,14 @@ import { Button } from '../../components/button';
 import { describedBy, Field, TextInput } from '../../components/field';
 import { focusRing } from '../../components/focus';
 import { InlineAlert } from '../../components/inline-alert';
+import { useWebLocalization } from '../../lib/i18n';
+import type { MessageKey } from '../../lib/translations';
 import { requestSignIn, verifyCode, type LoginState } from '../auth/actions';
 
 const EMAIL_ERRORS = {
-  'invalid-email': 'Enter a valid email address.',
-  unavailable: "We couldn't send the email right now. Wait a minute and try again.",
-} as const;
+  'invalid-email': 'login.invalidEmail',
+  unavailable: 'login.unavailable',
+} as const satisfies Record<string, MessageKey>;
 
 async function loginAction(previous: LoginState, formData: FormData): Promise<LoginState> {
   return formData.get('intent') === 'verify'
@@ -20,21 +22,21 @@ async function loginAction(previous: LoginState, formData: FormData): Promise<Lo
 }
 
 export function LoginForm({ next, linkFailed }: { next: string; linkFailed: boolean }) {
+  const { t, rich } = useWebLocalization();
   const [state, action, pending] = useActionState(loginAction, { step: 'email', email: '', next });
 
   if (state.step === 'email') {
-    const error = state.error ? EMAIL_ERRORS[state.error] : undefined;
+    const error = state.error ? t(EMAIL_ERRORS[state.error]) : undefined;
     return (
       <form action={action} className="flex flex-col gap-4" noValidate>
         {linkFailed && !state.error ? (
-          <InlineAlert tone="warning" title="That sign-in link didn't work">
-            It may have expired or been opened in a different browser. Request a new email, or use
-            the code it contains.
+          <InlineAlert tone="warning" title={t('login.linkFailedTitle')}>
+            {t('login.linkFailedBody')}
           </InlineAlert>
         ) : null}
         <input type="hidden" name="intent" value="request" />
         <input type="hidden" name="next" value={state.next} />
-        <Field id="email" label="Email" error={error}>
+        <Field id="email" label={t('login.email')} error={error}>
           <TextInput
             id="email"
             name="email"
@@ -49,7 +51,7 @@ export function LoginForm({ next, linkFailed }: { next: string; linkFailed: bool
           />
         </Field>
         <Button type="submit" variant="primary" disabled={pending} className="w-full py-[9px]">
-          {pending ? 'Sending…' : 'Email me a sign-in link'}
+          {pending ? t('login.sending') : t('login.emailLink')}
         </Button>
       </form>
     );
@@ -57,22 +59,21 @@ export function LoginForm({ next, linkFailed }: { next: string; linkFailed: bool
 
   const codeError =
     state.error === 'invalid-code'
-      ? 'That code is wrong or has expired. Request a new code and try again.'
+      ? t('login.invalidCode')
       : state.error === 'unavailable'
-        ? EMAIL_ERRORS.unavailable
+        ? t(EMAIL_ERRORS.unavailable)
         : undefined;
 
   return (
     <div className="flex flex-col gap-4">
-      <InlineAlert tone="info" title={state.resent ? 'We sent a new email' : 'Check your inbox'}>
-        We sent a sign-in link and a code to <strong>{state.email}</strong>. Open the link in this
-        browser, or enter the code below.
+      <InlineAlert tone="info" title={state.resent ? t('login.resentTitle') : t('login.checkInbox')}>
+        {rich('login.sentTo', { email: <strong>{state.email}</strong> })}
       </InlineAlert>
       <form action={action} className="flex flex-col gap-4" noValidate>
         <input type="hidden" name="intent" value="verify" />
         <input type="hidden" name="email" value={state.email} />
         <input type="hidden" name="next" value={state.next} />
-        <Field id="code" label="One-time code" error={codeError}>
+        <Field id="code" label={t('login.code')} error={codeError}>
           <TextInput
             id="code"
             name="code"
@@ -88,7 +89,7 @@ export function LoginForm({ next, linkFailed }: { next: string; linkFailed: bool
           />
         </Field>
         <Button type="submit" variant="primary" disabled={pending} className="w-full py-[9px]">
-          {pending ? 'Checking…' : 'Sign in'}
+          {pending ? t('login.checking') : t('login.signIn')}
         </Button>
       </form>
       <form action={action} className="flex items-center justify-between">
@@ -96,13 +97,13 @@ export function LoginForm({ next, linkFailed }: { next: string; linkFailed: bool
         <input type="hidden" name="email" value={state.email} />
         <input type="hidden" name="next" value={state.next} />
         <Button type="submit" variant="link" size="sm" disabled={pending} className="px-0">
-          Send a new code
+          {t('login.newCode')}
         </Button>
         <a
           href={state.next ? `/login?next=${encodeURIComponent(state.next)}` : '/login'}
           className={`rounded-sm text-[11.5px] font-semibold text-muted hover:text-text ${focusRing}`}
         >
-          Use a different email
+          {t('login.differentEmail')}
         </a>
       </form>
     </div>

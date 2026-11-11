@@ -9,6 +9,7 @@ import { Dialog } from '../../../../../../components/dialog';
 import { describedBy, Field, TextInput } from '../../../../../../components/field';
 import { InlineAlert } from '../../../../../../components/inline-alert';
 import { StatusChip } from '../../../../../../components/status-chip';
+import { useWebLocalization } from '../../../../../../lib/i18n';
 import { parseAthleteQuery } from '../../../../../../lib/trainer/athlete-query';
 import { TRAINER_NOTICE_COPY } from '../../../../../../lib/trainer/errors';
 import { useRefreshOnLostAccess, useTrainerErrors } from '../../../../../../lib/trainer/use-trainer';
@@ -39,6 +40,7 @@ export function InviteAthleteDialog({
   clubId: string;
   clubName: string;
 }) {
+  const { t } = useWebLocalization();
   const invite = useInviteAthleteToClub();
   const resolveError = useTrainerErrors(clubId);
   const [text, setText] = useState('');
@@ -100,7 +102,7 @@ export function InviteAthleteDialog({
       await invite.mutateAsync({ clubId, athleteId: item.athlete.id });
       setSent(item.athlete.displayName);
     } catch (error) {
-      setFailure(TRAINER_NOTICE_COPY[(await resolveError(error, 'invite')).kind]);
+      setFailure(t(TRAINER_NOTICE_COPY[(await resolveError(error, 'invite')).kind]));
     } finally {
       setInvitingId(null);
     }
@@ -111,7 +113,7 @@ export function InviteAthleteDialog({
       <Dialog
         open={open}
         onClose={close}
-        title="Invitation sent"
+        title={t('inviteAthlete.sentTitle')}
         footer={
           <>
             <Button
@@ -120,17 +122,16 @@ export function InviteAthleteDialog({
                 setText('');
               }}
             >
-              Invite another
+              {t('inviteAthlete.another')}
             </Button>
             <Button variant="primary" onClick={close}>
-              Done
+              {t('common.done')}
             </Button>
           </>
         }
       >
-        <InlineAlert tone="success" title={`Invitation sent. ${sent} must confirm before joining.`}>
-          Until they confirm, they appear on the roster as waiting for the athlete, and you
-          can&apos;t log metrics for them.
+        <InlineAlert tone="success" title={t('inviteAthlete.sentAlert', { athlete: sent })}>
+          {t('inviteAthlete.sentBody')}
         </InlineAlert>
       </Dialog>
     );
@@ -138,24 +139,24 @@ export function InviteAthleteDialog({
 
   const fieldHint =
     query.kind === 'too-short'
-      ? 'Type at least 2 characters.'
-      : 'Paste their profile link or handle, or type their name. Name search only finds athletes who chose to be searchable.';
-  const fieldError = query.kind === 'too-long' ? 'Use at most 100 characters.' : undefined;
+      ? t('inviteAthlete.tooShort')
+      : t('inviteAthlete.hint');
+  const fieldError = query.kind === 'too-long' ? t('inviteAthlete.tooLong') : undefined;
 
   return (
     <Dialog
       open={open}
       onClose={close}
-      title="Invite an athlete"
-      description={`They join ${clubName} only after they confirm the invitation.`}
+      title={t('inviteAthlete.title')}
+      description={t('inviteAthlete.description', { club: clubName })}
       footer={
         <Button onClick={close} disabled={invite.isPending}>
-          Close
+          {t('common.close')}
         </Button>
       }
     >
       <form noValidate onSubmit={(event) => event.preventDefault()}>
-        <Field id="find-athlete" label="Profile link, handle or name" hint={fieldHint} error={fieldError}>
+        <Field id="find-athlete" label={t('inviteAthlete.field')} hint={fieldHint} error={fieldError}>
           <TextInput
             id="find-athlete"
             type="search"
@@ -166,7 +167,7 @@ export function InviteAthleteDialog({
             }}
             invalid={fieldError !== undefined}
             aria-describedby={describedBy('find-athlete', true, fieldError)}
-            placeholder="https://…/athlete/mariana-pajon, @mariana-pajon or Mariana"
+            placeholder={t('inviteAthlete.placeholder')}
             autoComplete="off"
           />
         </Field>
@@ -174,27 +175,26 @@ export function InviteAthleteDialog({
 
       {failure ? <InlineAlert tone="error">{failure}</InlineAlert> : null}
       {lookupFailed ? (
-        <InlineAlert tone="error">We couldn&apos;t search right now. Try again.</InlineAlert>
+        <InlineAlert tone="error">{t('inviteAthlete.searchFailed')}</InlineAlert>
       ) : null}
 
       <div aria-live="polite" className="flex flex-col gap-2">
         {searched && searching && results.length === 0 ? (
-          <p className="text-[13px] text-muted">Searching…</p>
+          <p className="text-[13px] text-muted">{t('common.searching')}</p>
         ) : null}
         {nothingFound ? (
-          <InlineAlert tone="info" title="No athlete found">
-            Check the link or name, or ask the athlete for their profile link. A link finds them
-            even if their profile isn&apos;t searchable.
+          <InlineAlert tone="info" title={t('inviteAthlete.noneTitle')}>
+            {t('inviteAthlete.noneBody')}
           </InlineAlert>
         ) : null}
         {results.length > 0 ? (
-          <ul aria-label="Athletes found" className="flex flex-col divide-y divide-line2 rounded-[12px] border border-line">
+          <ul aria-label={t('inviteAthlete.results')} className="flex flex-col divide-y divide-line2 rounded-[12px] border border-line">
             {results.map((item) => (
               <li key={item.athlete.id} className="flex items-center gap-3 px-3.5 py-2.5">
                 <div className="min-w-0 flex-1 leading-tight">
                   <p className="truncate text-[13px] font-semibold text-text">{item.athlete.displayName}</p>
                   <p className="mt-0.5 truncate text-[12px] text-muted">
-                    @{item.athlete.slug} · {item.athlete.sport.name}
+                    {t('common.handleSport', { handle: item.athlete.slug, sport: item.athlete.sport.name })}
                   </p>
                 </div>
                 {item.relation === 'MEMBER' ? (
@@ -205,11 +205,11 @@ export function InviteAthleteDialog({
                   <Button
                     size="sm"
                     variant="primary"
-                    aria-label={`Invite ${item.athlete.displayName}`}
+                    aria-label={t('inviteAthlete.inviteName', { athlete: item.athlete.displayName })}
                     disabled={invite.isPending}
                     onClick={() => void send(item)}
                   >
-                    {invitingId === item.athlete.id ? 'Inviting…' : 'Invite'}
+                    {invitingId === item.athlete.id ? t('inviteAthlete.inviting') : t('inviteAthlete.invite')}
                   </Button>
                 )}
               </li>
@@ -223,7 +223,7 @@ export function InviteAthleteDialog({
               onClick={() => void nameLookup.fetchNextPage()}
               disabled={nameLookup.isFetchingNextPage}
             >
-              {nameLookup.isFetchingNextPage ? 'Loading…' : 'Load more'}
+              {nameLookup.isFetchingNextPage ? t('common.loading') : t('common.loadMore')}
             </Button>
           </div>
         ) : null}

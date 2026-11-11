@@ -9,12 +9,13 @@ import { Dialog } from '../../../../../../components/dialog';
 import { describedBy, Field, TextInput } from '../../../../../../components/field';
 import { InlineAlert } from '../../../../../../components/inline-alert';
 import { InviteInstructions } from '../../../../../../components/invite-instructions';
+import { useWebLocalization } from '../../../../../../lib/i18n';
 import { useInviteTrainerMutation } from '../../../../../../lib/portal-mutations';
+import type { MessageKey } from '../../../../../../lib/translations';
 
-const ERRORS: Record<string, string> = {
-  CONFLICT:
-    'This email already has a pending invitation to this club, or already belongs to one of its trainers.',
-  BAD_REQUEST: 'This club is deactivated. Reactivate it before inviting trainers.',
+const ERRORS: Partial<Record<string, MessageKey>> = {
+  CONFLICT: 'admin.invite.conflict',
+  BAD_REQUEST: 'admin.invite.deactivated',
 };
 
 export function InviteDialog({
@@ -30,6 +31,7 @@ export function InviteDialog({
   clubName: string;
   appOrigin: string;
 }) {
+  const { t } = useWebLocalization();
   const invite = useInviteTrainerMutation();
   const [email, setEmail] = useState('');
   const [fieldError, setFieldError] = useState<string | undefined>();
@@ -49,7 +51,7 @@ export function InviteDialog({
     setFailure(undefined);
     const parsed = inviteTrainerInput.safeParse({ clubId, email });
     if (!parsed.success) {
-      setFieldError('Enter a valid email address.');
+      setFieldError(t('common.invalidEmail'));
       return;
     }
     setFieldError(undefined);
@@ -58,10 +60,7 @@ export function InviteDialog({
       setSent({ email: parsed.data.email, expiresAt: result.expiresAt });
     } catch (error) {
       const code = getApiErrorCode(error);
-      setFailure(
-        (code !== null ? ERRORS[code] : undefined) ??
-          "We couldn't create the invitation. Try again.",
-      );
+      setFailure(t((code !== null ? ERRORS[code] : undefined) ?? 'admin.invite.failed'));
     }
   };
 
@@ -70,10 +69,10 @@ export function InviteDialog({
       <Dialog
         open={open}
         onClose={close}
-        title="Trainer invited"
+        title={t('admin.invite.sentTitle')}
         footer={
           <Button variant="primary" onClick={close}>
-            Done
+            {t('common.done')}
           </Button>
         }
       >
@@ -86,12 +85,12 @@ export function InviteDialog({
     <Dialog
       open={open}
       onClose={close}
-      title="Invite a trainer"
-      description={`They become a trainer of ${clubName} when they accept, signed in with this email.`}
+      title={t('admin.invite.title')}
+      description={t('admin.invite.description', { club: clubName })}
       footer={
         <>
           <Button onClick={close} disabled={invite.isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="primary"
@@ -99,7 +98,7 @@ export function InviteDialog({
             form="invite-trainer-form"
             disabled={invite.isPending}
           >
-            {invite.isPending ? 'Inviting…' : 'Invite'}
+            {invite.isPending ? t('admin.invite.inviting') : t('admin.invite.submit')}
           </Button>
         </>
       }
@@ -114,8 +113,8 @@ export function InviteDialog({
       >
         <Field
           id="invite-email"
-          label="Email"
-          hint="Use the address they'll sign in with. A trainer needs an account separate from any athlete account."
+          label={t('common.email')}
+          hint={t('admin.invite.emailHint')}
           error={fieldError}
         >
           <TextInput

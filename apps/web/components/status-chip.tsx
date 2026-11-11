@@ -1,4 +1,9 @@
+'use client';
+
 import type { ReactNode } from 'react';
+
+import { useWebLocalization } from '../lib/i18n';
+import type { MessageKey } from '../lib/translations';
 
 // Status chips from the prototype (portal-shell.jsx STATUS, atoms.jsx Chip).
 // "Suspended" is "Deactivated" here (handoff exception).
@@ -24,21 +29,22 @@ export function Chip({ tone = 'neutral', children }: { tone?: ChipTone; children
 }
 
 export const STATUS = {
-  active: { tone: 'verified', label: 'Active' },
-  deactivated: { tone: 'rejected', label: 'Deactivated' },
-  pending: { tone: 'pending', label: 'Pending' },
-  expired: { tone: 'neutral', label: 'Expired' },
-  accepted: { tone: 'verified', label: 'Accepted' },
-  declined: { tone: 'neutral', label: 'Declined' },
-  revoked: { tone: 'rejected', label: 'Revoked' },
-  revokedTrainer: { tone: 'rejected', label: 'Revoked trainer' },
-  member: { tone: 'verified', label: 'Member' },
-  waitingAthlete: { tone: 'pending', label: 'Waiting for the athlete' },
-} as const satisfies Record<string, { tone: ChipTone; label: string }>;
+  active: { tone: 'verified', label: 'status.active' },
+  deactivated: { tone: 'rejected', label: 'status.deactivated' },
+  pending: { tone: 'pending', label: 'status.pending' },
+  expired: { tone: 'neutral', label: 'status.expired' },
+  accepted: { tone: 'verified', label: 'status.accepted' },
+  declined: { tone: 'neutral', label: 'status.declined' },
+  revoked: { tone: 'rejected', label: 'status.revoked' },
+  revokedTrainer: { tone: 'rejected', label: 'status.revokedTrainer' },
+  member: { tone: 'verified', label: 'status.member' },
+  waitingAthlete: { tone: 'pending', label: 'status.waitingAthlete' },
+} as const satisfies Record<string, { tone: ChipTone; label: MessageKey }>;
 
 export type StatusKey = keyof typeof STATUS;
 
 export function StatusChip({ status }: { status: StatusKey }) {
+  const { t } = useWebLocalization();
   const { tone, label } = STATUS[status];
-  return <Chip tone={tone}>{label}</Chip>;
+  return <Chip tone={tone}>{t(label)}</Chip>;
 }

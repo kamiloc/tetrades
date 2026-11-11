@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { useEffect, type ReactElement } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
+import { useMobileLocalization } from '../../../lib/i18n';
 import { Feather, type IconName } from '../../../lib/icons';
 import { colors } from '../../../lib/theme';
 
@@ -57,6 +58,7 @@ function tabLabel(label: string) {
 }
 
 export default function TabsLayout(): ReactElement {
+  const { t } = useMobileLocalization();
   const pendingInvitations = usePendingInvitationCount();
 
   return (
@@ -79,18 +81,18 @@ export default function TabsLayout(): ReactElement {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarAccessibilityLabel: 'Profile',
-          tabBarLabel: tabLabel('Profile'),
+          title: t('tabs.profile'),
+          tabBarAccessibilityLabel: t('tabs.profile'),
+          tabBarLabel: tabLabel(t('tabs.profile')),
           tabBarIcon: ({ focused }) => <TabIcon name="user" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="connections"
         options={{
-          title: 'Connections',
-          tabBarAccessibilityLabel: 'Connections',
-          tabBarLabel: tabLabel('Connections'),
+          title: t('tabs.connections'),
+          tabBarAccessibilityLabel: t('tabs.connections'),
+          tabBarLabel: tabLabel(t('tabs.connections')),
           // No badge until a pending-request listing exists (proposal: UI-only Connections).
           tabBarIcon: ({ focused }) => <TabIcon name="users" focused={focused} />,
         }}
@@ -98,19 +100,19 @@ export default function TabsLayout(): ReactElement {
       <Tabs.Screen
         name="performance"
         options={{
-          title: 'Performance',
-          tabBarAccessibilityLabel: 'Performance',
-          tabBarLabel: tabLabel('Performance'),
+          title: t('tabs.performance'),
+          tabBarAccessibilityLabel: t('tabs.performance'),
+          tabBarLabel: tabLabel(t('tabs.performance')),
           tabBarIcon: ({ focused }) => <TabIcon name="activity" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="clubs"
         options={{
-          title: 'Clubs',
+          title: t('tabs.clubs'),
           tabBarAccessibilityLabel:
-            pendingInvitations > 0 ? `Clubs, ${pendingInvitations} pending invitations` : 'Clubs',
-          tabBarLabel: tabLabel('Clubs'),
+            pendingInvitations > 0 ? t('tabs.clubsWithInvitations', { count: pendingInvitations }) : t('tabs.clubs'),
+          tabBarLabel: tabLabel(t('tabs.clubs')),
           tabBarIcon: ({ focused }) => (
             <TabIcon name="flag" focused={focused} badge={pendingInvitations > 0 ? pendingInvitations : undefined} />
           ),

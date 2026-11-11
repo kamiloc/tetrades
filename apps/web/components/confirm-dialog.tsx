@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react';
 
+import { useWebLocalization } from '../lib/i18n';
+
 import { Button } from './button';
 import { Dialog } from './dialog';
 import { InlineAlert } from './inline-alert';
@@ -30,6 +32,7 @@ export function ConfirmDialog({
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
+  const { t } = useWebLocalization();
   return (
     <Dialog
       open={open}
@@ -39,14 +42,14 @@ export function ConfirmDialog({
       footer={
         <>
           <Button onClick={onClose} disabled={pending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant={tone === 'danger' ? 'danger' : 'primary'}
             onClick={onConfirm}
             disabled={pending}
           >
-            {pending ? 'Working…' : confirmLabel}
+            {pending ? t('common.working') : confirmLabel}
           </Button>
         </>
       }

@@ -12,7 +12,7 @@ import { AccessCheckFailed } from './access-check-failed';
 export const dynamic = 'force-dynamic';
 
 const SECTIONS: NavSection[] = [
-  { title: 'Manage', items: [{ href: '/admin/clubs', label: 'Clubs', icon: 'flag' }] },
+  { title: 'nav.manage', items: [{ href: '/admin/clubs', label: 'nav.clubs', icon: 'flag' }] },
 ];
 
 type Access = 'admin' | 'forbidden' | 'signed-out' | 'unavailable';
@@ -44,10 +44,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   return (
     <PortalShell
-      role="Admin portal"
+      role="portal.admin"
       tone="blue"
       sections={SECTIONS}
-      user={{ email: user.email ?? 'Admin', sub: 'Platform admin' }}
+      user={{ email: user.email, fallback: 'portal.adminFallback', sub: 'portal.platformAdmin' }}
     >
       {children}
     </PortalShell>

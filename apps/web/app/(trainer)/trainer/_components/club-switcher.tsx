@@ -6,6 +6,7 @@ import { useId } from 'react';
 
 import { focusRing } from '../../../../components/focus';
 import { Icon } from '../../../../components/icon';
+import { useWebLocalization } from '../../../../lib/i18n';
 import { clubRosterPath } from '../../../../lib/trainer/landing';
 
 // The current club in the sidebar. A trainer of several clubs can switch;
@@ -17,6 +18,7 @@ export function ClubSwitcher({
   current: Pick<ClubPublicOutput, 'id' | 'name'>;
   clubs: Pick<ClubPublicOutput, 'id' | 'name'>[];
 }) {
+  const { t } = useWebLocalization();
   const router = useRouter();
   const id = useId();
 
@@ -26,7 +28,7 @@ export function ClubSwitcher({
         htmlFor={id}
         className="px-1 text-[10px] font-bold uppercase tracking-[1.4px] text-on-ink3"
       >
-        Club
+        {t('trainer.clubLabel')}
       </label>
       {clubs.length > 1 ? (
         <div className="relative">

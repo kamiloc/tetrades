@@ -4618,6 +4618,13 @@ expo-linking@~55.0.17:
     expo-constants "~55.0.17"
     invariant "^2.2.4"
 
+expo-localization@~55.0.19:
+  version "55.0.19"
+  resolved "https://registry.yarnpkg.com/expo-localization/-/expo-localization-55.0.19.tgz#257eeddc8b5f080a243065c78b5f5e2720dc1ed6"
+  integrity sha512-rw8pcC4QL8HC3K8Vs5pdVCB+ayFkaVD0f+Ul+jHgM6W7XdzGtCzd0x7rI3M/9PzP1YpAgQ4jYZid/g+UKi9IIA==
+  dependencies:
+    rtl-detect "^1.0.2"
+
 expo-modules-autolinking@55.0.28:
   version "55.0.28"
   resolved "https://registry.yarnpkg.com/expo-modules-autolinking/-/expo-modules-autolinking-55.0.28.tgz#ab5b0fda47b9f802eeaf3d8837ed48e22fcec61a"
@@ -7447,6 +7454,11 @@ rrweb-cssom@^0.8.0:
   version "0.8.0"
   resolved "https://registry.yarnpkg.com/rrweb-cssom/-/rrweb-cssom-0.8.0.tgz#3021d1b4352fbf3b614aaeed0bc0d5739abe0bc2"
   integrity sha512-guoltQEx+9aMf2gDZ0s62EcV8lsXR+0w8915TC3ITdn2YueuNjdAYh/levpU9nFaoChh9RUS5ZdQMrKfVEN9tw==
+
+rtl-detect@^1.0.2:
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/rtl-detect/-/rtl-detect-1.1.2.tgz#ca7f0330af5c6bb626c15675c642ba85ad6273c6"
+  integrity sha512-PGMBq03+TTG/p/cRB7HCLKJ1MgDIi07+QU1faSjiYRfmY5UsAttV9Hs08jDAHVwcOwmVLcSJkpwyfXszVjWfIQ==
 
 run-parallel@^1.1.9:
   version "1.2.0"

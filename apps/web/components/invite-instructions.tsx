@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { formatDateTime } from '../lib/format';
+import { useWebLocalization } from '../lib/i18n';
 
 import { Button } from './button';
 import { TextInput } from './field';
@@ -19,6 +20,7 @@ export function InviteInstructions({
   expiresAt: Date;
   appOrigin: string;
 }) {
+  const { locale, t, rich } = useWebLocalization();
   const link = `${appOrigin}/trainer/invitations`;
   const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle');
 
@@ -32,25 +34,28 @@ export function InviteInstructions({
   };
 
   return (
-    <InlineAlert tone="info" title="Invitation created. No email is sent.">
+    <InlineAlert tone="info" title={t('invite.createdTitle')}>
       <p>
-        Ask <strong>{email}</strong> to sign in at <strong>{link}</strong> using this exact address
-        before <strong>{formatDateTime(expiresAt)}</strong>.
+        {rich('invite.instructions', {
+          email: <strong>{email}</strong>,
+          link: <strong>{link}</strong>,
+          expires: <strong>{formatDateTime(locale, expiresAt)}</strong>,
+        })}
       </p>
       <div className="mt-2 flex items-center gap-2">
         <TextInput
-          aria-label="Trainer invitations link"
+          aria-label={t('invite.linkLabel')}
           value={link}
           readOnly
           mono
           onFocus={(event) => event.currentTarget.select()}
         />
         <Button icon="copy" onClick={() => void copyLink()}>
-          {copy === 'copied' ? 'Copied' : 'Copy link'}
+          {copy === 'copied' ? t('invite.copied') : t('invite.copyLink')}
         </Button>
       </div>
       <p aria-live="polite" className="mt-1 text-[11.5px]">
-        {copy === 'failed' ? 'Copying was blocked. Select the link and copy it.' : ''}
+        {copy === 'failed' ? t('invite.copyBlocked') : ''}
       </p>
     </InlineAlert>
   );

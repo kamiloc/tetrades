@@ -1,15 +1,23 @@
-// Portal copy is English (handoff), so dates use en-US formatting.
-const DATE = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
-const DATE_TIME = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+import type { AppLocale } from './locale-selection';
 
-export function formatDate(value: Date): string {
-  return DATE.format(value);
+// Locale-aware display formatting for the selected interface language. Only
+// what the page shows changes; stored values and API payloads keep their own
+// formats.
+
+const LOCALE_TAGS: Readonly<Record<AppLocale, string>> = { en: 'en-US', es: 'es-CO' };
+
+export function localeTag(locale: AppLocale): string {
+  return LOCALE_TAGS[locale];
 }
 
-export function formatDateTime(value: Date): string {
-  return DATE_TIME.format(value);
+export function formatDate(locale: AppLocale, value: Date): string {
+  return new Intl.DateTimeFormat(LOCALE_TAGS[locale], { dateStyle: 'medium' }).format(value);
 }
 
-export function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
+export function formatDateTime(locale: AppLocale, value: Date): string {
+  return new Intl.DateTimeFormat(LOCALE_TAGS[locale], { dateStyle: 'medium', timeStyle: 'short' }).format(value);
+}
+
+export function formatNumber(locale: AppLocale, value: number, maximumFractionDigits = 2): string {
+  return new Intl.NumberFormat(LOCALE_TAGS[locale], { maximumFractionDigits }).format(value);
 }

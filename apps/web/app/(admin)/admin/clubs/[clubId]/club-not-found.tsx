@@ -1,24 +1,28 @@
+'use client';
+
 import Link from 'next/link';
 
 import { buttonClasses } from '../../../../../components/button';
 import { PageBody } from '../../../../../components/layout';
 import { TopBar } from '../../../../../components/portal-shell';
 import { EmptyState } from '../../../../../components/states';
+import { useWebLocalization } from '../../../../../lib/i18n';
 
 export function ClubNotFound() {
+  const { t } = useWebLocalization();
   return (
     <>
-      <TopBar crumbs={[{ label: 'Clubs', href: '/admin/clubs' }, { label: 'Not found' }]} />
+      <TopBar crumbs={[{ label: t('nav.clubs'), href: '/admin/clubs' }, { label: t('admin.notFound') }]} />
       <PageBody>
         <EmptyState
-          title="Club not found"
+          title={t('admin.clubNotFound')}
           action={
             <Link href="/admin/clubs" className={buttonClasses('secondary')}>
-              Back to clubs
+              {t('admin.backToClubs')}
             </Link>
           }
         >
-          This club doesn&apos;t exist, or the link is wrong.
+          {t('admin.clubNotFoundBody')}
         </EmptyState>
       </PageBody>
     </>

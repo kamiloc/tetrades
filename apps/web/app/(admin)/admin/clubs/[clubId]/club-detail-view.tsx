@@ -12,7 +12,8 @@ import { PageBody, PageHeader, Panel } from '../../../../../components/layout';
 import { TopBar } from '../../../../../components/portal-shell';
 import { ErrorState, LoadingState } from '../../../../../components/states';
 import { StatusChip } from '../../../../../components/status-chip';
-import { formatDate, plural } from '../../../../../lib/format';
+import { formatDate } from '../../../../../lib/format';
+import { useWebLocalization } from '../../../../../lib/i18n';
 import {
   useDeactivateClubMutation,
   useReactivateClubMutation,
@@ -27,6 +28,7 @@ function valuesOf(club: AdminClubOutput): ClubValues {
 }
 
 function EditClubForm({ club }: { club: AdminClubOutput }) {
+  const { t } = useWebLocalization();
   const updateClub = useUpdateClubMutation();
   const [values, setValues] = useState<ClubValues>(() => valuesOf(club));
   const [errors, setErrors] = useState<ClubErrors>({});
@@ -75,13 +77,13 @@ function EditClubForm({ club }: { club: AdminClubOutput }) {
         slugReadOnly
         disabled={updateClub.isPending}
       />
-      {result === 'saved' ? <InlineAlert tone="success">Changes saved.</InlineAlert> : null}
+      {result === 'saved' ? <InlineAlert tone="success">{t('common.changesSaved')}</InlineAlert> : null}
       {result === 'failed' ? (
-        <InlineAlert tone="error">We couldn&apos;t save the changes. Try again.</InlineAlert>
+        <InlineAlert tone="error">{t('common.saveFailed')}</InlineAlert>
       ) : null}
       <div className="flex gap-2">
         <Button type="submit" variant="primary" disabled={!dirty || updateClub.isPending}>
-          {updateClub.isPending ? 'Saving…' : 'Save changes'}
+          {updateClub.isPending ? t('common.saving') : t('common.save')}
         </Button>
         <Button
           onClick={() => {
@@ -90,7 +92,7 @@ function EditClubForm({ club }: { club: AdminClubOutput }) {
           }}
           disabled={!dirty || updateClub.isPending}
         >
-          Discard
+          {t('common.discard')}
         </Button>
       </div>
     </form>
@@ -98,6 +100,7 @@ function EditClubForm({ club }: { club: AdminClubOutput }) {
 }
 
 function StatusPanel({ club }: { club: AdminClubOutput }) {
+  const { locale, t } = useWebLocalization();
   const deactivate = useDeactivateClubMutation();
   const reactivate = useReactivateClubMutation();
   const utils = trpc.useUtils();
@@ -133,58 +136,51 @@ function StatusPanel({ club }: { club: AdminClubOutput }) {
   };
 
   return (
-    <Panel title="Status" right={<StatusChip status={club.isActive ? 'active' : 'deactivated'} />}>
+    <Panel title={t('common.status')} right={<StatusChip status={club.isActive ? 'active' : 'deactivated'} />}>
       <div className="flex flex-col gap-3 text-[13px]">
         {club.isActive ? (
           <p className="text-muted">
-            Active since {formatDate(club.createdAt)}.{' '}
-            {plural(club.activeTrainerCount, 'active trainer', 'active trainers')}.
+            {t('admin.club.activeSince', {
+              date: formatDate(locale, club.createdAt),
+              trainers: t('admin.club.activeTrainers', { count: club.activeTrainerCount }),
+            })}
           </p>
         ) : (
           <p className="text-muted">
-            Deactivated{club.deactivatedAt ? ` on ${formatDate(club.deactivatedAt)}` : ''}. Trainers
-            have no access while the club is deactivated.
+            {club.deactivatedAt
+              ? t('admin.club.deactivatedOn', { date: formatDate(locale, club.deactivatedAt) })
+              : t('admin.club.deactivatedBody')}
           </p>
         )}
         {cancelled !== null && !club.isActive ? (
-          <InlineAlert tone="success" title="Club deactivated">
-            Cancelled{' '}
-            {plural(
-              cancelled.cancelledCertificationRequests,
-              'pending certification request',
-              'pending certification requests',
-            )}
-            ,{' '}
-            {plural(
-              cancelled.rejectedMembershipInvitations,
-              'athlete invitation',
-              'athlete invitations',
-            )}{' '}
-            and{' '}
-            {plural(
-              cancelled.revokedTrainerInvitations,
-              'trainer invitation',
-              'trainer invitations',
-            )}
-            .
+          <InlineAlert tone="success" title={t('admin.club.deactivatedTitle')}>
+            {t('admin.club.cancelledSummary', {
+              requests: t('admin.club.cancelledRequests', { count: cancelled.cancelledCertificationRequests }),
+              athleteInvitations: t('admin.club.cancelledAthleteInvitations', {
+                count: cancelled.rejectedMembershipInvitations,
+              }),
+              trainerInvitations: t('admin.club.cancelledTrainerInvitations', {
+                count: cancelled.revokedTrainerInvitations,
+              }),
+            })}
           </InlineAlert>
         ) : null}
         <div>
           {club.isActive ? (
             <Button variant="danger" onClick={() => setConfirming('deactivate')}>
-              Deactivate club
+              {t('admin.club.deactivate')}
             </Button>
           ) : (
-            <Button onClick={() => setConfirming('reactivate')}>Reactivate club</Button>
+            <Button onClick={() => setConfirming('reactivate')}>{t('admin.club.reactivate')}</Button>
           )}
         </div>
       </div>
       <ConfirmDialog
         open={confirming === 'deactivate'}
-        title={`Deactivate ${club.name}?`}
-        confirmLabel="Deactivate club"
+        title={t('admin.club.deactivateTitle', { club: club.name })}
+        confirmLabel={t('admin.club.deactivate')}
         pending={pending}
-        error={failed ? "We couldn't deactivate the club. Try again." : undefined}
+        error={failed ? t('admin.club.deactivateFailed') : undefined}
         onConfirm={() => void confirm()}
         onClose={() => {
           if (!pending) {
@@ -193,19 +189,16 @@ function StatusPanel({ club }: { club: AdminClubOutput }) {
           }
         }}
       >
-        <p>Its trainers lose access to the club at once.</p>
-        <p>
-          Pending certification requests, athlete invitations and trainer invitations are cancelled.
-          You&apos;ll see how many of each.
-        </p>
+        <p>{t('admin.club.deactivateBody1')}</p>
+        <p>{t('admin.club.deactivateBody2')}</p>
       </ConfirmDialog>
       <ConfirmDialog
         open={confirming === 'reactivate'}
-        title={`Reactivate ${club.name}?`}
-        confirmLabel="Reactivate club"
+        title={t('admin.club.reactivateTitle', { club: club.name })}
+        confirmLabel={t('admin.club.reactivate')}
         tone="primary"
         pending={pending}
-        error={failed ? "We couldn't reactivate the club. Try again." : undefined}
+        error={failed ? t('admin.club.reactivateFailed') : undefined}
         onConfirm={() => void confirm()}
         onClose={() => {
           if (!pending) {
@@ -214,25 +207,23 @@ function StatusPanel({ club }: { club: AdminClubOutput }) {
           }
         }}
       >
-        <p>Trainers who weren&apos;t revoked regain access.</p>
-        <p>
-          Certification requests and invitations cancelled when the club was deactivated stay
-          cancelled. Send new invitations if you need them.
-        </p>
+        <p>{t('admin.club.reactivateBody1')}</p>
+        <p>{t('admin.club.reactivateBody2')}</p>
       </ConfirmDialog>
     </Panel>
   );
 }
 
 export function ClubDetailView({ clubId }: { clubId: string }) {
+  const { t } = useWebLocalization();
   const club = useAdminClub(clubId);
 
   if (club.isPending) {
     return (
       <>
-        <TopBar crumbs={[{ label: 'Clubs', href: '/admin/clubs' }, { label: 'Club' }]} />
+        <TopBar crumbs={[{ label: t('nav.clubs'), href: '/admin/clubs' }, { label: t('admin.club.crumb') }]} />
         <PageBody>
-          <LoadingState label="Loading club…" />
+          <LoadingState label={t('admin.club.loading')} />
         </PageBody>
       </>
     );
@@ -244,9 +235,9 @@ export function ClubDetailView({ clubId }: { clubId: string }) {
     if (code === 'NOT_FOUND' || code === 'BAD_REQUEST') return <ClubNotFound />;
     return (
       <>
-        <TopBar crumbs={[{ label: 'Clubs', href: '/admin/clubs' }, { label: 'Club' }]} />
+        <TopBar crumbs={[{ label: t('nav.clubs'), href: '/admin/clubs' }, { label: t('admin.club.crumb') }]} />
         <PageBody>
-          <ErrorState title="We couldn't load this club" onRetry={() => void club.refetch()} />
+          <ErrorState title={t('admin.club.loadFailed')} onRetry={() => void club.refetch()} />
         </PageBody>
       </>
     );
@@ -256,17 +247,17 @@ export function ClubDetailView({ clubId }: { clubId: string }) {
   return (
     <>
       <TopBar
-        crumbs={[{ label: 'Clubs', href: '/admin/clubs' }, { label: data.name }]}
+        crumbs={[{ label: t('nav.clubs'), href: '/admin/clubs' }, { label: data.name }]}
         action={
           <Link href={`/admin/clubs/${data.id}/trainers`} className={buttonClasses('secondary')}>
-            Trainers
+            {t('admin.club.trainers')}
           </Link>
         }
       />
       <PageBody>
         <PageHeader title={data.name} sub={<span className="font-mono">{data.slug}</span>} />
         <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-[18px]">
-          <Panel title="Details">
+          <Panel title={t('admin.club.details')}>
             {/* Remount on server changes so the form shows the saved values. */}
             <EditClubForm key={`${data.name}|${data.countryCode}|${data.city ?? ''}`} club={data} />
           </Panel>

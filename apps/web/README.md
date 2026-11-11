@@ -59,7 +59,11 @@ Supabase Auth must list `WEB_URL/auth/callback` (local and deployed) in its redi
 
 ## Styling
 
-Tailwind CSS 3.4 (`tailwind.config.ts`). Colors come from `docs/design-handoff/tokens/colors.ts` through `lib/tokens.ts`; never hard-code a handoff color. camelCase token keys become kebab-case classes (`onInk` → `text-on-ink`). Fonts are Inter and JetBrains Mono through `next/font`. Components live in `components/`; every interactive element uses the shared focus ring (`components/focus.ts`). Portal layouts set `lang="en"`.
+Tailwind CSS 3.4 (`tailwind.config.ts`). Colors come from `docs/design-handoff/tokens/colors.ts` through `lib/tokens.ts`; never hard-code a handoff color. camelCase token keys become kebab-case classes (`onInk` → `text-on-ink`). Fonts are Inter and JetBrains Mono through `next/font`. Components live in `components/`; every interactive element uses the shared focus ring (`components/focus.ts`). The root document language follows the browser language preferences with English fallback.
+
+## Localization
+
+Portal copy is English or Spanish, chosen per request from `Accept-Language` (English fallback); there is no language switcher or stored preference. Messages live in `lib/translations.ts`: add a key to the English catalog first, and the Spanish catalog must give it the same shape (a plural stays a plural, with the same `{name}` placeholders). Client components read `t`, `rich` (placeholders that are elements, like `<strong>`) and `locale` from `useWebLocalization()` in `lib/i18n.tsx`; Server Components use `getServerLocalization()` from `lib/server-i18n.ts`. Shared components that receive labels take message keys (nav items, portal role, status chips) and translate them themselves. Format dates and numbers with `lib/format.ts` and the current locale, never a hardcoded locale tag; number values passed to `t` are formatted automatically.
 
 ## Tests
 

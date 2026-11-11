@@ -9,13 +9,9 @@ import {
 import {
   METRIC_ENTRY_PAGE_SIZE,
   METRIC_RANGES,
-  METRIC_RANGE_LABELS,
-  TAB_STATES,
   filterEntriesByRange,
-  formatMetricValue,
   isEntryListTruncated,
   needsMoreEntries,
-  performanceSubtitle,
   rangeStart,
   selectViewState,
   type MetricRange,
@@ -31,26 +27,18 @@ import { SectionTitle } from '../../../components/SectionTitle';
 import { TabSkeleton } from '../../../components/Skeleton';
 import { SpeedChart } from '../../../components/SpeedChart';
 import { StatePanel } from '../../../components/StatePanel';
+import { formatDate, formatMetric } from '../../../lib/format';
+import { useMobileLocalization } from '../../../lib/i18n';
 import { isBusy, isFailed } from '../../../lib/query-state';
 import { colors } from '../../../lib/theme';
 
-const copy = TAB_STATES.performance;
 const RECENT_ENTRY_COUNT = 5;
 
-const shortDate = (date: Date): string =>
-  date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-const monthLabel = (date: Date): string =>
-  date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-
-// Metrics are trainer-reported (ADR-013). Entries expose only the trainer's
-// id, so attribution names the club, never the trainer.
-const attribution = (clubName: string | undefined): string =>
-  clubName ? `Reported by a trainer at ${clubName}` : 'Reported by a club trainer';
-
 function PerformanceShell({ subtitle, children }: { subtitle: string; children: ReactElement }): ReactElement {
+  const { t } = useMobileLocalization();
   return (
     <View className="flex-1 bg-canvas">
-      <ScreenHeader title="Performance" subtitle={subtitle} />
+      <ScreenHeader title={t('tabs.performance')} subtitle={subtitle} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="pb-6">
         {children}
       </ScrollView>
@@ -59,15 +47,16 @@ function PerformanceShell({ subtitle, children }: { subtitle: string; children: 
 }
 
 function ErrorState({ onRetry }: { onRetry: () => void }): ReactElement {
+  const { t } = useMobileLocalization();
   return (
-    <PerformanceShell subtitle={copy.sub.error}>
+    <PerformanceShell subtitle={t('performance.sub.error')}>
       <View className="px-4 pt-4">
         <StatePanel
           tone="danger"
           icon="alert-circle"
-          title={copy.error.title}
-          body={copy.error.body}
-          primary={{ label: copy.error.primary, onPress: onRetry }}
+          title={t('performance.error.title')}
+          body={t('common.checkConnection')}
+          primary={{ label: t('common.tryAgain'), onPress: onRetry }}
         />
       </View>
     </PerformanceShell>
@@ -75,10 +64,11 @@ function ErrorState({ onRetry }: { onRetry: () => void }): ReactElement {
 }
 
 export default function PerformanceScreen(): ReactElement {
+  const { t } = useMobileLocalization();
   const myAthlete = useMyAthlete();
   if (isBusy(myAthlete)) {
     return (
-      <PerformanceShell subtitle={copy.sub.empty}>
+      <PerformanceShell subtitle={t('performance.sub.empty')}>
         <TabSkeleton variant="kpi" />
       </PerformanceShell>
     );
@@ -90,12 +80,16 @@ export default function PerformanceScreen(): ReactElement {
 }
 
 function PerformanceBody({ athleteId, sport }: { athleteId: string; sport: string | null }): ReactElement {
+  const { locale, t } = useMobileLocalization();
   const summaries = useMetricSummaries(athleteId);
   const definitions = useMetricDefinitions({ take: 50 });
   const publicProfile = useMyPublicProfile();
   const memberships = useMyClubMemberships({ take: 50 });
 
-  const subtitle = performanceSubtitle(sport, publicProfile.data?.primaryPosition ?? null);
+  // "Soccer · Midfielder", or the empty-state subtitle without either.
+  const subtitle =
+    [sport, publicProfile.data?.primaryPosition].filter((part): part is string => !!part && part.trim() !== '').join(' · ') ||
+    t('performance.sub.empty');
   const definitionById = useMemo(
     () => new Map((definitions.data?.items ?? []).map((d) => [d.id, d])),
     [definitions.data],
@@ -147,10 +141,10 @@ function PerformanceBody({ athleteId, sport }: { athleteId: string; sport: strin
           <View className="pt-5">
             <StatePanel
               icon="activity"
-              title={copy.empty.title}
-              body={copy.empty.body}
-              primary={{ label: copy.empty.primary, onPress: () => router.push('/clubs') }}
-              secondary={{ label: copy.empty.secondary, onPress: () => router.push('/visibility') }}
+              title={t('performance.empty.title')}
+              body={t('performance.empty.body')}
+              primary={{ label: t('common.viewClubs'), onPress: () => router.push('/clubs') }}
+              secondary={{ label: t('common.manageVisibility'), onPress: () => router.push('/visibility') }}
             />
           </View>
         </View>
@@ -174,19 +168,19 @@ function PerformanceBody({ athleteId, sport }: { athleteId: string; sport: strin
                   onPress={() => setSelectedId(summary.metricDefinitionId)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={`${def?.name ?? 'Metric'}, latest ${formatMetricValue(summary.latestValue, unit)}`}
+                  accessibilityLabel={t('performance.kpiLabel', { metric: def?.name ?? t('common.metric'), value: formatMetric(locale, summary.latestValue, unit) })}
                   className="w-[47%] grow"
                 >
                   <Card className={`p-3.5 ${isSelected ? 'border-blue' : ''}`}>
                     <Text className="text-caption font-bold uppercase text-muted" numberOfLines={1}>
-                      {def?.name ?? 'Metric'}
+                      {def?.name ?? t('common.metric')}
                     </Text>
                     <Text className="mt-1.5 text-[24px] font-bold text-text">
-                      {formatMetricValue(summary.latestValue, '')}
+                      {formatMetric(locale, summary.latestValue, '')}
                     </Text>
                     <Text className="mt-0.5 text-meta text-subtle">{unit}</Text>
                     {summary.bestValue !== null ? (
-                      <Text className="mt-1 text-meta text-blue">Best {formatMetricValue(summary.bestValue, unit)}</Text>
+                      <Text className="mt-1 text-meta text-blue">{t('performance.best', { value: formatMetric(locale, summary.bestValue, unit) })}</Text>
                     ) : null}
                   </Card>
                 </Pressable>
@@ -199,7 +193,7 @@ function PerformanceBody({ athleteId, sport }: { athleteId: string; sport: strin
           key={selected.metricDefinitionId}
           athleteId={athleteId}
           metricDefinitionId={selected.metricDefinitionId}
-          metricName={definitionById.get(selected.metricDefinitionId)?.name ?? 'Metric'}
+          metricName={definitionById.get(selected.metricDefinitionId)?.name ?? t('common.metric')}
           unit={definitionById.get(selected.metricDefinitionId)?.unit ?? ''}
           clubNameById={clubNameById}
         />
@@ -221,7 +215,18 @@ function MetricTrend({
   unit: string;
   clubNameById: ReadonlyMap<string, string>;
 }): ReactElement {
+  const { locale, t } = useMobileLocalization();
   const [range, setRange] = useState<MetricRange>('6M');
+  const rangeLabels: Record<MetricRange, string> = {
+    '1M': t('range.1M'),
+    '3M': t('range.3M'),
+    '6M': t('range.6M'),
+    ALL: t('range.ALL'),
+  };
+  // Metrics are trainer-reported (ADR-013). Entries expose only the trainer's
+  // id, so attribution names the club, never the trainer.
+  const attribution = (clubName: string | undefined): string =>
+    clubName ? t('performance.reportedAtClub', { club: clubName }) : t('performance.reportedByTrainer');
   const entries = trpc.metric.listEntries.useInfiniteQuery(
     { athleteId, metricDefinitionId, take: METRIC_ENTRY_PAGE_SIZE },
     { getNextPageParam: (page) => page.nextCursor ?? undefined },
@@ -255,37 +260,37 @@ function MetricTrend({
             </View>
           ) : isFailed(entries) ? (
             <Pressable onPress={() => { void entries.refetch(); }} accessibilityRole="button" className="min-h-[44px] justify-center">
-              <Text className="text-center text-footnote text-danger">Couldn't load entries. Tap to try again.</Text>
+              <Text className="text-center text-footnote text-danger">{t('performance.entriesLoadFailed')}</Text>
             </Pressable>
           ) : (
             <SpeedChart
-              points={inRange.map((e) => ({ value: e.value, label: monthLabel(e.measuredAt) }))}
-              accessibilityLabel={`${metricName} over ${METRIC_RANGE_LABELS[range]}: ${inRange.length} entries`}
+              points={inRange.map((e) => ({ value: e.value, label: formatDate(locale, e.measuredAt, 'shortMonthYear') }))}
+              accessibilityLabel={t('performance.chartLabel', { metric: metricName, range: rangeLabels[range], count: inRange.length })}
             />
           )}
           {!isBusy(entries) && !isFailed(entries) && inRange.length === 0 ? (
-            <Text className="mt-2 text-center text-meta text-muted">No entries in this period.</Text>
+            <Text className="mt-2 text-center text-meta text-muted">{t('performance.noEntries')}</Text>
           ) : null}
           {truncated ? (
-            <Text className="mt-2 text-center text-meta text-muted">Showing the latest {loaded.length} entries.</Text>
+            <Text className="mt-2 text-center text-meta text-muted">{t('performance.showingLatest', { count: loaded.length })}</Text>
           ) : null}
           <View className="mt-3">
             <MSegmented
               options={METRIC_RANGES}
-              labels={METRIC_RANGE_LABELS}
+              labels={rangeLabels}
               value={range}
               onChange={setRange}
-              accessibilityLabel="Time range"
+              accessibilityLabel={t('performance.timeRange')}
             />
           </View>
         </Card>
       </View>
 
       <View className="px-4 pt-5">
-        <SectionTitle>Trainer-reported metrics</SectionTitle>
+        <SectionTitle>{t('performance.sub.empty')}</SectionTitle>
         <Card>
           {recent.length === 0 ? (
-            <Text className="px-4 py-3 text-footnote text-muted">No entries in this period.</Text>
+            <Text className="px-4 py-3 text-footnote text-muted">{t('performance.noEntries')}</Text>
           ) : (
             recent.map((entry, index) => (
               <View
@@ -293,9 +298,9 @@ function MetricTrend({
                 className={`flex-row items-center gap-3 px-4 py-3 ${index === recent.length - 1 ? '' : 'border-b border-line'}`}
               >
                 <View className="flex-1">
-                  <Text className="text-row-title text-text">{formatMetricValue(entry.value, unit)}</Text>
+                  <Text className="text-row-title text-text">{formatMetric(locale, entry.value, unit)}</Text>
                   <Text className="mt-0.5 text-meta text-muted">
-                    {shortDate(entry.measuredAt)} · {attribution(clubNameById.get(entry.clubId))}
+                    {formatDate(locale, entry.measuredAt, 'medium')} · {attribution(clubNameById.get(entry.clubId))}
                   </Text>
                 </View>
               </View>
