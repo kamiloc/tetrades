@@ -1,5 +1,7 @@
 import type {
+  ListAdminActionsInput,
   ListAdminClubsInput,
+  ListAdminTrainersInput,
   ListClubTrainerInvitationsInput,
   ListClubTrainersInput,
 } from '@packages/validators';
@@ -25,10 +27,38 @@ export const useAdminClubTrainerInvitations = (
   input: Pick<ListClubTrainerInvitationsInput, 'clubId'> & Partial<ListClubTrainerInvitationsInput>,
 ) => trpc.admin.listClubTrainerInvitations.useQuery(input);
 
+// Platform overview counts; refreshed by every admin mutation (design D4) and
+// considered fresh for a minute in between.
+export const useAdminOverview = () =>
+  trpc.admin.getOverview.useQuery(undefined, { staleTime: 60_000 });
+
+// Cross-club trainer directory, newest first, with Load more.
+export const useAdminTrainers = (input: Omit<Partial<ListAdminTrainersInput>, 'cursor'> = {}) =>
+  trpc.admin.listTrainers.useInfiniteQuery(input, {
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+
+// Admin action log, newest first, with Load more.
+export const useAdminActions = (input: Omit<Partial<ListAdminActionsInput>, 'cursor'> = {}) =>
+  trpc.admin.listActions.useInfiniteQuery(input, {
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+
+type AdminUtils = ReturnType<typeof trpc.useUtils>;
+
+// Every admin write changes what the insight pages show: the overview counts,
+// the activity log, and the directory (club name, access or revocation).
+const invalidateInsights = (utils: AdminUtils) =>
+  Promise.all([
+    utils.admin.getOverview.invalidate(),
+    utils.admin.listActions.invalidate(),
+    utils.admin.listTrainers.invalidate(),
+  ]);
+
 export const useCreateClub = () => {
   const utils = trpc.useUtils();
   return trpc.admin.createClub.useMutation({
-    onSuccess: () => utils.admin.listClubs.invalidate(),
+    onSuccess: () => Promise.all([utils.admin.listClubs.invalidate(), invalidateInsights(utils)]),
   });
 };
 
@@ -36,7 +66,11 @@ export const useUpdateClub = () => {
   const utils = trpc.useUtils();
   return trpc.admin.updateClub.useMutation({
     onSuccess: (_club, { clubId }) =>
-      Promise.all([utils.admin.listClubs.invalidate(), utils.admin.getClub.invalidate({ clubId })]),
+      Promise.all([
+        utils.admin.listClubs.invalidate(),
+        utils.admin.getClub.invalidate({ clubId }),
+        invalidateInsights(utils),
+      ]),
   });
 };
 
@@ -49,6 +83,7 @@ export const useDeactivateClub = () => {
         utils.admin.listClubs.invalidate(),
         utils.admin.getClub.invalidate({ clubId }),
         utils.admin.listClubTrainerInvitations.invalidate({ clubId }),
+        invalidateInsights(utils),
       ]),
   });
 };
@@ -57,7 +92,11 @@ export const useReactivateClub = () => {
   const utils = trpc.useUtils();
   return trpc.admin.reactivateClub.useMutation({
     onSuccess: (_club, { clubId }) =>
-      Promise.all([utils.admin.listClubs.invalidate(), utils.admin.getClub.invalidate({ clubId })]),
+      Promise.all([
+        utils.admin.listClubs.invalidate(),
+        utils.admin.getClub.invalidate({ clubId }),
+        invalidateInsights(utils),
+      ]),
   });
 };
 
@@ -65,14 +104,18 @@ export const useInviteTrainer = () => {
   const utils = trpc.useUtils();
   return trpc.admin.inviteTrainer.useMutation({
     onSuccess: (_invitation, { clubId }) =>
-      utils.admin.listClubTrainerInvitations.invalidate({ clubId }),
+      Promise.all([
+        utils.admin.listClubTrainerInvitations.invalidate({ clubId }),
+        invalidateInsights(utils),
+      ]),
   });
 };
 
 export const useRevokeTrainerInvitation = () => {
   const utils = trpc.useUtils();
   return trpc.admin.revokeTrainerInvitation.useMutation({
-    onSuccess: () => utils.admin.listClubTrainerInvitations.invalidate(),
+    onSuccess: () =>
+      Promise.all([utils.admin.listClubTrainerInvitations.invalidate(), invalidateInsights(utils)]),
   });
 };
 
@@ -85,6 +128,7 @@ export const useRevokeTrainer = () => {
         utils.admin.listClubTrainers.invalidate(),
         utils.admin.listClubs.invalidate(),
         utils.admin.getClub.invalidate(),
+        invalidateInsights(utils),
       ]),
   });
 };

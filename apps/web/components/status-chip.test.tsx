@@ -15,6 +15,7 @@ const EXPECTED: Record<StatusKey, string> = {
   declined: 'Declined',
   revoked: 'Revoked',
   revokedTrainer: 'Revoked trainer',
+  clubDeactivated: 'Club deactivated',
   member: 'Member',
   waitingAthlete: 'Waiting for the athlete',
 };

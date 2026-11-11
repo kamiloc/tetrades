@@ -67,9 +67,15 @@ export type AdminClubIdInput = z.infer<typeof adminClubIdInput>;
 export const adminClubStatusFilterEnum = z.enum(['ALL', 'ACTIVE', 'DEACTIVATED']);
 export type AdminClubStatusFilter = z.infer<typeof adminClubStatusFilterEnum>;
 
-// Admin: clubs newest first, optionally filtered by status.
+// Admin: a 2–100 character search (trimmed) over club name or slug.
+export const adminSearchQuerySchema = z.string().trim().min(2).max(100);
+
+// Admin: clubs newest first, optionally filtered by status, by a name or slug
+// search, and to clubs with no non-revoked trainer.
 export const listAdminClubsInput = paginationInput.extend({
   status: adminClubStatusFilterEnum.default('ALL'),
+  query: adminSearchQuerySchema.optional(),
+  withoutActiveTrainer: z.boolean().optional(),
 });
 export type ListAdminClubsInput = z.infer<typeof listAdminClubsInput>;
 
@@ -79,11 +85,9 @@ export type ListAdminClubsInput = z.infer<typeof listAdminClubsInput>;
 
 // Every non-admin club output. The timestamps (L1) stay out; `isActive` is
 // derived from `deactivatedAt IS NULL`.
-export const clubPublicOutput = clubSchema
-  .omit({ deactivatedAt: true, createdAt: true })
-  .extend({
-    isActive: z.boolean(), /// L0-PUBLIC
-  });
+export const clubPublicOutput = clubSchema.omit({ deactivatedAt: true, createdAt: true }).extend({
+  isActive: z.boolean(), /// L0-PUBLIC
+});
 export type ClubPublicOutput = z.infer<typeof clubPublicOutput>;
 
 // Admin view of a club: timestamps plus the count of non-revoked trainers.
