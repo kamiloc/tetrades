@@ -236,6 +236,19 @@ Layout and upload window are set by ADR-015.
 - Configure the Magic Link deep link in `app.json` under `scheme`.
 - Use `expo-image-picker` for photo intake and `expo-notifications` for push.
 
+## Frontend i18n rules
+
+Every frontend feature ships with its translations. Web and mobile support English and Spanish; the locale comes from browser/device preferences, with English as the fallback.
+
+- Never hardcode user-visible text in English or Spanish. Labels, headings, buttons, placeholders, empty/loading/error states, toasts, `alt` text, `accessibilityLabel`/`aria-*` text, page titles and metadata all go through the app's translation module.
+- Web: add keys to `apps/web/lib/translations.ts` and read them with `useWebLocalization()` (client) or `getServerLocalization()` (Server Components, `generateMetadata()`).
+- Mobile: add keys to `apps/mobile/lib/translations.ts` and read them with `useMobileLocalization()`.
+- Add every new key to BOTH the English and Spanish catalogs in the same change. A key missing from either catalog is a defect.
+- Use interpolation values and plural rules from the catalog; never build sentences by concatenating strings or with inline `locale === 'es' ? … : …` ternaries.
+- Format dates and numbers through the app's `lib/format.ts` helpers with the resolved locale; never hardcode `en-US`, `es-CO`, or any locale tag.
+- Catalogs stay app-local. Never move them into `packages/` or import one app's catalog from the other.
+- API responses, emails, and API-generated push text are out of scope; map API errors to translated client messages instead of rendering server text.
+
 ## Testing rules
 
 - Vitest only. Co-locate `*.test.ts` with source, or use `tests/` for cross-cutting suites.
