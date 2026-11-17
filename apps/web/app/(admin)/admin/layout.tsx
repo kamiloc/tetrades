@@ -3,17 +3,13 @@ import type { ReactNode } from 'react';
 
 import { NotAuthorized } from '../../../components/not-authorized';
 import { PortalShell } from '../../../components/portal-shell';
-import type { NavSection } from '../../../components/sidebar-nav';
+import { ADMIN_SECTIONS } from '../../../lib/admin-nav';
 import { createServerApi, getApiErrorCode } from '../../../lib/server-api';
 import { getSessionUser } from '../../../lib/session';
 
 import { AccessCheckFailed } from './access-check-failed';
 
 export const dynamic = 'force-dynamic';
-
-const SECTIONS: NavSection[] = [
-  { title: 'nav.manage', items: [{ href: '/admin/clubs', label: 'nav.clubs', icon: 'flag' }] },
-];
 
 type Access = 'admin' | 'forbidden' | 'signed-out' | 'unavailable';
 
@@ -46,8 +42,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <PortalShell
       role="portal.admin"
       tone="blue"
-      sections={SECTIONS}
-      user={{ email: user.email, fallback: 'portal.adminFallback', sub: 'portal.platformAdmin' }}
+      sections={ADMIN_SECTIONS}
+      user={{ email: user.email ?? 'Admin', sub: 'portal.platformAdmin', fallback: 'portal.adminFallback' }}
     >
       {children}
     </PortalShell>

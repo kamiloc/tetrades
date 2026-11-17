@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-10 (web admin insights)
+
+- README: A1 is now the admin overview (six counts, linked where a filtered list exists, and recent admin actions) instead of being replaced by the club list.
+- README: the activity page is the admin action log, not a product activity feed; `audit_log` stays actor-scoped.
+- README: added the cross-club trainer directory (access and club-name filters, no permissions, no revoke) and noted there's no email search; the club list gains a name/slug search and a "No active trainer" filter.
+- Status chip: added "Club deactivated" (`pending` tone) for a non-revoked trainer of a deactivated club.
+
 ## 2026-11-04 (web trainer portal)
 
 - README: added "Trainer portal" to the intentional production exceptions: no T1 dashboard; roster without groups, age or identifiers; athlete page with metrics only (no sessions, attendance, access or achievements tabs); metric logging without conditions or evidence; club-only entry attribution, no trainer names; certification queue without evidence, "Verify" or "ask for info"; athlete-only invitations (no staff invites, email lists or share links); no exports or messages; the club switcher in the sidebar.

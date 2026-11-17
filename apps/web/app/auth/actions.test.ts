@@ -156,14 +156,14 @@ describe('verifyCode', () => {
     expect([...cookieJar.values()].filter((c) => c.value !== '')).toHaveLength(0);
   });
 
-  it('signs in with the right code and lands an admin on the club list', async () => {
+  it('signs in with the right code and lands an admin on the overview', async () => {
     stubBackends({ goodCode: '123456', admin: true });
     const error = await verifyCode(
       codeStep,
       form({ email: codeStep.email, code: '123456', next: '' }),
     ).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(RedirectSignal);
-    expect((error as RedirectSignal).location).toBe('/admin/clubs');
+    expect((error as RedirectSignal).location).toBe('/admin');
     const session = [...cookieJar.values()].filter((c) => c.value !== '');
     expect(session.length).toBeGreaterThan(0);
     for (const cookie of session)

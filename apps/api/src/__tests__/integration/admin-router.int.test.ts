@@ -86,7 +86,11 @@ describe.skipIf(!authReady)('admin and trainerInvitation routers', () => {
       'BAD_REQUEST',
     );
     await expectTRPCCode(
-      as(admin).admin.createClub.mutate({ slug: created.slug, name: 'Repetido', countryCode: 'CO' }),
+      as(admin).admin.createClub.mutate({
+        slug: created.slug,
+        name: 'Repetido',
+        countryCode: 'CO',
+      }),
       'CONFLICT',
     );
     await expectTRPCCode(
@@ -101,14 +105,23 @@ describe.skipIf(!authReady)('admin and trainerInvitation routers', () => {
 
   it('updateClub: success; slug key BAD_REQUEST; unknown NOT_FOUND; no session UNAUTHORIZED', async () => {
     const created = await club('tejo');
-    const updated = await as(admin).admin.updateClub.mutate({ clubId: created.id, city: 'Floridablanca' });
+    const updated = await as(admin).admin.updateClub.mutate({
+      clubId: created.id,
+      city: 'Floridablanca',
+    });
     expect(updated).toMatchObject({ city: 'Floridablanca', slug: created.slug });
     // The cast only gets the forbidden key past the compiler.
     const withSlug = { clubId: created.id, slug: 'otro-slug' } as unknown as { clubId: string };
     await expectTRPCCode(as(admin).admin.updateClub.mutate(withSlug), 'BAD_REQUEST');
     expect((await as(admin).admin.getClub.query({ clubId: created.id })).slug).toBe(created.slug);
-    await expectTRPCCode(as(admin).admin.updateClub.mutate({ clubId: UNKNOWN_ID, name: 'Nadie' }), 'NOT_FOUND');
-    await expectTRPCCode(anon().admin.updateClub.mutate({ clubId: created.id, name: 'X Club' }), 'UNAUTHORIZED');
+    await expectTRPCCode(
+      as(admin).admin.updateClub.mutate({ clubId: UNKNOWN_ID, name: 'Nadie' }),
+      'NOT_FOUND',
+    );
+    await expectTRPCCode(
+      anon().admin.updateClub.mutate({ clubId: created.id, name: 'X Club' }),
+      'UNAUTHORIZED',
+    );
   });
 
   it('listClubs and getClub: success, invalid, not found, unauthorized', async () => {
@@ -133,14 +146,68 @@ describe.skipIf(!authReady)('admin and trainerInvitation routers', () => {
       rejectedMembershipInvitations: 0,
       revokedTrainerInvitations: 0,
     });
-    await expectTRPCCode(as(admin).admin.deactivateClub.mutate({ clubId: created.id }), 'BAD_REQUEST');
-    expect((await as(admin).admin.reactivateClub.mutate({ clubId: created.id })).isActive).toBe(true);
+    await expectTRPCCode(
+      as(admin).admin.deactivateClub.mutate({ clubId: created.id }),
+      'BAD_REQUEST',
+    );
+    expect((await as(admin).admin.reactivateClub.mutate({ clubId: created.id })).isActive).toBe(
+      true,
+    );
     for (const procedure of ['deactivateClub', 'reactivateClub'] as const) {
       await expectTRPCCode(as(admin).admin[procedure].mutate({ clubId: 'nope' }), 'BAD_REQUEST');
       await expectTRPCCode(as(admin).admin[procedure].mutate({ clubId: UNKNOWN_ID }), 'NOT_FOUND');
       await expectTRPCCode(anon().admin[procedure].mutate({ clubId: created.id }), 'UNAUTHORIZED');
-      await expectTRPCCode(as(athlete).admin[procedure].mutate({ clubId: created.id }), 'FORBIDDEN');
+      await expectTRPCCode(
+        as(athlete).admin[procedure].mutate({ clubId: created.id }),
+        'FORBIDDEN',
+      );
     }
+  });
+
+  // ── admin insights (add-web-admin-insights) ────────────────────────────────
+
+  it('getOverview: success; athlete FORBIDDEN; no session UNAUTHORIZED', async () => {
+    const overview = await as(admin).admin.getOverview.query();
+    expect(overview.generatedAt).toBeInstanceOf(Date);
+    expect(overview.activeClubs).toBeGreaterThanOrEqual(0);
+    await expectTRPCCode(as(athlete).admin.getOverview.query(), 'FORBIDDEN');
+    await expectTRPCCode(anon().admin.getOverview.query(), 'UNAUTHORIZED');
+  });
+
+  it('listTrainers: success, invalid, forbidden, unauthorized', async () => {
+    const page = await as(admin).admin.listTrainers.query({ access: 'REVOKED', take: 5 });
+    for (const item of page.items) expect(item.access).toBe('REVOKED');
+    await expectTRPCCode(as(admin).admin.listTrainers.query({ take: 51 }), 'BAD_REQUEST');
+    await expectTRPCCode(as(admin).admin.listTrainers.query({ clubQuery: 'a' }), 'BAD_REQUEST');
+    await expectTRPCCode(as(athlete).admin.listTrainers.query({}), 'FORBIDDEN');
+    await expectTRPCCode(anon().admin.listTrainers.query({}), 'UNAUTHORIZED');
+  });
+
+  it('listActions: own club actions as you; invalid, forbidden, unauthorized', async () => {
+    const created = await club('beisbol');
+    const page = await as(admin).admin.listActions.query({ clubId: created.id });
+    expect(page.items).toEqual([
+      expect.objectContaining({
+        action: 'CLUB_CREATED',
+        club: { id: created.id, name: created.name },
+        actor: { isYou: true, email: null },
+      }),
+    ]);
+    await expectTRPCCode(as(admin).admin.listActions.query({ take: 51 }), 'BAD_REQUEST');
+    await expectTRPCCode(as(admin).admin.listActions.query({ clubId: 'nope' }), 'BAD_REQUEST');
+    await expectTRPCCode(as(athlete).admin.listActions.query({}), 'FORBIDDEN');
+    await expectTRPCCode(anon().admin.listActions.query({}), 'UNAUTHORIZED');
+  });
+
+  it('listClubs: search and trainer filter; a 1-character query is BAD_REQUEST', async () => {
+    const created = await club('softbol');
+    const page = await as(admin).admin.listClubs.query({
+      query: created.slug,
+      status: 'ACTIVE',
+      withoutActiveTrainer: true,
+    });
+    expect(page.items.map((c) => c.id)).toEqual([created.id]);
+    await expectTRPCCode(as(admin).admin.listClubs.query({ query: 'x' }), 'BAD_REQUEST');
   });
 
   // ── trainer provisioning end to end ────────────────────────────────────────
@@ -167,7 +234,9 @@ describe.skipIf(!authReady)('admin and trainerInvitation routers', () => {
       'NOT_FOUND',
     );
 
-    expect(await as(invitee).trainerInvitation.accept.mutate({ invitationId: invitation.id })).toEqual({
+    expect(
+      await as(invitee).trainerInvitation.accept.mutate({ invitationId: invitation.id }),
+    ).toEqual({
       id: invitation.id,
       state: 'ACCEPTED',
       clubId: created.id,
@@ -184,13 +253,21 @@ describe.skipIf(!authReady)('admin and trainerInvitation routers', () => {
     const revoked = await as(admin).admin.revokeTrainer.mutate({ clubTrainerId: trainerId });
     expect(revoked).toMatchObject({ id: trainerId, status: 'REVOKED' });
     await expectTRPCCode(as(invitee).club.listRoster.query({ clubId: created.id }), 'FORBIDDEN');
-    await expectTRPCCode(as(admin).admin.revokeTrainer.mutate({ clubTrainerId: trainerId }), 'BAD_REQUEST');
+    await expectTRPCCode(
+      as(admin).admin.revokeTrainer.mutate({ clubTrainerId: trainerId }),
+      'BAD_REQUEST',
+    );
   });
 
   it('decline, and revokeTrainerInvitation', async () => {
     const created = await club('natacion');
-    const toDecline = await as(admin).admin.inviteTrainer.mutate({ clubId: created.id, email: decliner.email });
-    expect(await as(decliner).trainerInvitation.decline.mutate({ invitationId: toDecline.id })).toEqual({
+    const toDecline = await as(admin).admin.inviteTrainer.mutate({
+      clubId: created.id,
+      email: decliner.email,
+    });
+    expect(
+      await as(decliner).trainerInvitation.decline.mutate({ invitationId: toDecline.id }),
+    ).toEqual({
       id: toDecline.id,
       state: 'DECLINED',
     });
@@ -199,12 +276,17 @@ describe.skipIf(!authReady)('admin and trainerInvitation routers', () => {
       'NOT_FOUND',
     );
 
-    const toRevoke = await as(admin).admin.inviteTrainer.mutate({ clubId: created.id, email: decliner.email });
+    const toRevoke = await as(admin).admin.inviteTrainer.mutate({
+      clubId: created.id,
+      email: decliner.email,
+    });
     expect(
       await as(admin).admin.revokeTrainerInvitation.mutate({ invitationId: toRevoke.id }),
     ).toEqual({ id: toRevoke.id, state: 'REVOKED' });
 
-    const invitations = await as(admin).admin.listClubTrainerInvitations.query({ clubId: created.id });
+    const invitations = await as(admin).admin.listClubTrainerInvitations.query({
+      clubId: created.id,
+    });
     expect(invitations.items.map((i) => i.state)).toEqual(['REVOKED', 'DECLINED']);
     expect(invitations.items.every((i) => i.email === decliner.email.toLowerCase())).toBe(true);
   });
@@ -229,24 +311,54 @@ describe.skipIf(!authReady)('admin and trainerInvitation routers', () => {
       'FORBIDDEN',
     );
     // revokeTrainerInvitation / revokeTrainer
-    await expectTRPCCode(as(admin).admin.revokeTrainerInvitation.mutate({ invitationId: 'nope' }), 'BAD_REQUEST');
-    await expectTRPCCode(as(admin).admin.revokeTrainerInvitation.mutate({ invitationId: UNKNOWN_ID }), 'NOT_FOUND');
-    await expectTRPCCode(anon().admin.revokeTrainerInvitation.mutate({ invitationId: UNKNOWN_ID }), 'UNAUTHORIZED');
-    await expectTRPCCode(as(admin).admin.revokeTrainer.mutate({ clubTrainerId: 'nope' }), 'BAD_REQUEST');
-    await expectTRPCCode(as(admin).admin.revokeTrainer.mutate({ clubTrainerId: UNKNOWN_ID }), 'NOT_FOUND');
-    await expectTRPCCode(anon().admin.revokeTrainer.mutate({ clubTrainerId: UNKNOWN_ID }), 'UNAUTHORIZED');
+    await expectTRPCCode(
+      as(admin).admin.revokeTrainerInvitation.mutate({ invitationId: 'nope' }),
+      'BAD_REQUEST',
+    );
+    await expectTRPCCode(
+      as(admin).admin.revokeTrainerInvitation.mutate({ invitationId: UNKNOWN_ID }),
+      'NOT_FOUND',
+    );
+    await expectTRPCCode(
+      anon().admin.revokeTrainerInvitation.mutate({ invitationId: UNKNOWN_ID }),
+      'UNAUTHORIZED',
+    );
+    await expectTRPCCode(
+      as(admin).admin.revokeTrainer.mutate({ clubTrainerId: 'nope' }),
+      'BAD_REQUEST',
+    );
+    await expectTRPCCode(
+      as(admin).admin.revokeTrainer.mutate({ clubTrainerId: UNKNOWN_ID }),
+      'NOT_FOUND',
+    );
+    await expectTRPCCode(
+      anon().admin.revokeTrainer.mutate({ clubTrainerId: UNKNOWN_ID }),
+      'UNAUTHORIZED',
+    );
     // list procedures
     for (const procedure of ['listClubTrainers', 'listClubTrainerInvitations'] as const) {
-      await expectTRPCCode(as(admin).admin[procedure].query({ clubId: created.id, take: 51 }), 'BAD_REQUEST');
+      await expectTRPCCode(
+        as(admin).admin[procedure].query({ clubId: created.id, take: 51 }),
+        'BAD_REQUEST',
+      );
       await expectTRPCCode(as(admin).admin[procedure].query({ clubId: UNKNOWN_ID }), 'NOT_FOUND');
       await expectTRPCCode(anon().admin[procedure].query({ clubId: created.id }), 'UNAUTHORIZED');
     }
     // trainerInvitation.*
     await expectTRPCCode(anon().trainerInvitation.listMine.query(), 'UNAUTHORIZED');
     for (const procedure of ['accept', 'decline'] as const) {
-      await expectTRPCCode(as(invitee).trainerInvitation[procedure].mutate({ invitationId: 'nope' }), 'BAD_REQUEST');
-      await expectTRPCCode(as(invitee).trainerInvitation[procedure].mutate({ invitationId: UNKNOWN_ID }), 'NOT_FOUND');
-      await expectTRPCCode(anon().trainerInvitation[procedure].mutate({ invitationId: UNKNOWN_ID }), 'UNAUTHORIZED');
+      await expectTRPCCode(
+        as(invitee).trainerInvitation[procedure].mutate({ invitationId: 'nope' }),
+        'BAD_REQUEST',
+      );
+      await expectTRPCCode(
+        as(invitee).trainerInvitation[procedure].mutate({ invitationId: UNKNOWN_ID }),
+        'NOT_FOUND',
+      );
+      await expectTRPCCode(
+        anon().trainerInvitation[procedure].mutate({ invitationId: UNKNOWN_ID }),
+        'UNAUTHORIZED',
+      );
     }
   });
 

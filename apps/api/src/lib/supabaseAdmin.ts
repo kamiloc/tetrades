@@ -8,6 +8,10 @@
  *                       Every path it receives is built server-side from the
  *                       caller's own athlete (services/storage.ts); request
  *                       handlers never pass a client-supplied path.
+ *   AdminDirectory    — admin.listActions only: an acting admin's auth email
+ *                       (add-web-admin-insights design D2), cached in
+ *                       services/adminInsights.ts. The email is L1, returned
+ *                       to admins only and never logged.
  *
  * Nothing else may create a service-role client.
  */
@@ -50,6 +54,19 @@ export interface PhotoStorage {
   list(bucket: StorageBucket, prefix: string): Promise<string[]>;
   remove(bucket: StorageBucket, paths: string[]): Promise<void>;
 }
+
+/** Auth email lookup for the admin action log. */
+export interface AdminDirectory {
+  /**
+   * The auth user's current email, or null when the user no longer exists
+   * or has none. Unlike getConfirmedEmail it does not require confirmation:
+   * admins are provisioned out of band. Throws on any other failure.
+   */
+  getUserEmail(supabaseUserId: string): Promise<string | null>;
+}
+
+/** The one auth-admin call AdminDirectory needs; injectable for unit tests. */
+export type AuthUserLookup = Pick<SupabaseClient['auth']['admin'], 'getUserById'>;
 
 const ALL_BUCKETS = storageBucketSchema.options;
 const LIST_PAGE_SIZE = 100;
@@ -130,6 +147,23 @@ export function createSupabaseDeletionExternals(): DeletionExternals {
       const { email, email_confirmed_at: confirmedAt } = data.user;
       if (typeof email !== 'string' || email.length === 0 || !confirmedAt) return null;
       return email.trim().toLowerCase();
+    },
+  };
+}
+
+export function createSupabaseAdminDirectory(
+  lookup: () => AuthUserLookup = () => getAdminClient().auth.admin,
+): AdminDirectory {
+  return {
+    async getUserEmail(supabaseUserId) {
+      const { data, error } = await lookup().getUserById(supabaseUserId);
+      if (error !== null) {
+        if (error.status === 404) return null;
+        // Status only: the message could echo user data.
+        throw new Error(`auth user lookup failed (status ${String(error.status ?? 'unknown')})`);
+      }
+      const { email } = data.user;
+      return typeof email === 'string' && email.length > 0 ? email : null;
     },
   };
 }

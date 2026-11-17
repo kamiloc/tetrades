@@ -1,8 +1,11 @@
 import {
+  adminActionListOutput,
   adminClubIdInput,
   adminClubListOutput,
   adminClubOutput,
   adminClubTrainerListOutput,
+  adminOverviewOutput,
+  adminTrainerDirectoryListOutput,
   adminTrainerInvitationListOutput,
   adminWhoAmIOutput,
   clubTrainerIdInput,
@@ -10,7 +13,9 @@ import {
   deactivateClubOutput,
   inviteTrainerInput,
   inviteTrainerOutput,
+  listAdminActionsInput,
   listAdminClubsInput,
+  listAdminTrainersInput,
   listClubTrainerInvitationsInput,
   listClubTrainersInput,
   revokeClubTrainerOutput,
@@ -19,6 +24,7 @@ import {
   updateClubInput,
 } from '@packages/validators';
 
+import { createSupabaseAdminDirectory } from '../lib/supabaseAdmin.js';
 import {
   createClub,
   deactivateClub,
@@ -28,6 +34,13 @@ import {
   updateClub,
 } from '../services/adminClubs.js';
 import {
+  createCachedEmailLookup,
+  getOverview,
+  listActions,
+  listTrainers,
+  type AdminEmailLookup,
+} from '../services/adminInsights.js';
+import {
   inviteTrainer,
   listClubTrainerInvitations,
   listClubTrainers,
@@ -36,11 +49,18 @@ import {
 } from '../services/trainerInvitations.js';
 import { adminProcedure, router } from '../trpc.js';
 
+// Created on first use so routers load without the service-role key (tests,
+// bare dev). One cached lookup per process (design D2).
+let emailLookup: AdminEmailLookup | null = null;
+const adminEmailLookup = (): AdminEmailLookup =>
+  (emailLookup ??= createCachedEmailLookup(createSupabaseAdminDirectory()));
+
 /**
  * Platform admin surface (ADR-017, design D9): clubs and trainer access only.
  * Every procedure is adminProcedure (role re-read on every call). There is no
  * procedure that deletes a club, reads athlete data, or writes an account's
- * role or a legal hold.
+ * role or a legal hold. The insight reads (getOverview, listTrainers,
+ * listActions) are read-only and return no athlete data.
  */
 export const adminRouter = router({
   whoAmI: adminProcedure.output(adminWhoAmIOutput).query(() => ({ isAdmin: true as const })),
@@ -95,6 +115,23 @@ export const adminRouter = router({
     .input(trainerInvitationIdInput)
     .output(trainerInvitationMutationOutput)
     .mutation(({ ctx, input }) => revokeTrainerInvitation(ctx.prisma, ctx, input.invitationId)),
+
+  // Six counts from one REPEATABLE READ snapshot; no athlete data.
+  getOverview: adminProcedure
+    .output(adminOverviewOutput)
+    .query(({ ctx }) => getOverview(ctx.prisma)),
+
+  listTrainers: adminProcedure
+    .input(listAdminTrainersInput)
+    .output(adminTrainerDirectoryListOutput)
+    .query(({ ctx, input }) => listTrainers(ctx.prisma, input)),
+
+  // Reads the admin action log; resolves other admins' emails via Supabase
+  // Auth (owner-approved exception, design D2). Never writes a log row.
+  listActions: adminProcedure
+    .input(listAdminActionsInput)
+    .output(adminActionListOutput)
+    .query(({ ctx, input }) => listActions(ctx.prisma, ctx, adminEmailLookup(), input)),
 
   revokeTrainer: adminProcedure
     .input(clubTrainerIdInput)

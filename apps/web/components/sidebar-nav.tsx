@@ -13,6 +13,8 @@ export interface NavItem {
   href: string;
   label: MessageKey;
   icon: IconName;
+  /** Current only on an exact path match (for a section's index page). */
+  exact?: boolean;
 }
 
 export interface NavSection {
@@ -20,8 +22,9 @@ export interface NavSection {
   items: NavItem[];
 }
 
-function isActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+export function isActive(pathname: string, item: Pick<NavItem, 'href' | 'exact'>): boolean {
+  if (pathname === item.href) return true;
+  return item.exact !== true && pathname.startsWith(`${item.href}/`);
 }
 
 export function SidebarNav({ sections }: { sections: NavSection[] }) {
@@ -39,7 +42,7 @@ export function SidebarNav({ sections }: { sections: NavSection[] }) {
             {t(section.title)}
           </div>
           {section.items.map((item) => {
-            const active = isActive(pathname, item.href);
+            const active = isActive(pathname, item);
             return (
               <Link
                 key={item.href}

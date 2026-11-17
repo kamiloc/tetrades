@@ -542,12 +542,13 @@ Production deliberately differs from this prototype here:
 
 The admin and trainer web portals differ from `web/` here. Each unsupported surface in `WEB-AUDIT.md` is listed.
 
-- **A1 (overview, approval queue, recent activity) is replaced by the club list.** `/admin` opens `/admin/clubs`. There's no KPI strip, approval queue or activity feed.
+- **A1 is the overview (`add-web-admin-insights`).** `/admin` shows six counts (active and deactivated clubs, active clubs with no active trainer, active trainers, pending trainer invitations, those expiring within 48 hours) and the five most recent admin actions. The club and trainer counts link to filtered lists; the invitation counts aren't links. There's no approval queue and no athlete count.
 - **No club applications or review.** Clubs are created by an admin and start active; there's no application, approve or decline flow, and no owner identity checklist.
 - **No documents.** Club application documents and trainer credential files are not shown or uploaded.
-- **No activity feed or audit log.** `audit_log` stays actor-scoped and isn't shown as admin history.
+- **Activity is the admin action log, not a product feed.** `/admin/activity` lists admin actions on clubs and trainer access (who acted, what, which club, changed field names and cancelled counts). It shows no athlete activity, and `audit_log` stays actor-scoped and isn't shown.
+- **Trainer directory without permissions or email search.** `/admin/trainers` lists every trainer assignment across clubs with its access (Active, Club deactivated, Revoked) and "Invited as" email, filtered by access and club name. Revoking stays on the club's trainers page.
 - **No trainer permissions.** The `View` / `Log` / `Verify` pills and permission toggles aren't built; trainer access is one assignment per club, enforced by the API.
-- **No global search, exports, messages or sessions.** The top bar has breadcrumbs and one primary action, without the search box or notifications bell.
+- **No global search, email search, exports, messages or sessions.** The top bar has breadcrumbs and one primary action, without the search box or notifications bell. The only searches are the club list's name/slug search and the trainer directory's club-name search; there's no search by email, so emails never appear in page addresses.
 - **The invite modal takes an email only.** No role, credentials, email lists or share links. After inviting, the page shows what to pass on (no email is sent) with a Copy link button.
 - **"Suspended" is "Deactivated".** Clubs are deactivated and reactivated, never deleted. Invitation states are Pending, Expired, Accepted, Declined and Revoked; trainers are Active or Revoked.
 - **`/trainer/invitations` has no artboard.** It's built from the shell, table and state components. The trainer work screens are listed under "Trainer portal" below.

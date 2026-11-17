@@ -22,6 +22,9 @@ import {
 // | inviteTrainer, revokeTrainerInv.   | admin.listClubTrainerInvitations(id)                         |
 // | revokeTrainer                      | admin.listClubTrainers(id), admin.listClubs, admin.getClub(id) |
 // | trainerInvitation.accept, decline  | trainerInvitation.listMine                                   |
+//
+// Every admin mutation above also invalidates admin.getOverview,
+// admin.listActions and admin.listTrainers (add-web-admin-insights D4).
 
 export const useCreateClubMutation = useCreateClub;
 export const useUpdateClubMutation = useUpdateClub;

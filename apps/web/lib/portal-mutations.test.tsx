@@ -22,6 +22,10 @@ import {
 
 const CLUB = 'clxclub0000000000000000001';
 
+// Every admin mutation also refreshes the insight pages (add-web-admin-insights D4).
+const INSIGHTS = ['admin.getOverview', 'admin.listActions', 'admin.listTrainers'];
+const withInsights = (keys: string[]) => [...keys, ...INSIGHTS].sort();
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <ApiProvider apiUrl="http://localhost/api/trpc" getToken={async () => null}>
     {children}
@@ -66,32 +70,32 @@ describe('portal mutations invalidate the design D7 keys', () => {
         name: 'Liga de Atletismo',
         countryCode: 'CO',
       }),
-    ).toEqual(['admin.listClubs']);
+    ).toEqual(withInsights(['admin.listClubs']));
   });
 
   it('updateClub', async () => {
     expect(
       await invalidatedBy(useUpdateClubMutation, { clubId: CLUB, name: 'Club Nuevo' }),
-    ).toEqual([`admin.getClub(${CLUB})`, 'admin.listClubs'].sort());
+    ).toEqual(withInsights([`admin.getClub(${CLUB})`, 'admin.listClubs']));
   });
 
   it('deactivateClub', async () => {
     expect(await invalidatedBy(useDeactivateClubMutation, { clubId: CLUB })).toEqual(
-      [
+      withInsights([
         `admin.getClub(${CLUB})`,
         'admin.listClubs',
         `admin.listClubTrainerInvitations(${CLUB})`,
-      ].sort(),
+      ]),
     );
   });
 
   it('reactivateClub', async () => {
     expect(await invalidatedBy(useReactivateClubMutation, { clubId: CLUB })).toEqual(
-      [
+      withInsights([
         `admin.getClub(${CLUB})`,
         'admin.listClubs',
         `admin.listClubTrainerInvitations(${CLUB})`,
-      ].sort(),
+      ]),
     );
   });
 
@@ -101,7 +105,7 @@ describe('portal mutations invalidate the design D7 keys', () => {
         clubId: CLUB,
         email: 'entrenadora@example.co',
       }),
-    ).toEqual([`admin.listClubTrainerInvitations(${CLUB})`]);
+    ).toEqual(withInsights([`admin.listClubTrainerInvitations(${CLUB})`]));
   });
 
   it('revokeTrainerInvitation (all of the club lists, including this club)', async () => {
@@ -109,13 +113,13 @@ describe('portal mutations invalidate the design D7 keys', () => {
       await invalidatedBy(useRevokeTrainerInvitationMutation, {
         invitationId: 'clxinv0000000000000000001',
       }),
-    ).toEqual(['admin.listClubTrainerInvitations']);
+    ).toEqual(withInsights(['admin.listClubTrainerInvitations']));
   });
 
   it('revokeTrainer', async () => {
     expect(
       await invalidatedBy(useRevokeTrainerMutation, { clubTrainerId: 'clxtr00000000000000000001' }),
-    ).toEqual(['admin.getClub', 'admin.listClubTrainers', 'admin.listClubs'].sort());
+    ).toEqual(withInsights(['admin.getClub', 'admin.listClubTrainers', 'admin.listClubs']));
   });
 
   it('trainerInvitation.accept and decline', async () => {

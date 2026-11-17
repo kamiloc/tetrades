@@ -4,9 +4,10 @@ import { trpc } from '@packages/api-client';
 import type { AdminClubOutput, AdminClubStatusFilter } from '@packages/validators';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '../../../../components/button';
+import { TextInput } from '../../../../components/field';
 import { focusRing } from '../../../../components/focus';
 import { InlineAlert } from '../../../../components/inline-alert';
 import { PageBody, PageHeader, Toolbar } from '../../../../components/layout';
@@ -16,8 +17,10 @@ import { EmptyState, ErrorState, LoadingState } from '../../../../components/sta
 import { StatusChip } from '../../../../components/status-chip';
 import { NameCell, Table, type Column } from '../../../../components/table';
 import { formatNumber } from '../../../../lib/format';
+import { withParams } from '../../../../lib/href';
 import { useWebLocalization } from '../../../../lib/i18n';
 import type { MessageKey } from '../../../../lib/translations';
+import { searchTerm, useDebounced } from '../../../../lib/use-debounced';
 
 import { ClubFormDialog } from './club-form-dialog';
 
@@ -37,56 +40,93 @@ function parseFilter(value: string | null): AdminClubStatusFilter {
   return value === 'DEACTIVATED' || value === 'ALL' ? value : 'ACTIVE';
 }
 
+interface ListState {
+  status: AdminClubStatusFilter;
+  withoutTrainer: boolean;
+  query: string | undefined;
+}
+
+function clubsHref({ status, withoutTrainer, query }: ListState): string {
+  return withParams('/admin/clubs', {
+    status: status === 'ACTIVE' ? undefined : status,
+    trainers: withoutTrainer ? 'none' : undefined,
+    q: query,
+  });
+}
+
 export function ClubsView() {
+
   const { locale, t } = useWebLocalization();
+
+  const COLUMNS: Column<AdminClubOutput>[] = [
+    {
+      header: t('admin.clubs.colClub'),
+      className: 'w-[40%]',
+      cell: (club) => (
+        <Link
+          href={`/admin/clubs/${club.id}`}
+          className={`block min-w-0 rounded-sm hover:underline ${focusRing}`}
+        >
+          <NameCell title={club.name} sub={club.slug} />
+        </Link>
+      ),
+    },
+    {
+      header: t('admin.clubs.colLocation'),
+      cell: (club) => (
+        <span className="text-muted">
+          {club.city ? t('common.location', { city: club.city, country: club.countryCode }) : club.countryCode}
+        </span>
+      ),
+    },
+    {
+      header: t('common.status'),
+      cell: (club) => <StatusChip status={club.isActive ? 'active' : 'deactivated'} />,
+    },
+    {
+      header: t('admin.clubs.colActiveTrainers'),
+      align: 'right',
+      cell: (club) => <span className="font-semibold tabular-nums">{formatNumber(locale, club.activeTrainerCount)}</span>,
+    },
+  ];
+
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const filter = parseFilter(searchParams.get('status'));
+  const withoutTrainer = searchParams.get('trainers') === 'none';
+  const [search, setSearch] = useState(searchParams.get('q') ?? '');
+  const query = searchTerm(useDebounced(search));
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<{ id: string; name: string } | null>(null);
 
-  const columns: Column<AdminClubOutput>[] = [
-  {
-    header: t('admin.clubs.colClub'),
-    className: 'w-[40%]',
-    cell: (club) => (
-      <Link
-        href={`/admin/clubs/${club.id}`}
-        className={`block min-w-0 rounded-sm hover:underline ${focusRing}`}
-      >
-        <NameCell title={club.name} sub={club.slug} />
-      </Link>
-    ),
-  },
-  {
-    header: t('admin.clubs.colLocation'),
-    cell: (club) => (
-      <span className="text-muted">
-        {club.city ? t('common.location', { city: club.city, country: club.countryCode }) : club.countryCode}
-      </span>
-    ),
-  },
-  {
-    header: t('common.status'),
-    cell: (club) => <StatusChip status={club.isActive ? 'active' : 'deactivated'} />,
-  },
-  {
-    header: t('admin.clubs.colActiveTrainers'),
-    align: 'right',
-    cell: (club) => <span className="font-semibold tabular-nums">{formatNumber(locale, club.activeTrainerCount)}</span>,
-  },
-  ];
-
   const clubs = trpc.admin.listClubs.useInfiniteQuery(
-    { status: filter, take: 20 },
+    {
+      status: filter,
+      take: 20,
+      ...(withoutTrainer ? { withoutActiveTrainer: true } : {}),
+      ...(query ? { query } : {}),
+    },
     { getNextPageParam: (page) => page.nextCursor ?? undefined },
   );
 
-  const setFilter = (value: AdminClubStatusFilter) => {
-    router.replace(value === 'ACTIVE' ? '/admin/clubs' : `/admin/clubs?status=${value}`, {
+  const go = (next: Partial<ListState>) => {
+    router.replace(clubsHref({ status: filter, withoutTrainer, query, ...next }), {
       scroll: false,
     });
   };
+  const setFilter = (value: AdminClubStatusFilter) => go({ status: value });
+
+  // Keep the sent search in the address; the comparison stops the loop.
+  const urlQuery = searchParams.get('q') ?? undefined;
+  useEffect(() => {
+    if (urlQuery !== query) {
+      router.replace(clubsHref({ status: filter, withoutTrainer, query }), { scroll: false });
+    }
+  }, [urlQuery, query, filter, withoutTrainer, router]);
+
+  // The effect above drops `q` once the cleared input settles.
+  const clearSearch = () => setSearch('');
 
   const rows = clubs.data?.pages.flatMap((page) => page.items) ?? [];
   const createButton = (
@@ -120,11 +160,36 @@ export function ClubsView() {
         ) : null}
         <Toolbar
           left={
-            <SegmentedFilter
+            <>
+              <SegmentedFilter
               label={t('admin.clubs.statusFilter')}
               options={FILTERS.map((option) => ({ value: option.value, label: t(option.label) }))}
               value={filter}
               onChange={setFilter}
+              ></SegmentedFilter>
+              <button
+                type="button"
+                aria-pressed={withoutTrainer}
+                onClick={() => go({ withoutTrainer: !withoutTrainer })}
+                className={`rounded-[10px] border px-3 py-[6px] text-[12.5px] font-semibold ${
+                  withoutTrainer
+                    ? 'border-blue-line bg-blue-tint text-blue'
+                    : 'border-line bg-paper text-muted hover:text-text'
+                } ${focusRing}`}
+              >
+                No active trainer
+              </button>
+            </>
+          }
+          right={
+            <TextInput
+              type="search"
+              aria-label="Search clubs by name or slug"
+              placeholder="Search by name or slug"
+              value={search}
+              maxLength={100}
+              onChange={(event) => setSearch(event.target.value)}
+              className="w-[260px]"
             />
           }
         />
@@ -135,13 +200,23 @@ export function ClubsView() {
         ) : (
           <Table
             caption={t('nav.clubs')}
-            columns={columns}
+            columns={COLUMNS}
             rows={rows}
             rowKey={(club) => club.id}
             empty={
-              <EmptyState title={t(EMPTY_COPY[filter])} action={createButton}>
+              query ? (
+                <EmptyState
+                  icon="search"
+                  title={`${t('admin.clubs.noResults')} “${query}”`}
+                  action={<Button onClick={clearSearch}>Clear search</Button>}
+                />
+              ) : withoutTrainer ? (
+                <EmptyState title={t('admin.clubs.withoutTrainer')} />
+              ) : (
+                <EmptyState title={t(EMPTY_COPY[filter])} action={createButton}>
                 {t('admin.clubs.emptyBody')}
               </EmptyState>
+              )
             }
             footer={
               clubs.hasNextPage ? (

@@ -12,8 +12,11 @@
 --     in the same transaction as the write.
 --   - NO client policies exist, for any command, and every table privilege is
 --     revoked from anon and authenticated. No client — an admin included —
---     can read, insert, update or delete a row. Admins have no read surface
---     for this log in the application.
+--     can read, insert, update or delete a row directly.
+--   - Admins read the log only through the admin API (`admin.listActions`,
+--     add-web-admin-insights), which re-checks the admin role on every call,
+--     reads through the API's connection, and never returns `request_id` or
+--     the actor's internal ids. That read path adds no policy or grant here.
 --   - The API writes through its Prisma connection. Checked fact, recorded
 --     2026-11-01 on the DATABASE_URL connection (Supabase pooler):
 --       SELECT current_user, rolbypassrls FROM pg_roles WHERE rolname = current_user;

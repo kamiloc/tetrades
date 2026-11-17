@@ -38,6 +38,8 @@ export const STATUS = {
   revoked: { tone: 'rejected', label: 'status.revoked' },
   revokedTrainer: { tone: 'rejected', label: 'status.revokedTrainer' },
   member: { tone: 'verified', label: 'status.member' },
+  // A non-revoked trainer of a deactivated club: no access (ADR-017).
+  clubDeactivated: { tone: 'pending', label: 'status.clubDeactivated' },
   waitingAthlete: { tone: 'pending', label: 'status.waitingAthlete' },
 } as const satisfies Record<string, { tone: ChipTone; label: MessageKey }>;
 

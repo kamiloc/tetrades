@@ -11,9 +11,12 @@ Architecture: `docs/project-architecture.md` ("Web sign-in and session", "Web AP
 | `/`                                                    | Placeholder, links to `/login`                                                     |
 | `/login`                                               | Email step, then code step (Magic Link with a one-time code fallback)              |
 | `/auth/callback`                                       | Magic Link landing: exchanges the PKCE code, redirects through `safeNext`          |
-| `/admin` → `/admin/clubs`                              | Club list, create, filter, load more                                               |
+| `/admin`                                               | Overview: club, trainer and invitation counts (linked), recent admin actions       |
+| `/admin/clubs`                                         | Club list: create, status filter, "No active trainer" filter, name/slug search     |
 | `/admin/clubs/[clubId]`                                | Club details, edit (slug read-only), deactivate and reactivate                     |
 | `/admin/clubs/[clubId]/trainers`                       | Trainers, invitations, invite and revoke                                           |
+| `/admin/trainers`                                      | Trainer directory across clubs: access and club-name filters, links to each club   |
+| `/admin/activity`                                      | Admin action log: action and club filters (`?action=`, `?club=`), load more        |
 | `/trainer`                                             | Trainer landing: the only club's roster, the picker for several, or a no-club note |
 | `/trainer/clubs`                                       | Club picker                                                                        |
 | `/trainer/invitations`                                 | The signed-in user's trainer invitations: accept or decline                        |
@@ -24,6 +27,8 @@ Architecture: `docs/project-architecture.md` ("Web sign-in and session", "Web AP
 
 The admin layout shows the admin shell only when `admin.whoAmI` succeeds; anyone else sees "Not authorized". The API still checks the role on every call.
 
+The admin insight pages read `admin.getOverview`, `admin.listTrainers` and `admin.listActions`, and the club list sends `query` and `withoutActiveTrainer` to `admin.listClubs`. Filters and searches live in the page address; a search is sent only from 2 characters, after a 300 ms pause. Every admin mutation refreshes the overview, the directory and the activity log (`lib/portal-mutations.ts`). Action wording lives in `lib/admin-actions.ts`.
+
 Trainer routes (`app/(trainer)/trainer/`): the root layout only checks the session. The `(home)` route group (`/trainer`, `/trainer/clubs`, `/trainer/invitations`) uses the generic trainer nav. `clubs/[clubId]/layout.tsx` is the club guard: it reads `club.listMyTrainerClubs` server-side and renders "You're not a trainer of this club" (and no page) for a club the user doesn't train, otherwise the club nav and the club switcher. A club page that later gets `FORBIDDEN` calls `router.refresh()`, so the guard runs again. Error-to-message mapping lives in `lib/trainer/errors.ts` (`trainerErrorNotice`).
 
 ## Auth flow
@@ -33,7 +38,7 @@ Every Supabase auth call runs on the server (`app/auth/actions.ts`, `app/auth/ca
 1. `requestSignIn` sends one email with the link and the code. `emailRedirectTo` is `WEB_URL/auth/callback?next=…`. The message is the same whether or not the email has an account.
 2. The user opens the link (`/auth/callback`) or types the code (`verifyCode`).
 3. Cookies are written by `lib/supabase-server.ts`, which forces `httpOnly`, `SameSite=Lax`, `path=/`, and `Secure` everywhere except `localhost`.
-4. The landing is a safe `next` (`lib/safe-next.ts`: same-origin relative paths only), else `/admin/clubs` for admins and `/trainer` for everyone else.
+4. The landing is a safe `next` (`lib/safe-next.ts`: same-origin relative paths only), else `/admin` (the overview) for admins and `/trainer` for everyone else.
 
 `middleware.ts` refreshes the session on every request and sends sessionless `/admin/*` and `/trainer/*` visits to `/login?next=…`, keeping refreshed cookies on redirects. When the API answers `UNAUTHORIZED` in the browser, `components/providers.tsx` sends the user to sign-in with the current page as `next`.
 

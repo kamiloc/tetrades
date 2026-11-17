@@ -81,7 +81,7 @@ describe('GET /auth/callback', () => {
     async (next) => {
       stubExchange({ ok: true, admin: true });
       const response = await GET(callback(`?code=abc&next=${encodeURIComponent(next)}`));
-      expect(response.headers.get('location')).toBe(`${APP_ORIGIN}/admin/clubs`);
+      expect(response.headers.get('location')).toBe(`${APP_ORIGIN}/admin`);
     },
   );
 

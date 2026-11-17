@@ -131,7 +131,12 @@ export async function inviteTrainer(
 
       // An expired PENDING row still holds the unique slot: close it first.
       const expired = await tx.clubTrainerInvitation.findFirst({
-        where: { clubId: input.clubId, email: input.email, status: 'PENDING', expiresAt: { lte: now } },
+        where: {
+          clubId: input.clubId,
+          email: input.email,
+          status: 'PENDING',
+          expiresAt: { lte: now },
+        },
         select: { id: true },
       });
       if (expired !== null) {
@@ -257,6 +262,38 @@ export async function revokeTrainer(
  * (the invited address, not necessarily the current sign-in email); null for
  * rows provisioned before invitations or whose invitation was redacted.
  */
+/**
+ * "Invited as" emails for trainer assignments: the address of the latest
+ * ACCEPTED invitation for each (club, account), or null when there is none
+ * (provisioned before invitations) or it was redacted. One query per page;
+ * shared by listClubTrainers and the admin trainer directory.
+ */
+export async function resolveInvitedEmails(
+  prisma: PrismaClient,
+  pairs: readonly { clubId: string; userAccountId: string }[],
+): Promise<(pair: { clubId: string; userAccountId: string }) => string | null> {
+  const keyOf = (clubId: string, userAccountId: string) => `${clubId}:${userAccountId}`;
+  const invitations =
+    pairs.length === 0
+      ? []
+      : await prisma.clubTrainerInvitation.findMany({
+          where: {
+            status: 'ACCEPTED',
+            OR: pairs.map((p) => ({ clubId: p.clubId, acceptedByUserAccountId: p.userAccountId })),
+          },
+          orderBy: { respondedAt: 'desc' },
+          select: { clubId: true, acceptedByUserAccountId: true, email: true, redactedAt: true },
+        });
+  const emailOf = new Map<string, string | null>();
+  for (const inv of invitations) {
+    if (inv.acceptedByUserAccountId === null) continue;
+    const key = keyOf(inv.clubId, inv.acceptedByUserAccountId);
+    // Newest first: keep the first one seen.
+    if (!emailOf.has(key)) emailOf.set(key, inv.redactedAt === null ? inv.email : null);
+  }
+  return (pair) => emailOf.get(keyOf(pair.clubId, pair.userAccountId)) ?? null;
+}
+
 export async function listClubTrainers(
   prisma: PrismaClient,
   input: ListClubTrainersInput,
@@ -268,30 +305,15 @@ export async function listClubTrainers(
     ...cursorArgs(input),
     select: { id: true, userAccountId: true, createdAt: true, revokedAt: true },
   });
-  const invitations =
-    rows.length === 0
-      ? []
-      : await prisma.clubTrainerInvitation.findMany({
-          where: {
-            clubId: input.clubId,
-            status: 'ACCEPTED',
-            acceptedByUserAccountId: { in: rows.map((r) => r.userAccountId) },
-          },
-          orderBy: { respondedAt: 'desc' },
-          select: { acceptedByUserAccountId: true, email: true, redactedAt: true },
-        });
-  const invitedEmailOf = new Map<string, string | null>();
-  for (const inv of invitations) {
-    if (inv.acceptedByUserAccountId === null || invitedEmailOf.has(inv.acceptedByUserAccountId)) {
-      continue;
-    }
-    invitedEmailOf.set(inv.acceptedByUserAccountId, inv.redactedAt === null ? inv.email : null);
-  }
+  const invitedEmail = await resolveInvitedEmails(
+    prisma,
+    rows.map((r) => ({ clubId: input.clubId, userAccountId: r.userAccountId })),
+  );
   return toPage(
     rows.map(({ userAccountId, ...row }) => ({
       ...row,
       status: row.revokedAt === null ? ('ACTIVE' as const) : ('REVOKED' as const),
-      invitedEmail: invitedEmailOf.get(userAccountId) ?? null,
+      invitedEmail: invitedEmail({ clubId: input.clubId, userAccountId }),
     })),
     input.take,
     (r) => r.id,
