@@ -5,9 +5,11 @@ import { View } from 'react-native';
 
 import FullScreenSpinner from '../../components/spinner';
 import { StatePanel } from '../../components/StatePanel';
+import { useMobileLocalization } from '../../lib/i18n';
 import { isBusy, isFailed } from '../../lib/query-state';
 
 export default function AppLayout() {
+  const { t } = useMobileLocalization();
   const { isLoading: sessionLoading, isAuthenticated } = useSession();
   const onboardingState = useOnboardingState();
   const segments = useSegments();
@@ -36,9 +38,9 @@ export default function AppLayout() {
         <StatePanel
           tone="danger"
           icon="alert-circle"
-          title="Couldn't check your profile"
-          body="Check your connection and try again."
-          primary={{ label: 'Try again', onPress: () => { void onboardingState.refetch(); } }}
+          title={t('app.profileCheckFailed')}
+          body={t('common.checkConnection')}
+          primary={{ label: t('common.tryAgain'), onPress: () => { void onboardingState.refetch(); } }}
         />
       </View>
     );
@@ -63,7 +65,7 @@ export default function AppLayout() {
         name="onboarding"
         options={{
           headerShown: true,
-          title: 'Welcome',
+          title: t('app.welcome'),
           headerTitleAlign: 'center',
           headerBackVisible: false,
           gestureEnabled: false,
@@ -74,7 +76,7 @@ export default function AppLayout() {
         options={{
           presentation: 'modal',
           headerShown: true,
-          title: 'Edit profile',
+          title: t('app.editProfile'),
           headerTitleAlign: 'center',
         }}
       />
@@ -82,7 +84,7 @@ export default function AppLayout() {
         name="achievements"
         options={{
           headerShown: true,
-          title: 'Achievements',
+          title: t('achievements.title'),
           headerTitleAlign: 'center',
         }}
       />

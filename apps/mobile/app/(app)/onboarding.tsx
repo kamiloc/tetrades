@@ -1,8 +1,5 @@
 import { trpc, useBootstrapAthlete, useSports } from '@packages/api-client';
-import {
-  NON_ATHLETE_ACCOUNT_ONBOARDING_MESSAGE,
-  TRAINER_ACCOUNT_ONBOARDING_MESSAGE,
-} from '@packages/shared-logic';
+import { TRAINER_ACCOUNT_ONBOARDING_MESSAGE } from '@packages/shared-logic';
 import { TRPCClientError } from '@trpc/client';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -15,48 +12,49 @@ import {
 } from 'react-native';
 
 import { KeyboardAwareScrollView } from '../../components/KeyboardAwareScrollView';
+import { useMobileLocalization } from '../../lib/i18n';
 import { colors } from '../../lib/theme';
+import type { MessageKey } from '../../lib/translations';
 
 // Countries are kept short on purpose — expand the list once the product
 // targets athletes outside LATAM. ISO-3166 alpha-2 codes.
-const COUNTRIES: { code: string; name: string }[] = [
-  { code: 'CO', name: 'Colombia' },
-  { code: 'MX', name: 'México' },
-  { code: 'AR', name: 'Argentina' },
-  { code: 'CL', name: 'Chile' },
-  { code: 'PE', name: 'Perú' },
-  { code: 'EC', name: 'Ecuador' },
-  { code: 'BR', name: 'Brasil' },
-  { code: 'ES', name: 'España' },
-  { code: 'US', name: 'Estados Unidos' },
+const COUNTRIES: { code: string; en: string; es: string }[] = [
+  { code: 'CO', en: 'Colombia', es: 'Colombia' },
+  { code: 'MX', en: 'Mexico', es: 'México' },
+  { code: 'AR', en: 'Argentina', es: 'Argentina' },
+  { code: 'CL', en: 'Chile', es: 'Chile' },
+  { code: 'PE', en: 'Peru', es: 'Perú' },
+  { code: 'EC', en: 'Ecuador', es: 'Ecuador' },
+  { code: 'BR', en: 'Brazil', es: 'Brasil' },
+  { code: 'ES', en: 'Spain', es: 'España' },
+  { code: 'US', en: 'United States', es: 'Estados Unidos' },
 ];
 
 // One capacity per account (ADR-017): athlete.bootstrap answers FORBIDDEN for
 // trainer and admin accounts. The server message is only compared against
 // the known shared constant to pick fixed copy; it is never shown raw.
-function capacityError(err: unknown): string | null {
+function capacityError(err: unknown): MessageKey | null {
   if (!(err instanceof TRPCClientError)) return null;
   const data: unknown = err.data;
   const code =
     typeof data === 'object' && data !== null && 'code' in data ? (data as { code: unknown }).code : null;
   if (code !== 'FORBIDDEN') return null;
   return err.message === TRAINER_ACCOUNT_ONBOARDING_MESSAGE
-    ? TRAINER_ACCOUNT_ONBOARDING_MESSAGE
-    : NON_ATHLETE_ACCOUNT_ONBOARDING_MESSAGE;
+    ? 'onboarding.trainerAccount'
+    : 'onboarding.otherAccount';
 }
 
-function getSpanishError(message: string): string {
+function onboardingErrorKey(message: string): MessageKey {
   if (message.includes('NOT_FOUND') || message.includes('Sport not available')) {
-    return 'El deporte seleccionado no está disponible';
+    return 'onboarding.sportUnavailable';
   }
-  if (message.includes('Too many requests')) {
-    return 'Demasiados intentos. Espera un momento';
-  }
-  return 'No se pudo crear el perfil. Intenta de nuevo';
+  if (message.includes('Too many requests')) return 'onboarding.tooManyRequests';
+  return 'onboarding.createFailed';
 }
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { locale, t } = useMobileLocalization();
   const utils = trpc.useUtils();
   const sportsQuery = useSports();
   const bootstrap = useBootstrapAthlete();
@@ -64,7 +62,7 @@ export default function OnboardingScreen() {
   const [displayName, setDisplayName] = useState('');
   const [sportId, setSportId] = useState<string | null>(null);
   const [countryCode, setCountryCode] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<MessageKey | null>(null);
 
   const isValid =
     displayName.trim().length >= 2 && sportId !== null && countryCode !== null;
@@ -95,26 +93,26 @@ export default function OnboardingScreen() {
     } catch (err: unknown) {
       console.warn('[bootstrap] failed:', err);
       const message = err instanceof Error ? err.message : String(err);
-      setError(capacityError(err) ?? getSpanishError(message));
+      setError(capacityError(err) ?? onboardingErrorKey(message));
     }
   };
 
   return (
     <KeyboardAwareScrollView className="flex-1 bg-canvas" contentContainerClassName="px-6 pt-14 pb-10">
         <Text className="text-title2 font-bold text-text mb-2">
-          Crea tu perfil de atleta
+          {t('onboarding.title')}
         </Text>
         <Text className="text-body text-muted mb-8">
-          Necesitamos algunos datos básicos para empezar.
+          {t('onboarding.intro')}
         </Text>
 
         {/* Display name */}
         <Text className="text-footnote font-semibold text-text mb-2">
-          Nombre público
+          {t('onboarding.publicName')}
         </Text>
         <TextInput
           className="bg-paper border border-line rounded-lg px-4 py-3 text-body text-text mb-6"
-          placeholder="Ej. Daniela Pérez"
+          placeholder={t('onboarding.namePlaceholder')}
           placeholderTextColor={colors.subtle}
           value={displayName}
           onChangeText={setDisplayName}
@@ -125,7 +123,7 @@ export default function OnboardingScreen() {
 
         {/* Sport */}
         <Text className="text-footnote font-semibold text-text mb-2">
-          Deporte principal
+          {t('onboarding.mainSport')}
         </Text>
         {sportsQuery.isLoading ? (
           <View className="py-6 items-center">
@@ -139,7 +137,7 @@ export default function OnboardingScreen() {
             className="py-3 px-4 bg-paper border border-line rounded-lg mb-6"
           >
             <Text className="text-body text-red-600">
-              No pudimos cargar los deportes. Toca para reintentar.
+              {t('onboarding.sportsLoadFailed')}
             </Text>
           </Pressable>
         ) : (
@@ -165,7 +163,7 @@ export default function OnboardingScreen() {
         )}
 
         {/* Country */}
-        <Text className="text-footnote font-semibold text-text mb-2">País</Text>
+        <Text className="text-footnote font-semibold text-text mb-2">{t('onboarding.country')}</Text>
         <View className="flex-row flex-wrap gap-2 mb-6">
           {COUNTRIES.map(country => {
             const selected = country.code === countryCode;
@@ -179,7 +177,7 @@ export default function OnboardingScreen() {
                 <Text
                   className={`text-body ${selected ? 'text-paper font-semibold' : 'text-text'}`}
                 >
-                  {country.name}
+                  {locale === 'es' ? country.es : country.en}
                 </Text>
               </Pressable>
             );
@@ -187,7 +185,7 @@ export default function OnboardingScreen() {
         </View>
 
         {error !== null ? (
-          <Text className="text-body text-red-600 mb-4">{error}</Text>
+          <Text className="text-body text-red-600 mb-4">{error === null ? null : t(error)}</Text>
         ) : null}
 
         <Pressable
@@ -195,13 +193,13 @@ export default function OnboardingScreen() {
           onPress={handleSubmit}
           disabled={!isValid || isSubmitting}
           accessibilityRole="button"
-          accessibilityLabel="Crear perfil"
+          accessibilityLabel={t('onboarding.createProfile')}
         >
           {isSubmitting ? (
             <ActivityIndicator color={colors.paper} />
           ) : (
             <Text className="text-body-lg font-semibold text-on-ink">
-              Crear perfil
+              {t('onboarding.createProfile')}
             </Text>
           )}
         </Pressable>

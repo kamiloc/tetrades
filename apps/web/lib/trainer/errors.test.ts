@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { translate } from '../translations';
+
 import { needsTrainerCheck, TRAINER_NOTICE_COPY, trainerErrorNotice, type TrainerAction } from './errors';
 
 const ACTIONS: TrainerAction[] = ['load', 'load-athlete', 'invite', 'report-entry', 'decide-certification'];
@@ -51,8 +53,10 @@ describe('trainerErrorNotice', () => {
   });
 
   it('has user-facing copy for every notice, with no codes or ids', () => {
-    for (const copy of Object.values(TRAINER_NOTICE_COPY)) {
-      expect(copy).not.toMatch(/FORBIDDEN|NOT_FOUND|BAD_REQUEST|CONFLICT|[a-z0-9]{25}/);
+    for (const key of Object.values(TRAINER_NOTICE_COPY)) {
+      for (const locale of ['en', 'es'] as const) {
+        expect(translate(locale, key)).not.toMatch(/FORBIDDEN|NOT_FOUND|BAD_REQUEST|CONFLICT|[a-z0-9]{25}/);
+      }
     }
   });
 });

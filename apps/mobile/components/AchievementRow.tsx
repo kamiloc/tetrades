@@ -2,6 +2,7 @@ import { achievementChip, type ChipTone, type VerificationStatusValue } from '@p
 import type { ReactElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { useMobileLocalization } from '../lib/i18n';
 import type { IconName } from '../lib/icons';
 import { Feather } from '../lib/icons';
 import { colors } from '../lib/theme';
@@ -24,6 +25,7 @@ interface AchievementRowProps {
 }
 
 export function AchievementRow({ title, meta, status, last = false, onPress }: AchievementRowProps): ReactElement {
+  const { t } = useMobileLocalization();
   const tile = TILE[achievementChip(status).tone];
   const content = (
     <View className={`flex-row items-center gap-3 px-4 py-3 ${last ? '' : 'border-b border-line'}`}>
@@ -46,8 +48,8 @@ export function AchievementRow({ title, meta, status, last = false, onPress }: A
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${achievementChip(status).accessibilityLabel}`}
-      accessibilityHint="Opens certification options"
+      accessibilityLabel={t('achievement.rowLabel', { title, status: t(`status.${status}.a11y`) })}
+      accessibilityHint={t('common.certificationOptions')}
       style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
     >
       {content}

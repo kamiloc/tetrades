@@ -3,6 +3,9 @@
 import { ApiProvider } from '@packages/api-client';
 import type { ReactNode } from 'react';
 
+import { WebLocalizationProvider } from '../lib/i18n';
+import type { AppLocale } from '../lib/locale-selection';
+
 // Browser API calls go to the same-origin proxy (/api/trpc), which adds the
 // session token on the server (design D3). The browser never holds a token,
 // so getToken always returns null.
@@ -15,10 +18,12 @@ function toSignIn(): void {
   window.location.assign(`/login?next=${encodeURIComponent(here)}`);
 }
 
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({ children, locale }: { children: ReactNode; locale: AppLocale }) {
   return (
-    <ApiProvider apiUrl="/api/trpc" getToken={noToken} onUnauthorized={toSignIn}>
-      {children}
-    </ApiProvider>
+    <WebLocalizationProvider locale={locale}>
+      <ApiProvider apiUrl="/api/trpc" getToken={noToken} onUnauthorized={toSignIn}>
+        {children}
+      </ApiProvider>
+    </WebLocalizationProvider>
   );
 }

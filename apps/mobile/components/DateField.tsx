@@ -2,7 +2,10 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { useState, type ReactElement } from 'react';
 import { Modal, Platform, Pressable, Text, View } from 'react-native';
 
+import { formatDate } from '../lib/format';
+import { useMobileLocalization } from '../lib/i18n';
 import { Feather } from '../lib/icons';
+import { accessibilityLanguageFor } from '../lib/locale-selection';
 import { colors } from '../lib/theme';
 
 import { PillButton } from './PillButton';
@@ -36,8 +39,6 @@ interface DateFieldProps {
   minimumDate?: Date;
   error?: boolean;
   disabled?: boolean;
-  // Display locale and sheet button labels, for screens not yet in English.
-  locale?: string;
   cancelLabel?: string;
   doneLabel?: string;
 }
@@ -48,22 +49,25 @@ export function DateField({
   value,
   onChange,
   label,
-  placeholder = 'Select a date',
+  placeholder,
   maximumDate,
   minimumDate,
   error = false,
   disabled = false,
-  locale = 'en-US',
-  cancelLabel = 'Cancel',
-  doneLabel = 'Done',
+  cancelLabel,
+  doneLabel,
 }: DateFieldProps): ReactElement {
+  const { t, locale } = useMobileLocalization();
+  const placeholderText = placeholder ?? t('common.selectDate');
+  const cancelText = cancelLabel ?? t('common.cancel');
+  const doneText = doneLabel ?? t('common.done');
   const [open, setOpen] = useState(false);
   const selected = fromIsoDate(value);
   const [draft, setDraft] = useState<Date>(selected ?? maximumDate ?? new Date());
 
   const display = selected
-    ? selected.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' })
-    : placeholder;
+    ? formatDate(locale, selected, 'long')
+    : placeholderText;
 
   const onAndroidChange = (event: DateTimePickerEvent, date?: Date): void => {
     setOpen(false);
@@ -79,8 +83,8 @@ export function DateField({
         }}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${selected ? display : placeholder}`}
-        accessibilityHint="Opens a date picker"
+        accessibilityLabel={`${label}: ${selected ? display : placeholderText}`}
+        accessibilityHint={t('common.openDatePicker')}
         className={`min-h-[48px] flex-row items-center justify-between rounded-lg border bg-paper px-4 ${error ? 'border-danger' : 'border-line'}`}
       >
         <Text className={selected ? 'text-body text-text' : 'text-body text-muted'}>{display}</Text>
@@ -99,7 +103,7 @@ export function DateField({
 
       {Platform.OS === 'ios' ? (
         <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-          <Pressable className="flex-1 bg-black/30" onPress={() => setOpen(false)} accessibilityLabel="Close" accessibilityRole="button" />
+          <Pressable className="flex-1 bg-black/30" onPress={() => setOpen(false)} accessibilityLabel={t('common.close')} accessibilityRole="button" />
           <View style={{ backgroundColor: colors.paper, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 34 }}>
             <Text className="mb-2 text-center text-row-title text-text">{label}</Text>
             <DateTimePicker
@@ -112,11 +116,12 @@ export function DateField({
               maximumDate={maximumDate}
               minimumDate={minimumDate}
               accentColor={colors.blue}
+              locale={accessibilityLanguageFor(locale)}
             />
             <View className="mt-2 flex-row justify-end gap-2">
-              <PillButton label={cancelLabel} variant="text" onPress={() => setOpen(false)} />
+              <PillButton label={cancelText} variant="text" onPress={() => setOpen(false)} />
               <PillButton
-                label={doneLabel}
+                label={doneText}
                 onPress={() => {
                   onChange(toIsoDate(draft));
                   setOpen(false);

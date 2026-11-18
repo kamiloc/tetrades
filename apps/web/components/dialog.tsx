@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
+import { useWebLocalization } from '../lib/i18n';
+
 import { focusRing } from './focus';
 import { Icon } from './icon';
 
@@ -28,6 +30,7 @@ export function Dialog({
   footer,
   width = 'md',
 }: DialogProps) {
+  const { t } = useWebLocalization();
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const titleId = useId();
@@ -87,7 +90,7 @@ export function Dialog({
             </div>
             <button
               type="button"
-              aria-label="Close"
+              aria-label={t('common.close')}
               onClick={onClose}
               className={`inline-flex h-[30px] w-[30px] items-center justify-center rounded-[8px] border border-line bg-paper text-muted hover:text-text ${focusRing}`}
             >

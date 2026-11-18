@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
+import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 
 import { Providers } from '../components/providers';
+import { resolveAcceptLanguage } from '../lib/locale-selection';
+import { getServerLocalization } from '../lib/server-i18n';
 
 import './globals.css';
 
@@ -10,18 +13,17 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
 
-export const metadata: Metadata = {
-  title: 'The Athlete Passport',
-  description: 'Verifiable athletic records',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getServerLocalization();
+  return { title: t('common.appTitle'), description: t('common.appDescription') };
+}
 
-// The document root stays `es`; each portal layout sets `lang="en"` on its
-// own root because portal copy follows the English handoff (design D5).
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const locale = resolveAcceptLanguage((await headers()).get('accept-language'));
   return (
-    <html lang="es" className={`${inter.variable} ${mono.variable}`}>
+    <html lang={locale} className={`${inter.variable} ${mono.variable}`}>
       <body>
-        <Providers>{children}</Providers>
+        <Providers locale={locale}>{children}</Providers>
       </body>
     </html>
   );

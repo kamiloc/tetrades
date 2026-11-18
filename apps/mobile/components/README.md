@@ -21,9 +21,13 @@ Shared UI for the signed-in app and sign-in screen, built from the design handof
 | `MSegmented` | Segmented control (radio group) for ranges and audiences | `segmented`, `rounded-segmented`, `paper` |
 | `SpeedChart` | SVG line and area chart for one metric's entries; handles 0, 1, or many points | `blue`, `blue-tint`, `line` |
 | `AuthButton` | Email sign-in button. The only provider: Apple and Google are intentionally not built (AGENTS.md: Magic Link + OTP only) | `blue`, CTA glow |
-| `DateField` | Native date picker behind a field-styled button (Android dialog, iOS inline sheet). Value is `YYYY-MM-DD`. `locale`/button-label props for screens not yet in English. `toIsoDate`, `fromIsoDate` helpers | `line`, `danger`, `paper` |
+| `DateField` | Native date picker behind a field-styled button (Android dialog, iOS inline sheet). Value is `YYYY-MM-DD`. Display date, iOS calendar, and button labels follow the app locale; button labels can be overridden. `toIsoDate`, `fromIsoDate` helpers | `line`, `danger`, `paper` |
 | `KeyboardAwareScrollView` | ScrollView that pads by the keyboard overlap and scrolls the focused input into view (iOS and Android edge-to-edge, built-in APIs). `useKeyboardOverlap` for bottom sheets | none |
 | `Toast` | `ToastProvider` (mounted in `app/_layout.tsx`), `useToast()` → `success(msg)` / `error(msg)`, and `ToastViewport`. Shows at the bottom, above the tab bar (root) or the keyboard. Add a `ToastViewport` inside any RN `Modal` or native modal screen that can show a toast. Auto-dismisses; announced to screen readers | `ink` (success), `danger-*` (error), `shadow.ink` |
 | `spinner` (default export) | Full-screen activity indicator | `canvas` |
 
 Icons come from `lib/icons.tsx` (`Feather`, backed by `@expo/vector-icons`). Add a name to `IconName` before using a new icon.
+
+## Localization
+
+Mobile interface copy lives in `apps/mobile/lib/translations.ts`. Add each message key to the English catalog first; the Spanish catalog must implement the same key and message shape. Use `{name}` placeholders for values and `one`/`other` forms for count messages. Components read the selected locale and `t` function from `useMobileLocalization()` in `apps/mobile/lib/i18n.tsx`; format dates and numbers with `lib/format.ts` (`formatDate`, `formatNumber`, `formatMetric`) using that locale, never a hardcoded locale tag; number values passed to `t` are formatted automatically, and user-facing native content should preserve the matching accessibility language.

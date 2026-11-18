@@ -40,10 +40,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   return (
     <PortalShell
-      role="Admin portal"
+      role="portal.admin"
       tone="blue"
       sections={ADMIN_SECTIONS}
-      user={{ email: user.email ?? 'Admin', sub: 'Platform admin' }}
+      user={{ email: user.email, sub: 'portal.platformAdmin', fallback: 'portal.adminFallback' }}
     >
       {children}
     </PortalShell>

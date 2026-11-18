@@ -20,15 +20,18 @@ import {
 import { DateField, fromIsoDate } from '../../components/DateField';
 import { KeyboardAwareScrollView } from '../../components/KeyboardAwareScrollView';
 import { ToastViewport, useToast } from '../../components/Toast';
+import { useMobileLocalization } from '../../lib/i18n';
+import type { MessageKey } from '../../lib/translations';
 
-function getSpanishError(message: string): string {
-  if (message.includes('FORBIDDEN')) return 'No tienes permiso para editar este perfil';
-  if (message.includes('NOT_FOUND')) return 'Perfil no encontrado';
-  if (message.includes('Too many requests')) return 'Demasiados intentos. Espera un momento';
-  return 'No se pudo guardar. Por favor intenta de nuevo';
+function saveErrorKey(message: string): MessageKey {
+  if (message.includes('FORBIDDEN')) return 'profileEdit.forbidden';
+  if (message.includes('NOT_FOUND')) return 'profileEdit.notFound';
+  if (message.includes('Too many requests')) return 'profileEdit.tooManyRequests';
+  return 'profileEdit.saveFailed';
 }
 
 export default function ProfileEditScreen() {
+  const { t } = useMobileLocalization();
   const router = useRouter();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -96,35 +99,35 @@ export default function ProfileEditScreen() {
     if (heightCm !== '') {
       const h = parseInt(heightCm, 10);
       if (isNaN(h) || h < 100 || h > 250) {
-        newErrors['heightCm'] = 'Estatura válida: 100–250 cm';
+        newErrors['heightCm'] = t('profileEdit.heightRange');
       }
     }
 
     if (weightKg !== '') {
       const w = parseFloat(weightKg);
       if (isNaN(w) || w < 30 || w > 300) {
-        newErrors['weightKg'] = 'Peso válido: 30–300 kg';
+        newErrors['weightKg'] = t('profileEdit.weightRange');
       }
     }
 
     if (exactDob !== '') {
       const dob = fromIsoDate(exactDob);
-      if (!dob) newErrors['exactDob'] = 'Selecciona una fecha válida';
-      else if (dob > new Date()) newErrors['exactDob'] = 'La fecha no puede ser futura';
+      if (!dob) newErrors['exactDob'] = t('profileEdit.dobInvalid');
+      else if (dob > new Date()) newErrors['exactDob'] = t('profileEdit.dobFuture');
     }
 
     if (contactEmail !== '' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail)) {
-      newErrors['contactEmail'] = 'Ingresa un correo electrónico válido';
+      newErrors['contactEmail'] = t('auth.invalidEmail');
     } else if (contactEmail.length > 254) {
-      newErrors['contactEmail'] = 'El correo no puede superar 254 caracteres';
+      newErrors['contactEmail'] = t('profileEdit.emailTooLong');
     }
 
     if (contactPhone !== '' && (contactPhone.length < 7 || contactPhone.length > 20)) {
-      newErrors['contactPhone'] = 'Ingresa un teléfono válido (7–20 caracteres)';
+      newErrors['contactPhone'] = t('profileEdit.phoneInvalid');
     }
 
     if (govId !== '' && (govId.length < 5 || govId.length > 30)) {
-      newErrors['govId'] = 'Ingresa un número de identificación válido (5–30 caracteres)';
+      newErrors['govId'] = t('profileEdit.govIdInvalid');
     }
 
     setErrors(newErrors);
@@ -170,11 +173,11 @@ export default function ProfileEditScreen() {
       await queryClient.invalidateQueries({ queryKey: [['athlete', 'getMyAthlete']] });
       setIsPublicDirty(false);
       setIsPrivateDirty(false);
-      toast.success('Perfil guardado');
+      toast.success(t('profileEdit.saved'));
       router.back();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error desconocido';
-      const saveError = getSpanishError(message);
+      const message = err instanceof Error ? err.message : '';
+      const saveError = t(saveErrorKey(message));
       setErrors({ save: saveError });
       toast.error(saveError);
     } finally {
@@ -205,16 +208,16 @@ export default function ProfileEditScreen() {
         )}
 
         {/* ── SECCIÓN PÚBLICA ─────────────────────────────────────── */}
-        <Text className="text-body font-bold text-text mb-3">Perfil público</Text>
+        <Text className="text-body font-bold text-text mb-3">{t('profileEdit.publicSection')}</Text>
 
         {/* Biografía */}
         <View className="mb-5">
-          <Text className="text-body font-medium text-text mb-1">Biografía</Text>
+          <Text className="text-body font-medium text-text mb-1">{t('profileEdit.bio')}</Text>
           <TextInput
             value={publicBio}
             onChangeText={setPublic(setPublicBio)}
             className="border border-line rounded-xl px-4 py-3 text-text bg-paper text-base"
-            placeholder="Cuéntanos sobre ti como deportista..."
+            placeholder={t('profileEdit.bioPlaceholder')}
             placeholderTextColor="#6B7280"
             multiline
             numberOfLines={3}
@@ -224,12 +227,12 @@ export default function ProfileEditScreen() {
 
         {/* Ciudad */}
         <View className="mb-5">
-          <Text className="text-body font-medium text-text mb-1">Ciudad</Text>
+          <Text className="text-body font-medium text-text mb-1">{t('profileEdit.city')}</Text>
           <TextInput
             value={city}
             onChangeText={setPublic(setCity)}
             className="border border-line rounded-xl px-4 py-3 text-text bg-paper text-base"
-            placeholder="Ej: Bogotá"
+            placeholder={t('profileEdit.cityPlaceholder')}
             placeholderTextColor="#6B7280"
             returnKeyType="next"
           />
@@ -237,12 +240,12 @@ export default function ProfileEditScreen() {
 
         {/* Posición principal */}
         <View className="mb-5">
-          <Text className="text-body font-medium text-text mb-1">Posición principal</Text>
+          <Text className="text-body font-medium text-text mb-1">{t('profileEdit.position')}</Text>
           <TextInput
             value={primaryPosition}
             onChangeText={setPublic(setPrimaryPosition)}
             className="border border-line rounded-xl px-4 py-3 text-text bg-paper text-base"
-            placeholder="Ej: Delantero, Portero, Defensa..."
+            placeholder={t('profileEdit.positionPlaceholder')}
             placeholderTextColor="#6B7280"
             returnKeyType="next"
           />
@@ -251,14 +254,14 @@ export default function ProfileEditScreen() {
         {/* Altura y Peso — side by side */}
         <View className="flex-row gap-3 mb-5">
           <View className="flex-1">
-            <Text className="text-body font-medium text-text mb-1">Altura (cm)</Text>
+            <Text className="text-body font-medium text-text mb-1">{t('profileEdit.height')}</Text>
             <TextInput
               value={heightCm}
               onChangeText={setPublic(setHeightCm)}
               className={`border rounded-xl px-4 py-3 text-text bg-paper text-base ${
                 errors['heightCm'] !== undefined ? 'border-red-400' : 'border-line'
               }`}
-              placeholder="Ej: 175"
+              placeholder={t('profileEdit.heightPlaceholder')}
               placeholderTextColor="#6B7280"
               keyboardType="number-pad"
               returnKeyType="next"
@@ -268,14 +271,14 @@ export default function ProfileEditScreen() {
             )}
           </View>
           <View className="flex-1">
-            <Text className="text-body font-medium text-text mb-1">Peso (kg)</Text>
+            <Text className="text-body font-medium text-text mb-1">{t('profileEdit.weight')}</Text>
             <TextInput
               value={weightKg}
               onChangeText={setPublic(setWeightKg)}
               className={`border rounded-xl px-4 py-3 text-text bg-paper text-base ${
                 errors['weightKg'] !== undefined ? 'border-red-400' : 'border-line'
               }`}
-              placeholder="Ej: 70"
+              placeholder={t('profileEdit.weightPlaceholder')}
               placeholderTextColor="#6B7280"
               keyboardType="decimal-pad"
               returnKeyType="next"
@@ -289,9 +292,9 @@ export default function ProfileEditScreen() {
         {/* Visible en búsquedas */}
         <View className="flex-row items-center justify-between bg-paper border border-line rounded-xl px-4 py-3 mb-8">
           <View className="flex-1 mr-3">
-            <Text className="text-body font-medium text-text">Visible en búsquedas</Text>
+            <Text className="text-body font-medium text-text">{t('profileEdit.searchable')}</Text>
             <Text className="text-caption text-muted mt-0.5">
-              Otros deportistas pueden encontrarte
+              {t('profileEdit.searchableHint')}
             </Text>
           </View>
           <Switch
@@ -303,24 +306,21 @@ export default function ProfileEditScreen() {
         </View>
 
         {/* ── SECCIÓN PRIVADA ─────────────────────────────────────── */}
-        <Text className="text-body font-bold text-text mb-3">Datos privados</Text>
+        <Text className="text-body font-bold text-text mb-3">{t('profileEdit.privateSection')}</Text>
         <Text className="text-caption text-muted mb-4">
-          Solo tú puedes ver esta información. Se guarda cifrada.
+          {t('profileEdit.privateHint')}
         </Text>
 
         {/* Fecha de nacimiento */}
         <View className="mb-5">
-          <Text className="text-body font-medium text-text mb-1">Fecha de nacimiento</Text>
+          <Text className="text-body font-medium text-text mb-1">{t('profileEdit.dob')}</Text>
           <DateField
-            label="Fecha de nacimiento"
-            placeholder="Selecciona tu fecha de nacimiento"
+            label={t('profileEdit.dob')}
+            placeholder={t('profileEdit.dobPlaceholder')}
             value={exactDob}
             onChange={setPrivate(setExactDob)}
             maximumDate={new Date()}
             error={errors['exactDob'] !== undefined}
-            locale="es-CO"
-            cancelLabel="Cancelar"
-            doneLabel="Listo"
           />
           {errors['exactDob'] !== undefined && (
             <Text className="text-red-500 text-xs mt-1">{errors['exactDob']}</Text>
@@ -329,14 +329,14 @@ export default function ProfileEditScreen() {
 
         {/* Correo de contacto */}
         <View className="mb-5">
-          <Text className="text-body font-medium text-text mb-1">Correo de contacto</Text>
+          <Text className="text-body font-medium text-text mb-1">{t('profileEdit.contactEmail')}</Text>
           <TextInput
             value={contactEmail}
             onChangeText={setPrivate(setContactEmail)}
             className={`border rounded-xl px-4 py-3 text-text bg-paper text-base ${
               errors['contactEmail'] !== undefined ? 'border-red-400' : 'border-line'
             }`}
-            placeholder="tu@correo.com"
+            placeholder={t('auth.emailPlaceholder')}
             placeholderTextColor="#6B7280"
             keyboardType="email-address"
             autoCapitalize="none"
@@ -349,14 +349,14 @@ export default function ProfileEditScreen() {
 
         {/* Teléfono de contacto */}
         <View className="mb-5">
-          <Text className="text-body font-medium text-text mb-1">Teléfono de contacto</Text>
+          <Text className="text-body font-medium text-text mb-1">{t('profileEdit.contactPhone')}</Text>
           <TextInput
             value={contactPhone}
             onChangeText={setPrivate(setContactPhone)}
             className={`border rounded-xl px-4 py-3 text-text bg-paper text-base ${
               errors['contactPhone'] !== undefined ? 'border-red-400' : 'border-line'
             }`}
-            placeholder="Ej: +57 300 123 4567"
+            placeholder={t('profileEdit.phonePlaceholder')}
             placeholderTextColor="#6B7280"
             keyboardType="phone-pad"
             returnKeyType="next"
@@ -368,14 +368,14 @@ export default function ProfileEditScreen() {
 
         {/* Número de identificación */}
         <View className="mb-5">
-          <Text className="text-body font-medium text-text mb-1">Número de identificación</Text>
+          <Text className="text-body font-medium text-text mb-1">{t('profileEdit.govId')}</Text>
           <TextInput
             value={govId}
             onChangeText={setPrivate(setGovId)}
             className={`border rounded-xl px-4 py-3 text-text bg-paper text-base ${
               errors['govId'] !== undefined ? 'border-red-400' : 'border-line'
             }`}
-            placeholder="Ej: 1234567890"
+            placeholder={t('profileEdit.govIdPlaceholder')}
             placeholderTextColor="#6B7280"
             returnKeyType="done"
           />
@@ -393,7 +393,7 @@ export default function ProfileEditScreen() {
         >
           {isSaving
             ? <ActivityIndicator color="#ffffff" />
-            : <Text className="text-white font-semibold text-base">Guardar cambios</Text>
+            : <Text className="text-white font-semibold text-base">{t('profileEdit.save')}</Text>
           }
         </Pressable>
     </KeyboardAwareScrollView>

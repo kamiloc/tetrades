@@ -17,26 +17,40 @@ import { TopBar } from '../../../../../../../components/portal-shell';
 import { EmptyState, ErrorState, LoadingState } from '../../../../../../../components/states';
 import { StatusChip } from '../../../../../../../components/status-chip';
 import { Table, type Column } from '../../../../../../../components/table';
-import { formatDate } from '../../../../../../../lib/format';
+import { formatDate, formatNumber } from '../../../../../../../lib/format';
+import { useWebLocalization } from '../../../../../../../lib/i18n';
+import type { AppLocale } from '../../../../../../../lib/locale-selection';
 import { trainerErrorNotice } from '../../../../../../../lib/trainer/errors';
 import {
   useCurrentClub,
   useMetricCatalog,
   useRefreshOnLostAccess,
 } from '../../../../../../../lib/trainer/use-trainer';
+import type { MessageKey, MessageValues } from '../../../../../../../lib/translations';
 import { LoadMore } from '../../../../_components/load-more';
 
 import { LogMetricDialog } from './log-metric-dialog';
 
-const NUMBER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
+type Translate = (key: MessageKey, values?: MessageValues) => string;
 
-function valueWithUnit(value: number, definition: MetricDefinitionPublicOutput | undefined): string {
-  return definition ? `${NUMBER.format(value)} ${definition.unit}` : NUMBER.format(value);
+function valueWithUnit(
+  locale: AppLocale,
+  t: Translate,
+  value: number,
+  definition: MetricDefinitionPublicOutput | undefined,
+): string {
+  const number = formatNumber(locale, value, 3);
+  return definition ? t('athlete.valueWithUnit', { value: number, unit: definition.unit }) : number;
 }
 
 /** "Reported by <club>" for this club's entries, "another club" otherwise (design D5). */
-export function entryAttribution(entry: Pick<AthleteMetricEntryOutput, 'clubId'>, clubId: string, clubName: string): string {
-  return entry.clubId === clubId ? `Reported by ${clubName}` : 'Reported by another club';
+export function entryAttribution(
+  entry: Pick<AthleteMetricEntryOutput, 'clubId'>,
+  clubId: string,
+  clubName: string,
+  t: Translate,
+): string {
+  return entry.clubId === clubId ? t('athlete.reportedByClub', { club: clubName }) : t('athlete.reportedByOther');
 }
 
 function SummaryCard({
@@ -46,24 +60,25 @@ function SummaryCard({
   summary: AthleteMetricSummaryOutput;
   definition: MetricDefinitionPublicOutput | undefined;
 }) {
+  const { locale, t } = useWebLocalization();
   return (
     <li className="flex min-w-0 flex-col gap-2 rounded-[12px] border border-line bg-paper2 p-3.5">
-      <p className="truncate text-[12px] font-semibold text-muted">{definition?.name ?? 'Retired metric'}</p>
+      <p className="truncate text-[12px] font-semibold text-muted">{definition?.name ?? t('athlete.retiredMetric')}</p>
       <dl className="grid grid-cols-2 gap-2 text-[12px]">
         <div>
-          <dt className="text-subtle">Latest</dt>
-          <dd className="text-[15px] font-bold text-text">{valueWithUnit(summary.latestValue, definition)}</dd>
-          <dd className="text-muted">{formatDate(summary.latestMeasuredAt)}</dd>
+          <dt className="text-subtle">{t('athlete.latest')}</dt>
+          <dd className="text-[15px] font-bold text-text">{valueWithUnit(locale, t, summary.latestValue, definition)}</dd>
+          <dd className="text-muted">{formatDate(locale, summary.latestMeasuredAt)}</dd>
         </div>
         <div>
-          <dt className="text-subtle">Best</dt>
+          <dt className="text-subtle">{t('athlete.best')}</dt>
           {summary.bestValue !== null && summary.bestMeasuredAt !== null ? (
             <>
-              <dd className="text-[15px] font-bold text-text">{valueWithUnit(summary.bestValue, definition)}</dd>
-              <dd className="text-muted">{formatDate(summary.bestMeasuredAt)}</dd>
+              <dd className="text-[15px] font-bold text-text">{valueWithUnit(locale, t, summary.bestValue, definition)}</dd>
+              <dd className="text-muted">{formatDate(locale, summary.bestMeasuredAt)}</dd>
             </>
           ) : (
-            <dd className="text-muted">No best for this metric</dd>
+            <dd className="text-muted">{t('athlete.noBest')}</dd>
           )}
         </div>
       </dl>
@@ -84,6 +99,7 @@ function ActiveMemberMetrics({
   definitions: Map<string, MetricDefinitionPublicOutput>;
   onLog: () => void;
 }) {
+  const { locale, t } = useWebLocalization();
   const summaries = trpc.metric.getSummaries.useQuery({ athleteId: athlete.id });
   const entries = trpc.metric.listEntries.useInfiniteQuery(
     { athleteId: athlete.id, take: 20 },
@@ -93,26 +109,26 @@ function ActiveMemberMetrics({
 
   const columns: Column<AthleteMetricEntryOutput>[] = [
     {
-      header: 'Metric',
+      header: t('athlete.colMetric'),
       className: 'w-[32%]',
-      cell: (e) => <span className="font-semibold">{definitions.get(e.metricDefinitionId)?.name ?? 'Retired metric'}</span>,
+      cell: (e) => <span className="font-semibold">{definitions.get(e.metricDefinitionId)?.name ?? t('athlete.retiredMetric')}</span>,
     },
-    { header: 'Value', cell: (e) => valueWithUnit(e.value, definitions.get(e.metricDefinitionId)) },
-    { header: 'Measured', cell: (e) => <span className="text-muted">{formatDate(e.measuredAt)}</span> },
-    { header: 'Reported by', cell: (e) => <span className="text-muted">{entryAttribution(e, clubId, clubName)}</span> },
+    { header: t('athlete.colValue'), cell: (e) => valueWithUnit(locale, t, e.value, definitions.get(e.metricDefinitionId)) },
+    { header: t('athlete.colMeasured'), cell: (e) => <span className="text-muted">{formatDate(locale, e.measuredAt)}</span> },
+    { header: t('athlete.colReportedBy'), cell: (e) => <span className="text-muted">{entryAttribution(e, clubId, clubName, t)}</span> },
   ];
 
   return (
     <>
-      <Panel title="Summaries">
+      <Panel title={t('athlete.summaries')}>
         {summaries.isPending ? (
-          <LoadingState label="Loading summaries…" />
+          <LoadingState label={t('athlete.summariesLoading')} />
         ) : summaries.isError ? (
-          <ErrorState title="We couldn't load the summaries" onRetry={() => void summaries.refetch()} />
+          <ErrorState title={t('athlete.summariesLoadFailed')} onRetry={() => void summaries.refetch()} />
         ) : summaries.data.length === 0 ? (
-          <p className="text-[13px] text-muted">No summaries yet. They appear after the first entry.</p>
+          <p className="text-[13px] text-muted">{t('athlete.noSummaries')}</p>
         ) : (
-          <ul aria-label="Metric summaries" className="grid grid-cols-2 gap-3 xl:grid-cols-3">
+          <ul aria-label={t('athlete.summariesLabel')} className="grid grid-cols-2 gap-3 xl:grid-cols-3">
             {summaries.data.map((summary) => (
               <SummaryCard
                 key={summary.metricDefinitionId}
@@ -125,27 +141,27 @@ function ActiveMemberMetrics({
       </Panel>
 
       {entries.isPending ? (
-        <LoadingState label="Loading entries…" />
+        <LoadingState label={t('athlete.entriesLoading')} />
       ) : entries.isError ? (
-        <ErrorState title="We couldn't load the entries" onRetry={() => void entries.refetch()} />
+        <ErrorState title={t('athlete.entriesLoadFailed')} onRetry={() => void entries.refetch()} />
       ) : (
         <>
           <Table
-            caption={`Metric entries of ${athlete.displayName}, newest first`}
+            caption={t('athlete.entriesCaption', { athlete: athlete.displayName })}
             columns={columns}
             rows={rows}
             rowKey={(e) => e.id}
             empty={
               <EmptyState
                 icon="flag"
-                title="No metrics yet"
+                title={t('athlete.noMetrics')}
                 action={
                   <Button variant="primary" icon="plus" onClick={onLog}>
-                    Log metric
+                    {t('athlete.logMetric')}
                   </Button>
                 }
               >
-                Log this athlete&apos;s first measurement.
+                {t('athlete.firstMeasurement')}
               </EmptyState>
             }
           />
@@ -161,8 +177,9 @@ function ActiveMemberMetrics({
 }
 
 export function AthleteView({ clubId, athleteId }: { clubId: string; athleteId: string }) {
+  const { t } = useWebLocalization();
   const { club } = useCurrentClub(clubId);
-  const clubName = club?.name ?? 'this club';
+  const clubName = club?.name ?? t('roster.thisClub');
   const member = useRosterAthlete({ clubId, athleteId });
   const lostAccess = useRefreshOnLostAccess(member.error, 'load-athlete');
   const active = member.data?.status === 'ACTIVE';
@@ -176,17 +193,17 @@ export function AthleteView({ clubId, athleteId }: { clubId: string; athleteId: 
 
   const rosterHref = `/trainer/clubs/${clubId}/athletes`;
   const crumbs = (label: string) => [
-    { label: club?.name ?? 'Club', href: rosterHref },
-    { label: 'Athletes', href: rosterHref },
+    { label: club?.name ?? t('trainer.clubLabel'), href: rosterHref },
+    { label: t('nav.athletes'), href: rosterHref },
     { label },
   ];
 
   if (member.isPending || lostAccess) {
     return (
       <>
-        <TopBar crumbs={crumbs('Athlete')} />
+        <TopBar crumbs={crumbs(t('common.athlete'))} />
         <PageBody>
-          <LoadingState label="Loading athlete…" />
+          <LoadingState label={t('athlete.loading')} />
         </PageBody>
       </>
     );
@@ -197,23 +214,22 @@ export function AthleteView({ clubId, athleteId }: { clubId: string; athleteId: 
       trainerErrorNotice(getApiErrorCode(member.error), null, 'load-athlete').kind === 'athlete-not-found';
     return (
       <>
-        <TopBar crumbs={crumbs(notFound ? 'Not found' : 'Athlete')} />
+        <TopBar crumbs={crumbs(notFound ? t('admin.notFound') : t('common.athlete'))} />
         <PageBody>
           {notFound ? (
             <EmptyState
               icon="users"
-              title="Athlete not found"
+              title={t('athlete.notFoundTitle')}
               action={
                 <Link href={rosterHref} className={buttonClasses('secondary')}>
-                  Back to athletes
+                  {t('athlete.backToAthletes')}
                 </Link>
               }
             >
-              This athlete isn&apos;t on the club&apos;s roster. Their membership may have ended,
-              or the link is wrong.
+              {t('athlete.notFoundBody')}
             </EmptyState>
           ) : (
-            <ErrorState title="We couldn't load this athlete" onRetry={() => void member.refetch()} />
+            <ErrorState title={t('athlete.loadFailed')} onRetry={() => void member.refetch()} />
           )}
         </PageBody>
       </>
@@ -223,7 +239,7 @@ export function AthleteView({ clubId, athleteId }: { clubId: string; athleteId: 
   const { athlete } = member.data;
   const logButton = active ? (
     <Button variant="primary" icon="plus" onClick={() => setLogging(true)} disabled={catalog.isPending}>
-      Log metric
+      {t('athlete.logMetric')}
     </Button>
   ) : undefined;
 
@@ -235,14 +251,14 @@ export function AthleteView({ clubId, athleteId }: { clubId: string; athleteId: 
           title={athlete.displayName}
           sub={
             <span className="inline-flex items-center gap-2">
-              @{athlete.slug} · {athlete.sport.name}
+              {t('common.handleSport', { handle: athlete.slug, sport: athlete.sport.name })}
               <StatusChip status={active ? 'active' : 'waitingAthlete'} />
             </span>
           }
         />
         {logged ? (
-          <InlineAlert tone="success" title="Metric logged">
-            {logged} was added to {athlete.displayName}&apos;s entries.
+          <InlineAlert tone="success" title={t('athlete.loggedTitle')}>
+            {t('athlete.loggedBody', { entry: logged, athlete: athlete.displayName })}
           </InlineAlert>
         ) : null}
         {active ? (
@@ -254,9 +270,8 @@ export function AthleteView({ clubId, athleteId }: { clubId: string; athleteId: 
             onLog={() => setLogging(true)}
           />
         ) : (
-          <InlineAlert tone="info" title="Waiting for the athlete to confirm">
-            You invited {athlete.displayName} to {clubName}. Until they confirm, you can&apos;t see
-            or log their metrics.
+          <InlineAlert tone="info" title={t('athlete.waitingTitle')}>
+            {t('athlete.waitingBody', { athlete: athlete.displayName, club: clubName })}
           </InlineAlert>
         )}
       </PageBody>

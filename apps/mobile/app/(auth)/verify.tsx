@@ -12,11 +12,13 @@ import { KeyboardAwareScrollView } from '../../components/KeyboardAwareScrollVie
 import { PillButton } from '../../components/PillButton'
 import { sendLoginMagicLink } from '../../lib/auth-actions'
 import { authErrorMessage } from '../../lib/auth-errors'
+import { useMobileLocalization } from '../../lib/i18n'
 import { Feather } from '../../lib/icons'
 import { colors } from '../../lib/theme'
 
 export default function VerifyScreen() {
   const router = useRouter()
+  const { locale, t } = useMobileLocalization()
   const rawParams = useLocalSearchParams<{ email?: string }>()
   const email: string | undefined = Array.isArray(rawParams.email)
     ? (rawParams.email[0] ?? undefined)
@@ -60,7 +62,7 @@ export default function VerifyScreen() {
     const { error: verifyError } = await verifyOtp(email, code)
     setIsLoading(false)
     if (verifyError !== null) {
-      setError(authErrorMessage(verifyError))
+      setError(authErrorMessage(verifyError, locale))
       setCode('')
       return
     }
@@ -79,7 +81,7 @@ export default function VerifyScreen() {
     } catch (error: unknown) {
       setIsLoading(false)
       const message = error instanceof Error ? error.message : ''
-      setError(authErrorMessage(message))
+      setError(authErrorMessage(message, locale))
       return
     }
     setIsLoading(false)
@@ -102,18 +104,18 @@ export default function VerifyScreen() {
           onPress={() => router.back()}
           className="min-h-[44px] flex-row items-center gap-1 pr-4"
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t('common.back')}
         >
           <Feather name="chevron-left" size={20} color={colors.blue} />
-          <Text className="text-body-lg text-blue">Back</Text>
+          <Text className="text-body-lg text-blue">{t('common.back')}</Text>
         </Pressable>
       </View>
 
       <Text accessibilityRole="header" className="mb-2 text-title2 font-bold text-text">
-        Check your email
+        {t('auth.checkEmail')}
       </Text>
-      <Text className="mb-1 text-body text-muted">We sent a link and a code to {email}</Text>
-      <Text className="mb-8 text-footnote text-subtle">Enter the 6-digit code from the email.</Text>
+      <Text className="mb-1 text-body text-muted">{t('auth.sentLinkAndCode', { email })}</Text>
+      <Text className="mb-8 text-footnote text-subtle">{t('auth.enterSixDigitCode')}</Text>
 
       {/* OTP input */}
       <TextInput
@@ -123,7 +125,7 @@ export default function VerifyScreen() {
         autoFocus
         placeholder="000000"
         placeholderTextColor={colors.subtle}
-        accessibilityLabel="Verification code"
+        accessibilityLabel={t('auth.verificationCode')}
         value={code}
         onChangeText={setCode}
         onSubmitEditing={handleVerify}
@@ -138,7 +140,7 @@ export default function VerifyScreen() {
       ) : null}
 
       <PillButton
-        label="Verify code"
+        label={t('auth.verifyCode')}
         onPress={() => { void handleVerify(); }}
         disabled={verifyDisabled}
         loading={isLoading}
@@ -147,21 +149,21 @@ export default function VerifyScreen() {
 
       {/* Resend section */}
       <View className="mb-4 mt-8 items-center">
-        <Text className="mb-2 text-body text-muted">Didn't get the code?</Text>
+        <Text className="mb-2 text-body text-muted">{t('auth.didntGetCode')}</Text>
         <Pressable
           onPress={handleResend}
           disabled={resendDisabled}
           accessibilityRole="button"
-          accessibilityLabel={cooldown > 0 ? `Resend in ${cooldown} seconds` : 'Resend code'}
+          accessibilityLabel={cooldown > 0 ? t('auth.resendCountdown', { count: cooldown }) : t('auth.resendCode')}
           className="min-h-[44px] justify-center"
         >
           <Text className={`text-body font-semibold ${resendDisabled ? 'text-subtle' : 'text-blue'}`}>
-            {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+            {cooldown > 0 ? t('auth.resendShort', { count: cooldown }) : t('auth.resendCode')}
           </Text>
         </Pressable>
       </View>
 
-      <Text className="text-center text-small text-subtle">You can also open the link we emailed you.</Text>
+      <Text className="text-center text-small text-subtle">{t('auth.openEmailLink')}</Text>
     </KeyboardAwareScrollView>
   )
 }

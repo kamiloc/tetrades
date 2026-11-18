@@ -5,6 +5,7 @@ import { focusRing } from '../../../../../components/focus';
 import { Icon } from '../../../../../components/icon';
 import { PageBody, PageHeader } from '../../../../../components/layout';
 import { TopBar } from '../../../../../components/portal-shell';
+import { getServerLocalization } from '../../../../../lib/server-i18n';
 import { clubRosterPath } from '../../../../../lib/trainer/landing';
 import { loadMyTrainerClubs } from '../../../../../lib/trainer/my-clubs';
 import { LoadFailed } from '../../_components/load-failed';
@@ -14,14 +15,14 @@ export const dynamic = 'force-dynamic';
 
 // The club picker for a trainer of several clubs.
 export default async function TrainerClubsPage() {
-  const result = await loadMyTrainerClubs();
+  const [result, { t }] = await Promise.all([loadMyTrainerClubs(), getServerLocalization()]);
   if (result.status === 'signed-out') redirect('/login');
 
   return (
     <>
-      <TopBar crumbs={[{ label: 'Trainer portal', href: '/trainer' }, { label: 'Clubs' }]} />
+      <TopBar crumbs={[{ label: t('portal.trainer'), href: '/trainer' }, { label: t('nav.clubs') }]} />
       <PageBody>
-        <PageHeader title="Your clubs" sub="Choose a club to see its athletes." />
+        <PageHeader title={t('trainer.yourClubs')} sub={t('trainer.chooseClub')} />
         {result.status !== 'ok' ? (
           <LoadFailed />
         ) : result.clubs.length === 0 ? (

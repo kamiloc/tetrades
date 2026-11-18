@@ -23,8 +23,8 @@ describe('InviteInstructions', () => {
     expect(text).toContain('No email is sent');
     expect(text).toContain('valentina.rios@example.co');
     expect(text).toContain('https://portal.example.co/trainer/invitations');
-    expect(text).toContain(formatDateTime(EXPIRES));
-    expect(formatDateTime(EXPIRES)).toMatch(/Nov 1[67], 2026/);
+    expect(text).toContain(formatDateTime('en', EXPIRES));
+    expect(formatDateTime('en', EXPIRES)).toMatch(/Nov 1[67], 2026/);
     expect(screen.getByLabelText('Trainer invitations link')).toHaveProperty(
       'value',
       'https://portal.example.co/trainer/invitations',

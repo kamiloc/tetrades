@@ -4,10 +4,12 @@ import { ActivityIndicator, View } from 'react-native'
 
 import { verifyMagicLinkCallback } from '../../lib/auth-actions'
 import { authClient } from '../../lib/auth-client'
+import { useMobileLocalization } from '../../lib/i18n'
 import { colors } from '../../lib/theme'
 
 export default function CallbackScreen() {
   const router = useRouter()
+  const { t } = useMobileLocalization()
   const rawParams = useLocalSearchParams<{
     token_hash?: string
     type?: string
@@ -41,7 +43,7 @@ export default function CallbackScreen() {
 
   return (
     <View className="flex-1 items-center justify-center bg-ink">
-      <ActivityIndicator color={colors.blue} accessibilityLabel="Signing you in" />
+      <ActivityIndicator color={colors.blue} accessibilityLabel={t('auth.signingIn')} />
     </View>
   )
 }

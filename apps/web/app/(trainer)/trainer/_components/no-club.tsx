@@ -1,22 +1,25 @@
+'use client';
+
 import Link from 'next/link';
 
 import { buttonClasses } from '../../../../components/button';
 import { EmptyState } from '../../../../components/states';
+import { useWebLocalization } from '../../../../lib/i18n';
 
 // A signed-in user who trains no active club (spec: "No club").
 export function NoClub() {
+  const { t } = useWebLocalization();
   return (
     <EmptyState
       icon="flag"
-      title="You're not a trainer of any club yet"
+      title={t('trainer.noClubTitle')}
       action={
         <Link href="/trainer/invitations" className={buttonClasses('primary')}>
-          See trainer invitations
+          {t('trainer.seeInvitations')}
         </Link>
       }
     >
-      When a club&apos;s admin invites you, accept the invitation to start working with its
-      athletes.
+      {t('trainer.noClubBody')}
     </EmptyState>
   );
 }

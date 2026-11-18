@@ -12,6 +12,7 @@ import {
 import { AccessibilityInfo, Animated, Keyboard, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useMobileLocalization } from '../lib/i18n';
 import { Feather } from '../lib/icons';
 import { colors, shadow, TAB_BAR_HEIGHT_ABOVE_INSET } from '../lib/theme';
 
@@ -96,6 +97,7 @@ const KEYBOARD_HIDE = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidH
 // aboveTabBar={false}.
 export function ToastViewport({ aboveTabBar = false }: { aboveTabBar?: boolean }): ReactElement | null {
   const context = useContext(ToastContext);
+  const { t } = useMobileLocalization();
   const insets = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0)).current;
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -136,7 +138,7 @@ export function ToastViewport({ aboveTabBar = false }: { aboveTabBar?: boolean }
           onPress={context.dismiss}
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
-          accessibilityHint="Dismisses the notification"
+          accessibilityHint={t('common.dismissNotification')}
           className="min-h-[48px] flex-row items-center gap-2.5 rounded-lg border px-4 py-3"
           style={{ backgroundColor: tone.bg, borderColor: tone.border }}
         >

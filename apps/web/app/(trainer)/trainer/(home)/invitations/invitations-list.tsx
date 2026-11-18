@@ -10,6 +10,7 @@ import { InlineAlert } from '../../../../../components/inline-alert';
 import { EmptyState, ErrorState, LoadingState } from '../../../../../components/states';
 import { NameCell, Table, type Column } from '../../../../../components/table';
 import { formatDateTime } from '../../../../../lib/format';
+import { useWebLocalization } from '../../../../../lib/i18n';
 import {
   useAcceptTrainerInvitationMutation,
   useDeclineTrainerInvitationMutation,
@@ -35,36 +36,37 @@ export function noticeForError(code: string | null): { notice: Notice; refetch: 
 }
 
 function NoticeAlert({ notice }: { notice: Notice }) {
+  const { t } = useWebLocalization();
   switch (notice.kind) {
     case 'accepted':
       return (
-        <InlineAlert tone="success" title={`You're now a trainer of ${notice.clubName}`}>
-          Your club tools will appear in the trainer portal.
+        <InlineAlert tone="success" title={t('trainerInvites.acceptedTitle', { club: notice.clubName })}>
+          {t('trainerInvites.acceptedBody')}
         </InlineAlert>
       );
     case 'declined':
       return (
-        <InlineAlert tone="info">You declined the invitation from {notice.clubName}.</InlineAlert>
+        <InlineAlert tone="info">{t('trainerInvites.declined', { club: notice.clubName })}</InlineAlert>
       );
     case 'unavailable':
       return (
-        <InlineAlert tone="warning" title="This invitation is no longer available">
-          It may have expired or been withdrawn. The list has been refreshed.
+        <InlineAlert tone="warning" title={t('trainerInvites.unavailableTitle')}>
+          {t('trainerInvites.unavailableBody')}
         </InlineAlert>
       );
     case 'separate-account':
       return (
-        <InlineAlert tone="error" title="This account can't become a trainer">
-          This is an athlete or admin account. Trainer access needs a separate account with a
-          different email. Ask the club&apos;s admin to invite that address.
+        <InlineAlert tone="error" title={t('trainerInvites.separateTitle')}>
+          {t('trainerInvites.separateBody')}
         </InlineAlert>
       );
     case 'failed':
-      return <InlineAlert tone="error">Something went wrong. Try again.</InlineAlert>;
+      return <InlineAlert tone="error">{t('common.genericError')}</InlineAlert>;
   }
 }
 
 export function InvitationsList({ email }: { email: string }) {
+  const { locale, t, rich } = useWebLocalization();
   const invitations = useMyTrainerInvitations();
   const accept = useAcceptTrainerInvitationMutation();
   const decline = useDeclineTrainerInvitationMutation();
@@ -103,30 +105,30 @@ export function InvitationsList({ email }: { email: string }) {
 
   const columns: Column<MyTrainerInvitationOutput>[] = [
     {
-      header: 'Club',
+      header: t('trainerInvites.colClub'),
       className: 'w-[45%]',
       cell: (i) => (
         <NameCell
           title={i.club.name}
-          sub={i.club.city ? `${i.club.city}, ${i.club.countryCode}` : i.club.countryCode}
+          sub={i.club.city ? t('common.location', { city: i.club.city, country: i.club.countryCode }) : i.club.countryCode}
         />
       ),
     },
     {
-      header: 'Expires',
-      cell: (i) => <span className="text-muted">{formatDateTime(i.expiresAt)}</span>,
+      header: t('trainerInvites.colExpires'),
+      cell: (i) => <span className="text-muted">{formatDateTime(locale, i.expiresAt)}</span>,
     },
     {
-      header: 'Actions',
+      header: t('common.actions'),
       hideHeader: true,
       align: 'right',
       cell: (i) => (
         <div className="flex justify-end gap-2">
           <Button size="sm" onClick={() => setDeclining(i)} disabled={busy}>
-            Decline
+            {t('common.decline')}
           </Button>
           <Button size="sm" variant="primary" onClick={() => void onAccept(i)} disabled={busy}>
-            Accept
+            {t('common.accept')}
           </Button>
         </div>
       ),
@@ -137,40 +139,36 @@ export function InvitationsList({ email }: { email: string }) {
     <div className="flex flex-col gap-[18px]">
       {notice ? <NoticeAlert notice={notice} /> : null}
       {invitations.isPending ? (
-        <LoadingState label="Loading invitations…" />
+        <LoadingState label={t('trainerInvites.loading')} />
       ) : invitations.isError ? (
         <ErrorState
-          title="We couldn't load your invitations"
+          title={t('trainerInvites.loadFailed')}
           onRetry={() => void invitations.refetch()}
         />
       ) : (
         <Table
-          caption="Your trainer invitations"
+          caption={t('trainerInvites.caption')}
           columns={columns}
           rows={invitations.data.items}
           rowKey={(i) => i.id}
           empty={
-            <EmptyState icon="mail" title={`No trainer invitations for ${email}`}>
-              If you expected one, sign out and sign in with the address the club&apos;s admin
-              invited.
+            <EmptyState icon="mail" title={t('trainerInvites.emptyTitle', { email })}>
+              {t('trainerInvites.emptyBody')}
             </EmptyState>
           }
         />
       )}
       <ConfirmDialog
         open={declining !== null}
-        title="Decline this invitation?"
-        confirmLabel="Decline invitation"
+        title={t('trainerInvites.declineTitle')}
+        confirmLabel={t('trainerInvites.declineConfirm')}
         pending={decline.isPending}
         onConfirm={() => void onDecline()}
         onClose={() => {
           if (!decline.isPending) setDeclining(null);
         }}
       >
-        <p>
-          You won&apos;t become a trainer of <strong>{declining?.club.name}</strong>. The
-          club&apos;s admin can invite you again later.
-        </p>
+        <p>{rich('trainerInvites.declineBody', { club: <strong>{declining?.club.name}</strong> })}</p>
       </ConfirmDialog>
     </div>
   );

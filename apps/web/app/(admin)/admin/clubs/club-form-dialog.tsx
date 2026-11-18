@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button } from '../../../../components/button';
 import { Dialog } from '../../../../components/dialog';
 import { InlineAlert } from '../../../../components/inline-alert';
+import { useWebLocalization } from '../../../../lib/i18n';
 import { useCreateClubMutation } from '../../../../lib/portal-mutations';
 
 import { ClubFields, validateCreate, type ClubErrors, type ClubValues } from './club-fields';
@@ -21,6 +22,7 @@ export function ClubFormDialog({
   onClose: () => void;
   onCreated: (club: { id: string; name: string }) => void;
 }) {
+  const { t } = useWebLocalization();
   const createClub = useCreateClubMutation();
   const [values, setValues] = useState<ClubValues>(EMPTY);
   const [errors, setErrors] = useState<ClubErrors>({});
@@ -48,7 +50,7 @@ export function ClubFormDialog({
       onCreated({ id: club.id, name: club.name });
     } catch (error) {
       if (getApiErrorCode(error) === 'CONFLICT') {
-        setErrors({ slug: 'That slug is already used by another club.' });
+        setErrors({ slug: 'admin.clubForm.slugTaken' });
       } else {
         setFailure(true);
       }
@@ -59,12 +61,12 @@ export function ClubFormDialog({
     <Dialog
       open={open}
       onClose={close}
-      title="Create a club"
-      description="New clubs start active. Clubs can be deactivated later, never deleted."
+      title={t('admin.clubForm.title')}
+      description={t('admin.clubForm.description')}
       footer={
         <>
           <Button onClick={close} disabled={createClub.isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="primary"
@@ -72,7 +74,7 @@ export function ClubFormDialog({
             form="create-club-form"
             disabled={createClub.isPending}
           >
-            {createClub.isPending ? 'Creating…' : 'Create club'}
+            {createClub.isPending ? t('admin.clubForm.creating') : t('admin.clubs.create')}
           </Button>
         </>
       }
@@ -95,7 +97,7 @@ export function ClubFormDialog({
         />
       </form>
       {failure ? (
-        <InlineAlert tone="error">We couldn&apos;t create the club. Try again.</InlineAlert>
+        <InlineAlert tone="error">{t('admin.clubForm.createFailed')}</InlineAlert>
       ) : null}
     </Dialog>
   );

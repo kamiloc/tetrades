@@ -11,8 +11,9 @@ import { PageBody, PageHeader, Panel, Toolbar } from '../../../../components/lay
 import { TopBar } from '../../../../components/portal-shell';
 import { EmptyState, ErrorState, LoadingState } from '../../../../components/states';
 import { Chip } from '../../../../components/status-chip';
-import { ADMIN_ACTION_LABELS } from '../../../../lib/admin-actions';
+import { adminActionLabel } from '../../../../lib/admin-actions';
 import { withParams } from '../../../../lib/href';
+import { useWebLocalization } from '../../../../lib/i18n';
 
 import { ActivityList } from './activity-entry';
 
@@ -32,6 +33,7 @@ function activityHref(action: AdminAction | undefined, club: string | undefined)
 }
 
 export function ActivityView() {
+  const { t } = useWebLocalization();
   const router = useRouter();
   const searchParams = useSearchParams();
   const action = parseAction(searchParams.get('action'));
@@ -58,34 +60,31 @@ export function ActivityView() {
 
   return (
     <>
-      <TopBar crumbs={[{ label: 'Admin' }, { label: 'Activity' }]} />
+      <TopBar crumbs={[{ label: t('admin.crumb') }, { label: t('nav.activity') }]} />
       <PageBody>
-        <PageHeader
-          title="Activity"
-          sub="Admin actions on clubs and trainer access, newest first, from every admin."
-        />
+        <PageHeader title={t('nav.activity')} sub={t('admin.activity.sub')} />
         <Toolbar
           left={
             <>
               <Select
-                aria-label="Action"
+                aria-label={t('admin.activity.actionFilter')}
                 value={action ?? ''}
                 onChange={(event) => replace(parseAction(event.target.value), clubId)}
                 className="w-[240px]"
               >
-                <option value="">All actions</option>
+                <option value="">{t('admin.activity.allActions')}</option>
                 {adminActionEnum.options.map((value) => (
                   <option key={value} value={value}>
-                    {ADMIN_ACTION_LABELS[value]}
+                    {t(adminActionLabel(value))}
                   </option>
                 ))}
               </Select>
               {clubId ? (
                 <Chip tone="blue">
-                  Club: {clubName ?? 'Loading…'}
+                  {t('admin.activity.clubFilter', { club: clubName ?? t('common.loading') })}
                   <button
                     type="button"
-                    aria-label="Remove club filter"
+                    aria-label={t('admin.activity.removeClubFilter')}
                     className="ml-1 rounded-sm"
                     onClick={() => replace(action, undefined)}
                   >
@@ -96,16 +95,13 @@ export function ActivityView() {
             </>
           }
         />
-        <Panel title="Admin actions">
+        <Panel title={t('admin.activity.panel')}>
           {actions.isPending ? (
-            <LoadingState label="Loading activity…" />
+            <LoadingState label={t('admin.activity.loading')} />
           ) : actions.isError ? (
-            <ErrorState
-              title="We couldn't load the activity"
-              onRetry={() => void actions.refetch()}
-            />
+            <ErrorState title={t('admin.activity.loadFailed')} onRetry={() => void actions.refetch()} />
           ) : rows.length === 0 ? (
-            <EmptyState icon="activity" title="No admin actions match these filters" />
+            <EmptyState icon="activity" title={t('admin.activity.empty')} />
           ) : (
             <div className="flex flex-col gap-4">
               <ActivityList entries={rows} />
@@ -115,7 +111,7 @@ export function ActivityView() {
                     onClick={() => void actions.fetchNextPage()}
                     disabled={actions.isFetchingNextPage}
                   >
-                    {actions.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                    {actions.isFetchingNextPage ? t('common.loading') : t('common.loadMore')}
                   </Button>
                 </div>
               ) : null}

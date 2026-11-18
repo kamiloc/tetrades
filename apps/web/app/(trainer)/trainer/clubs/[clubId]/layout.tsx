@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import { PageBody } from '../../../../../components/layout';
 import { TopBar } from '../../../../../components/portal-shell';
+import { getServerLocalization } from '../../../../../lib/server-i18n';
 import { getSessionUser } from '../../../../../lib/session';
 import { loadMyTrainerClubs } from '../../../../../lib/trainer/my-clubs';
 import { ClubSwitcher } from '../../_components/club-switcher';
@@ -22,17 +23,18 @@ export default async function TrainerClubLayout({
   children: ReactNode;
   params: Promise<{ clubId: string }>;
 }) {
-  const [{ clubId }, user, result] = await Promise.all([
+  const [{ clubId }, user, result, { t }] = await Promise.all([
     params,
     getSessionUser(),
     loadMyTrainerClubs(),
+    getServerLocalization(),
   ]);
   if (result.status === 'signed-out') redirect('/login');
 
   if (result.status === 'unavailable') {
     return (
       <TrainerShell user={user}>
-        <TopBar crumbs={[{ label: 'Trainer portal', href: '/trainer' }, { label: 'Club' }]} />
+        <TopBar crumbs={[{ label: t('portal.trainer'), href: '/trainer' }, { label: t('trainer.clubLabel') }]} />
         <PageBody>
           <LoadFailed />
         </PageBody>

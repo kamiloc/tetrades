@@ -21,13 +21,15 @@ import { StatusChip, type StatusKey } from '../../../../components/status-chip';
 import { NameCell, Table, type Column } from '../../../../components/table';
 import { formatDate } from '../../../../lib/format';
 import { withParams } from '../../../../lib/href';
+import { useWebLocalization } from '../../../../lib/i18n';
+import type { MessageKey } from '../../../../lib/translations';
 import { searchTerm, useDebounced } from '../../../../lib/use-debounced';
 
-const FILTERS: { value: AdminTrainerAccessFilter; label: string }[] = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'CLUB_DEACTIVATED', label: 'Club deactivated' },
-  { value: 'REVOKED', label: 'Revoked' },
-  { value: 'ALL', label: 'All' },
+const FILTERS: { value: AdminTrainerAccessFilter; label: MessageKey }[] = [
+  { value: 'ACTIVE', label: 'admin.directory.filterActive' },
+  { value: 'CLUB_DEACTIVATED', label: 'admin.directory.filterClubDeactivated' },
+  { value: 'REVOKED', label: 'admin.directory.filterRevoked' },
+  { value: 'ALL', label: 'admin.clubs.filterAll' },
 ];
 
 // Never "Active" for a trainer whose club is deactivated (ADR-017).
@@ -41,43 +43,48 @@ function parseAccess(value: string | null): AdminTrainerAccessFilter {
   return FILTERS.find((f) => f.value === value)?.value ?? 'ACTIVE';
 }
 
-const COLUMNS: Column<AdminTrainerDirectoryEntryOutput>[] = [
-  {
-    header: 'Club',
-    className: 'w-[32%]',
-    cell: (t) => (
-      <Link
-        href={`/admin/clubs/${t.club.id}/trainers`}
-        className={`flex min-w-0 items-center gap-2 rounded-sm hover:underline ${focusRing}`}
-      >
-        <NameCell title={t.club.name} sub={t.club.slug} />
-        {t.club.isActive ? null : <StatusChip status="deactivated" />}
-      </Link>
-    ),
-  },
-  {
-    header: 'Invited as',
-    className: 'w-[28%]',
-    cell: (t) =>
-      t.invitedEmail === null ? (
-        <span className="text-muted">Provisioned before invitations</span>
-      ) : (
-        <span className="block truncate">{t.invitedEmail}</span>
-      ),
-  },
-  { header: 'Access', cell: (t) => <StatusChip status={ACCESS_CHIP[t.access]} /> },
-  { header: 'Added', cell: (t) => <span className="text-muted">{formatDate(t.createdAt)}</span> },
-  {
-    header: 'Revoked',
-    cell: (t) => <span className="text-muted">{t.revokedAt ? formatDate(t.revokedAt) : '—'}</span>,
-  },
-];
-
 function directoryHref(access: AdminTrainerAccessFilter, club: string | undefined): string {
   return withParams('/admin/trainers', { access: access === 'ACTIVE' ? undefined : access, club });
 }
 
 export function TrainersDirectoryView() {
+  const { locale, t } = useWebLocalization();
+
+  const COLUMNS: Column<AdminTrainerDirectoryEntryOutput>[] = [
+    {
+      header: t('admin.clubs.colClub'),
+      className: 'w-[32%]',
+      cell: (row) => (
+        <Link
+          href={`/admin/clubs/${row.club.id}/trainers`}
+          className={`flex min-w-0 items-center gap-2 rounded-sm hover:underline ${focusRing}`}
+        >
+          <NameCell title={row.club.name} sub={row.club.slug} />
+          {row.club.isActive ? null : <StatusChip status="deactivated" />}
+        </Link>
+      ),
+    },
+    {
+      header: t('admin.directory.colInvitedAs'),
+      className: 'w-[28%]',
+      cell: (row) =>
+        row.invitedEmail === null ? (
+          <span className="text-muted">{t('admin.trainers.provisioned')}</span>
+        ) : (
+          <span className="block truncate">{row.invitedEmail}</span>
+        ),
+    },
+    { header: t('admin.directory.colAccess'), cell: (row) => <StatusChip status={ACCESS_CHIP[row.access]} /> },
+    {
+      header: t('admin.directory.colAdded'),
+      cell: (row) => <span className="text-muted">{formatDate(locale, row.createdAt)}</span>,
+    },
+    {
+      header: t('admin.directory.colRevoked'),
+      cell: (row) => <span className="text-muted">{row.revokedAt ? formatDate(locale, row.revokedAt) : '—'}</span>,
+    },
+  ];
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const access = parseAccess(searchParams.get('access'));
@@ -97,17 +104,14 @@ export function TrainersDirectoryView() {
 
   return (
     <>
-      <TopBar crumbs={[{ label: 'Admin' }, { label: 'Trainers' }]} />
+      <TopBar crumbs={[{ label: t('admin.crumb') }, { label: t('nav.trainers') }]} />
       <PageBody>
-        <PageHeader
-          title="Trainers"
-          sub="Every trainer assignment across clubs, newest first. Revoke from the club's trainers page."
-        />
+        <PageHeader title={t('nav.trainers')} sub={t('admin.directory.sub')} />
         <Toolbar
           left={
             <SegmentedFilter
-              label="Trainer access"
-              options={FILTERS}
+              label={t('admin.directory.accessFilter')}
+              options={FILTERS.map((option) => ({ value: option.value, label: t(option.label) }))}
               value={access}
               onChange={(value) =>
                 router.replace(directoryHref(value, clubQuery), { scroll: false })
@@ -117,8 +121,8 @@ export function TrainersDirectoryView() {
           right={
             <TextInput
               type="search"
-              aria-label="Search by club name"
-              placeholder="Search by club name"
+              aria-label={t('admin.directory.search')}
+              placeholder={t('admin.directory.search')}
               value={search}
               maxLength={100}
               onChange={(event) => setSearch(event.target.value)}
@@ -127,21 +131,18 @@ export function TrainersDirectoryView() {
           }
         />
         {trainers.isPending ? (
-          <LoadingState label="Loading trainers…" />
+          <LoadingState label={t('admin.trainers.loading')} />
         ) : trainers.isError ? (
-          <ErrorState
-            title="We couldn't load the trainers"
-            onRetry={() => void trainers.refetch()}
-          />
+          <ErrorState title={t('admin.trainers.loadFailed')} onRetry={() => void trainers.refetch()} />
         ) : (
           <Table
-            caption="Trainers"
+            caption={t('nav.trainers')}
             columns={COLUMNS}
             rows={rows}
-            rowKey={(t) => t.id}
+            rowKey={(row) => row.id}
             empty={
-              <EmptyState icon="users" title="No trainers match these filters">
-                Trainers join a club by accepting an invitation from its trainers page.
+              <EmptyState icon="users" title={t('admin.directory.empty')}>
+                {t('admin.directory.emptyBody')}
               </EmptyState>
             }
             footer={
@@ -151,7 +152,7 @@ export function TrainersDirectoryView() {
                     onClick={() => void trainers.fetchNextPage()}
                     disabled={trainers.isFetchingNextPage}
                   >
-                    {trainers.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                    {trainers.isFetchingNextPage ? t('common.loading') : t('common.loadMore')}
                   </Button>
                 </div>
               ) : undefined

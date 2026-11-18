@@ -15,6 +15,7 @@ import { TopBar } from '../../../../../../components/portal-shell';
 import { EmptyState, ErrorState, LoadingState } from '../../../../../../components/states';
 import { NameCell, Table, type Column } from '../../../../../../components/table';
 import { formatDate } from '../../../../../../lib/format';
+import { useWebLocalization } from '../../../../../../lib/i18n';
 import { TRAINER_NOTICE_COPY } from '../../../../../../lib/trainer/errors';
 import {
   useCurrentClub,
@@ -27,6 +28,7 @@ type Deciding = { kind: 'approve' | 'reject'; request: PendingCertificationOutpu
 
 
 export function CertificationsView({ clubId }: { clubId: string }) {
+  const { locale, t, rich } = useWebLocalization();
   const { club } = useCurrentClub(clubId);
   const utils = trpc.useUtils();
   const queue = trpc.achievement.listPendingCertifications.useInfiniteQuery(
@@ -44,7 +46,7 @@ export function CertificationsView({ clubId }: { clubId: string }) {
   const [notice, setNotice] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
 
   const rows = queue.data?.pages.flatMap((page) => page.items) ?? [];
-  const clubName = club?.name ?? 'Club';
+  const clubName = club?.name ?? t('trainer.clubLabel');
 
   const close = () => {
     if (decide.isPending) return;
@@ -63,7 +65,7 @@ export function CertificationsView({ clubId }: { clubId: string }) {
       const parsed = rejectionReasonSchema.safeParse(reason);
       if (!parsed.success) {
         setReasonError(
-          reason.trim() === '' ? 'Give the athlete a reason.' : 'Use at most 300 characters.',
+          reason.trim() === '' ? t('certs.reasonRequired') : t('certs.reasonTooLong'),
         );
         return;
       }
@@ -79,8 +81,8 @@ export function CertificationsView({ clubId }: { clubId: string }) {
         tone: 'success',
         text:
           deciding.kind === 'approve'
-            ? `Certified "${request.achievement.title}" for ${request.athlete.displayName}.`
-            : `Rejected "${request.achievement.title}". ${request.athlete.displayName} sees your reason.`,
+            ? t('certs.certified', { achievement: request.achievement.title, athlete: request.athlete.displayName })
+            : t('certs.rejected', { achievement: request.achievement.title, athlete: request.athlete.displayName }),
       });
       setDeciding(null);
       setReason('');
@@ -91,24 +93,24 @@ export function CertificationsView({ clubId }: { clubId: string }) {
       if (result.kind === 'no-longer-pending' || result.kind === 'no-longer-member') {
         void utils.achievement.listPendingCertifications.invalidate({ clubId });
       }
-      setFailure(TRAINER_NOTICE_COPY[result.kind]);
+      setFailure(t(TRAINER_NOTICE_COPY[result.kind]));
     }
   };
 
   const columns: Column<PendingCertificationOutput>[] = [
     {
-      header: 'Achievement',
+      header: t('certs.colAchievement'),
       className: 'w-[32%]',
       cell: (r) => <NameCell title={r.achievement.title} sub={r.achievement.organization} />,
     },
-    { header: 'Date', cell: (r) => <span className="text-muted">{formatDate(r.achievement.achievedOn)}</span> },
+    { header: t('certs.colDate'), cell: (r) => <span className="text-muted">{formatDate(locale, r.achievement.achievedOn)}</span> },
     {
-      header: 'Athlete',
+      header: t('common.athlete'),
       cell: (r) => <NameCell title={r.athlete.displayName} sub={`@${r.athlete.slug}`} />,
     },
-    { header: 'Requested', cell: (r) => <span className="text-muted">{formatDate(r.requestedAt)}</span> },
+    { header: t('certs.colRequested'), cell: (r) => <span className="text-muted">{formatDate(locale, r.requestedAt)}</span> },
     {
-      header: 'Actions',
+      header: t('common.actions'),
       hideHeader: true,
       align: 'right',
       className: 'w-[180px]',
@@ -117,24 +119,24 @@ export function CertificationsView({ clubId }: { clubId: string }) {
           <Button
             size="sm"
             variant="danger"
-            aria-label={`Reject ${r.achievement.title}`}
+            aria-label={t('certs.rejectLabel', { achievement: r.achievement.title })}
             onClick={() => {
               setNotice(null);
               setDeciding({ kind: 'reject', request: r });
             }}
           >
-            Reject
+            {t('certs.reject')}
           </Button>
           <Button
             size="sm"
             variant="primary"
-            aria-label={`Approve ${r.achievement.title}`}
+            aria-label={t('certs.approveLabel', { achievement: r.achievement.title })}
             onClick={() => {
               setNotice(null);
               setDeciding({ kind: 'approve', request: r });
             }}
           >
-            Approve
+            {t('certs.approve')}
           </Button>
         </div>
       ),
@@ -144,38 +146,42 @@ export function CertificationsView({ clubId }: { clubId: string }) {
   const summary =
     deciding !== null ? (
       <p>
-        <strong>{deciding.request.achievement.title}</strong> · {deciding.request.achievement.organization},{' '}
-        {formatDate(deciding.request.achievement.achievedOn)}, by {deciding.request.athlete.displayName}.
+        {rich('certs.summary', {
+          achievement: <strong>{deciding.request.achievement.title}</strong>,
+          organization: deciding.request.achievement.organization,
+          date: formatDate(locale, deciding.request.achievement.achievedOn),
+          athlete: deciding.request.athlete.displayName,
+        })}
       </p>
     ) : null;
 
   return (
     <>
       <TopBar
-        crumbs={[{ label: clubName, href: `/trainer/clubs/${clubId}/athletes` }, { label: 'Certifications' }]}
+        crumbs={[{ label: clubName, href: `/trainer/clubs/${clubId}/athletes` }, { label: t('nav.certifications') }]}
       />
       <PageBody>
         <PageHeader
-          title="Certifications"
-          sub="Achievements your club's athletes asked the club to certify."
+          title={t('nav.certifications')}
+          sub={t('certs.sub')}
         />
         {notice ? (
           <InlineAlert tone={notice.tone}>{notice.text}</InlineAlert>
         ) : null}
         {queue.isPending || lostAccess ? (
-          <LoadingState label="Loading requests…" />
+          <LoadingState label={t('certs.loading')} />
         ) : queue.isError ? (
-          <ErrorState title="We couldn't load the requests" onRetry={() => void queue.refetch()} />
+          <ErrorState title={t('certs.loadFailed')} onRetry={() => void queue.refetch()} />
         ) : (
           <>
             <Table
-              caption={`Pending certification requests for ${clubName}`}
+              caption={t('certs.caption', { club: clubName })}
               columns={columns}
               rows={rows}
               rowKey={(r) => r.id}
               empty={
-                <EmptyState icon="check" title="Nothing to review">
-                  When an athlete asks the club to certify an achievement, it appears here.
+                <EmptyState icon="check" title={t('certs.emptyTitle')}>
+                  {t('certs.emptyBody')}
                 </EmptyState>
               }
             />
@@ -190,8 +196,8 @@ export function CertificationsView({ clubId }: { clubId: string }) {
 
       <ConfirmDialog
         open={deciding?.kind === 'approve'}
-        title="Certify this achievement?"
-        confirmLabel="Approve"
+        title={t('certs.approveTitle')}
+        confirmLabel={t('certs.approve')}
         tone="primary"
         pending={decide.isPending}
         error={failure}
@@ -199,21 +205,21 @@ export function CertificationsView({ clubId }: { clubId: string }) {
         onClose={close}
       >
         {summary}
-        <p className="text-muted">The achievement shows as certified by {clubName}.</p>
+        <p className="text-muted">{t('certs.approveBody', { club: clubName })}</p>
       </ConfirmDialog>
 
       <Dialog
         open={deciding?.kind === 'reject'}
         onClose={close}
-        title="Reject this request?"
+        title={t('certs.rejectTitle')}
         width="sm"
         footer={
           <>
             <Button onClick={close} disabled={decide.isPending}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" type="submit" form="reject-form" disabled={decide.isPending}>
-              {decide.isPending ? 'Working…' : 'Reject'}
+              {decide.isPending ? t('common.working') : t('certs.reject')}
             </Button>
           </>
         }
@@ -227,7 +233,7 @@ export function CertificationsView({ clubId }: { clubId: string }) {
             void confirm();
           }}
         >
-          <Field id="reject-reason" label="Reason" hint="The athlete sees this reason." error={reasonError}>
+          <Field id="reject-reason" label={t('certs.reason')} hint={t('certs.reasonHint')} error={reasonError}>
             <textarea
               id="reject-reason"
               rows={3}

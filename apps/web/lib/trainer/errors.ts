@@ -1,3 +1,5 @@
+import type { MessageKey } from '../translations';
+
 // What a trainer page shows when an API call fails (design D6). FORBIDDEN on
 // a write is ambiguous: the caller re-reads their clubs first and passes
 // `stillTrainer`. A `not-trainer` notice means the page should call
@@ -51,12 +53,13 @@ export function needsTrainerCheck(code: string | null, action: TrainerAction): b
   return code === 'FORBIDDEN' && (action === 'report-entry' || action === 'decide-certification');
 }
 
-export const TRAINER_NOTICE_COPY: Record<TrainerNotice['kind'], string> = {
-  'not-trainer': "You're no longer a trainer of this club.",
-  'athlete-not-found': "This athlete isn't on the club's roster.",
-  'no-longer-member': 'This athlete is no longer an active member of the club.',
-  'no-longer-pending': 'This request is no longer pending. The queue has been refreshed.',
-  'already-member': 'This athlete already has a pending or active membership with the club.',
-  'clock-skew': "The date can't be in the future. Check your device's date and time.",
-  failed: 'Something went wrong. Try again.',
+/** Message keys; translate with the page's `t`. */
+export const TRAINER_NOTICE_COPY: Record<TrainerNotice['kind'], MessageKey> = {
+  'not-trainer': 'trainer.notice.notTrainer',
+  'athlete-not-found': 'trainer.notice.athleteNotFound',
+  'no-longer-member': 'trainer.notice.noLongerMember',
+  'no-longer-pending': 'trainer.notice.noLongerPending',
+  'already-member': 'trainer.notice.alreadyMember',
+  'clock-skew': 'trainer.notice.clockSkew',
+  failed: 'common.genericError',
 };

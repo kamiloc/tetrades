@@ -3,19 +3,22 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { useWebLocalization } from '../lib/i18n';
+import type { MessageKey } from '../lib/translations';
+
 import { focusRing } from './focus';
 import { Icon, type IconName } from './icon';
 
 export interface NavItem {
   href: string;
-  label: string;
+  label: MessageKey;
   icon: IconName;
   /** Current only on an exact path match (for a section's index page). */
   exact?: boolean;
 }
 
 export interface NavSection {
-  title: string;
+  title: MessageKey;
   items: NavItem[];
 }
 
@@ -25,17 +28,18 @@ export function isActive(pathname: string, item: Pick<NavItem, 'href' | 'exact'>
 }
 
 export function SidebarNav({ sections }: { sections: NavSection[] }) {
+  const { t } = useWebLocalization();
   const pathname = usePathname();
   return (
     <>
       {sections.map((section, index) => (
         <nav
           key={section.title}
-          aria-label={section.title}
+          aria-label={t(section.title)}
           className={`flex flex-col gap-0.5 px-3 ${index === 0 ? 'pt-3.5' : 'mt-1.5 border-t border-ink-line pt-3'}`}
         >
           <div className="px-3 pb-2 pt-1.5 text-[10px] font-bold uppercase tracking-[1.4px] text-on-ink3">
-            {section.title}
+            {t(section.title)}
           </div>
           {section.items.map((item) => {
             const active = isActive(pathname, item);
@@ -57,7 +61,7 @@ export function SidebarNav({ sections }: { sections: NavSection[] }) {
                   />
                 ) : null}
                 <Icon name={item.icon} size={17} strokeWidth={active ? 2 : 1.75} />
-                <span className="flex-1">{item.label}</span>
+                <span className="flex-1">{t(item.label)}</span>
               </Link>
             );
           })}

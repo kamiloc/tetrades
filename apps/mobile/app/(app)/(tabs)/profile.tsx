@@ -6,7 +6,7 @@ import {
   useMyPublicProfile,
 } from '@packages/api-client';
 import { useSignOut } from '@packages/auth';
-import { TAB_STATES, selectViewState } from '@packages/shared-logic';
+import { selectViewState } from '@packages/shared-logic';
 import { router } from 'expo-router';
 import { useState, type ReactElement } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -21,12 +21,13 @@ import { SectionTitle } from '../../../components/SectionTitle';
 import { TabSkeleton } from '../../../components/Skeleton';
 import { StatePanel } from '../../../components/StatePanel';
 import { Tag } from '../../../components/Tag';
+import { formatNumber } from '../../../lib/format';
+import { useMobileLocalization } from '../../../lib/i18n';
 import { Feather } from '../../../lib/icons';
 import { isBusy, isFailed } from '../../../lib/query-state';
 import { colors } from '../../../lib/theme';
 
 const ACHIEVEMENT_PREVIEW_COUNT = 3;
-const copy = TAB_STATES.profile;
 
 function Stat({ label, value, divider = false, accent = false }: { label: string; value: string; divider?: boolean; accent?: boolean }): ReactElement {
   return (
@@ -38,9 +39,10 @@ function Stat({ label, value, divider = false, accent = false }: { label: string
 }
 
 function ProfileStateShell({ state, onRetry, onSignOut }: { state: 'loading' | 'error'; onRetry: () => void; onSignOut: () => void }): ReactElement {
+  const { t } = useMobileLocalization();
   return (
     <View className="flex-1 bg-canvas">
-      <ScreenHeader title="Profile" subtitle={state === 'error' ? copy.sub.error : copy.sub.empty} />
+      <ScreenHeader title={t('tabs.profile')} subtitle={state === 'error' ? t('profile.sub.error') : t('profile.sub.empty')} />
       {state === 'loading' ? (
         <TabSkeleton variant="profile" />
       ) : (
@@ -48,10 +50,10 @@ function ProfileStateShell({ state, onRetry, onSignOut }: { state: 'loading' | '
           <StatePanel
             tone="danger"
             icon="alert-circle"
-            title={copy.error.title}
-            body={copy.error.body}
-            primary={{ label: copy.error.primary, onPress: onRetry }}
-            secondary={{ label: copy.error.secondary, onPress: onSignOut }}
+            title={t('profile.error.title')}
+            body={t('common.checkConnection')}
+            primary={{ label: t('common.tryAgain'), onPress: onRetry }}
+            secondary={{ label: t('common.signOut'), onPress: onSignOut }}
           />
         </View>
       )}
@@ -86,6 +88,7 @@ function ProfileBody({ athleteId, displayName, sport, onSignOut }: {
   sport: string | null;
   onSignOut: () => void;
 }): ReactElement {
+  const { locale, t } = useMobileLocalization();
   const publicProfile = useMyPublicProfile();
   const achievements = useListAchievements({ athleteId, take: ACHIEVEMENT_PREVIEW_COUNT });
   const connections = useConnections(athleteId);
@@ -112,7 +115,7 @@ function ProfileBody({ athleteId, displayName, sport, onSignOut }: {
     return <ProfileStateShell state={state} onRetry={retry} onSignOut={onSignOut} />;
   }
 
-  const subtitle = copy.sub.empty;
+  const subtitle = t('profile.sub.empty');
   const activeClubs = (memberships.data?.items ?? []).filter((m) => m.status === 'ACTIVE').slice(0, 2);
   const connectionCount = connections.data?.length ?? 0;
 
@@ -128,7 +131,7 @@ function ProfileBody({ athleteId, displayName, sport, onSignOut }: {
   return (
     <View className="flex-1 bg-canvas">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="pb-6">
-        <ScreenHeader title="Profile" subtitle={subtitle} overlap />
+        <ScreenHeader title={t('tabs.profile')} subtitle={subtitle} overlap />
 
         {/* Identity card overlaps the header by 20pt */}
         <View className="-mt-5 px-4">
@@ -137,10 +140,10 @@ function ProfileBody({ athleteId, displayName, sport, onSignOut }: {
               <Avatar name={displayName} size={68} ring />
               <View className="min-w-0 flex-1">
                 <Text className="text-card-title text-text" numberOfLines={1}>
-                  {displayName ?? 'Your profile'}
+                  {displayName ?? t('profile.yourProfile')}
                 </Text>
                 <Text className="mt-1 text-[13.5px] text-muted">
-                  {[profile?.primaryPosition, sport].filter(Boolean).join(' · ') || 'Add your sport and position'}
+                  {[profile?.primaryPosition, sport].filter(Boolean).join(' · ') || t('profile.addSportPosition')}
                 </Text>
                 {activeClubs.length > 0 ? (
                   <View className="mt-2 flex-row flex-wrap gap-1.5">
@@ -154,9 +157,9 @@ function ProfileBody({ athleteId, displayName, sport, onSignOut }: {
               </View>
             </View>
             <View className="mt-[18px] flex-row border-t border-line pt-4">
-              <Stat label="Height" value={profile && profile.heightCm !== null ? `${profile.heightCm} cm` : '—'} />
-              <Stat label="Weight" value={profile && profile.weightKg !== null ? `${profile.weightKg} kg` : '—'} divider />
-              <Stat label="Connections" value={String(connectionCount)} divider accent />
+              <Stat label={t('profile.height')} value={profile && profile.heightCm !== null ? t('units.cm', { value: profile.heightCm }) : '—'} />
+              <Stat label={t('profile.weight')} value={profile && profile.weightKg !== null ? t('units.kg', { value: profile.weightKg }) : '—'} divider />
+              <Stat label={t('tabs.connections')} value={formatNumber(locale, connectionCount)} divider accent />
             </View>
           </Card>
         </View>
@@ -165,17 +168,17 @@ function ProfileBody({ athleteId, displayName, sport, onSignOut }: {
           <View className="px-4 pt-5">
             <StatePanel
               icon="shield"
-              title={copy.empty.title}
-              body={copy.empty.body}
-              primary={{ label: copy.empty.primary, onPress: () => router.push('/profile-edit') }}
-              secondary={{ label: copy.empty.secondary, onPress: () => setDismissedEmpty(true) }}
+              title={t('profile.empty.title')}
+              body={t('profile.empty.body')}
+              primary={{ label: t('profile.empty.title'), onPress: () => router.push('/profile-edit') }}
+              secondary={{ label: t('common.notNow'), onPress: () => setDismissedEmpty(true) }}
             />
           </View>
         ) : (
           <View className="px-4 pt-5">
-            <SectionTitle action={{ label: 'Edit', onPress: () => router.push('/profile-edit') }}>About</SectionTitle>
+            <SectionTitle action={{ label: t('common.edit'), onPress: () => router.push('/profile-edit') }}>{t('profile.about')}</SectionTitle>
             <Card className="px-4 py-3.5">
-              <Text className="text-body-copy text-text">{profile?.publicBio ?? 'Add a short bio so other athletes know who you are.'}</Text>
+              <Text className="text-body-copy text-text">{profile?.publicBio ?? t('profile.bioPlaceholder')}</Text>
               {profile?.city ? (
                 <View className="mt-2.5 flex-row items-center gap-1">
                   <Feather name="map-pin" size={13} color={colors.subtle} />
@@ -187,10 +190,10 @@ function ProfileBody({ athleteId, displayName, sport, onSignOut }: {
         )}
 
         <View className="px-4 pt-5">
-          <SectionTitle action={{ label: 'See all', onPress: () => router.push('/achievements') }}>Achievements</SectionTitle>
+          <SectionTitle action={{ label: t('common.seeAll'), onPress: () => router.push('/achievements') }}>{t('achievements.title')}</SectionTitle>
           <Card>
             {achievementItems.length === 0 ? (
-              <EmptyRow icon="shield">{copy.emptyRows.achievements ?? 'No achievements yet'}</EmptyRow>
+              <EmptyRow icon="shield">{t('profile.noAchievements')}</EmptyRow>
             ) : (
               achievementItems.map((item, index) => (
                 <AchievementRow
@@ -213,17 +216,18 @@ function ProfileBody({ athleteId, displayName, sport, onSignOut }: {
               <Feather name="shield" size={20} color={colors.blue} />
             </View>
             <View className="min-w-0 flex-1">
-              <Text className="text-[13.5px] font-semibold text-text">Passport {pct}% complete</Text>
+              <Text className="text-[13.5px] font-semibold text-text">{t('profile.passportComplete', { percent: pct })}</Text>
               <View
                 accessible
                 accessibilityRole="progressbar"
+                accessibilityLabel={t('profile.passportComplete', { percent: pct })}
                 accessibilityValue={{ min: 0, max: 100, now: pct }}
                 className="mt-1.5 h-1.5 overflow-hidden rounded-pill bg-[#E6ECF6]"
               >
                 <View className="h-full rounded-pill bg-blue" style={{ width: `${pct}%` }} />
               </View>
             </View>
-            <PillButton label="Finish" variant="ghost" onPress={() => router.push('/profile-edit')} />
+            <PillButton label={t('profile.finish')} variant="ghost" onPress={() => router.push('/profile-edit')} />
           </Card>
         </View>
 
@@ -233,13 +237,13 @@ function ProfileBody({ athleteId, displayName, sport, onSignOut }: {
             <Pressable
               onPress={() => router.push('/visibility')}
               accessibilityRole="button"
-              accessibilityHint="Choose who can see your achievements, clubs, and metrics"
+              accessibilityHint={t('profile.visibilityHint')}
               className="min-h-[52px] flex-row items-center gap-3 px-4 py-3"
             >
               <View className="h-[34px] w-[34px] items-center justify-center rounded-md bg-canvas">
                 <Feather name="eye" size={17} color={colors.muted} />
               </View>
-              <Text className="flex-1 text-row-title text-text">Visibility</Text>
+              <Text className="flex-1 text-row-title text-text">{t('visibility.title')}</Text>
               <Feather name="chevron-right" size={18} color={colors.subtle} />
             </Pressable>
           </Card>

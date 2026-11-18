@@ -1,6 +1,8 @@
 import type { ReactElement } from 'react';
 import { View } from 'react-native';
 
+import { useMobileLocalization } from '../lib/i18n';
+
 import { Card } from './Card';
 
 function Block({ className }: { className: string }): ReactElement {
@@ -25,10 +27,11 @@ function ListCardSkeleton({ rows }: { rows: number }): ReactElement {
 
 // Placeholder layouts shown while a tab's data loads.
 export function TabSkeleton({ variant }: { variant: 'profile' | 'list' | 'kpi' }): ReactElement {
+  const { t } = useMobileLocalization();
   return (
     <View
       accessible
-      accessibilityLabel="Loading"
+      accessibilityLabel={t('common.loading')}
       accessibilityState={{ busy: true }}
       className="gap-5 px-4 pt-4"
     >

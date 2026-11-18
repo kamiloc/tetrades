@@ -1,22 +1,27 @@
+'use client';
+
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { signOut } from '../app/auth/actions';
+import { useWebLocalization } from '../lib/i18n';
+import type { MessageKey } from '../lib/translations';
 
 import { ApMark } from './ap-mark';
 import { focusRing } from './focus';
 import { Icon } from './icon';
 import { SidebarNav, type NavSection } from './sidebar-nav';
 
-// The admin and trainer portal frame (prototype PSidebar + PMain). Portal
-// copy is English, so the shell root sets lang="en" (design D5). It lays out
+// The admin and trainer portal frame (prototype PSidebar + PMain). It lays out
 // without horizontal scrolling from 1024 px up.
 
 export type RoleTone = 'blue' | 'amber';
 
 export interface PortalUser {
-  email: string;
-  sub: string;
+  /** Null shows `fallback` instead. */
+  email: string | null;
+  fallback: MessageKey;
+  sub: MessageKey;
 }
 
 function initials(email: string): string {
@@ -34,23 +39,25 @@ export function Sidebar({
   user,
   header,
 }: {
-  role: string;
+  role: MessageKey;
   tone: RoleTone;
   sections: NavSection[];
   user: PortalUser;
   /** Shown under the brand, above the nav (the trainer club switcher). */
   header?: ReactNode;
 }) {
+  const { t } = useWebLocalization();
+  const email = user.email ?? t(user.fallback);
   return (
     <aside className="sticky top-0 flex h-screen w-[252px] shrink-0 flex-col border-r border-ink-edge bg-gradient-to-b from-ink via-ink2 via-60% to-ink-deep text-on-ink">
       <div className="flex items-center gap-[11px] border-b border-ink-line px-[18px] pb-4 pt-[18px]">
         <ApMark size={28} onDark />
         <div className="flex flex-1 flex-col leading-tight">
-          <span className="text-[14.5px] font-bold tracking-[-0.2px]">Athlete Passport</span>
+          <span className="text-[14.5px] font-bold tracking-[-0.2px]">{t('common.brand')}</span>
           <span
             className={`mt-[3px] text-[10px] font-bold uppercase tracking-[1.6px] ${tone === 'amber' ? 'text-role-amber' : 'text-role-blue'}`}
           >
-            {role}
+            {t(role)}
           </span>
         </div>
       </div>
@@ -62,19 +69,19 @@ export function Sidebar({
             aria-hidden="true"
             className="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue to-blue2 text-[12px] font-bold"
           >
-            {initials(user.email)}
+            {initials(email)}
           </span>
           <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-[13px] font-semibold" title={user.email}>
-              {user.email}
+            <div className="truncate text-[13px] font-semibold" title={email}>
+              {email}
             </div>
-            <div className="mt-px text-[11px] text-on-ink2">{user.sub}</div>
+            <div className="mt-px text-[11px] text-on-ink2">{t(user.sub)}</div>
           </div>
           <form action={signOut}>
             <button
               type="submit"
-              aria-label="Sign out"
-              title="Sign out"
+              aria-label={t('common.signOut')}
+              title={t('common.signOut')}
               className={`inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-on-ink2 ring-offset-ink hover:bg-ink3 hover:text-on-ink ${focusRing}`}
             >
               <Icon name="logOut" size={16} />
@@ -92,9 +99,10 @@ export interface Crumb {
 }
 
 export function TopBar({ crumbs, action }: { crumbs: Crumb[]; action?: ReactNode }) {
+  const { t } = useWebLocalization();
   return (
     <header className="flex h-[60px] shrink-0 items-center gap-4 border-b border-line bg-paper px-7">
-      <nav aria-label="Breadcrumb" className="min-w-0">
+      <nav aria-label={t('common.breadcrumb')} className="min-w-0">
         <ol className="flex items-center gap-2 text-[13px]">
           {crumbs.map((crumb, index) => {
             const last = index === crumbs.length - 1;
@@ -137,7 +145,7 @@ export function PortalShell({
   header,
   children,
 }: {
-  role: string;
+  role: MessageKey;
   tone: RoleTone;
   sections: NavSection[];
   user: PortalUser;
@@ -145,7 +153,7 @@ export function PortalShell({
   children: ReactNode;
 }) {
   return (
-    <div lang="en" className="flex min-h-screen min-w-portal bg-canvas">
+    <div className="flex min-h-screen min-w-portal bg-canvas">
       <Sidebar role={role} tone={tone} sections={sections} user={user} header={header} />
       <main className="flex min-w-0 flex-1 flex-col">{children}</main>
     </div>

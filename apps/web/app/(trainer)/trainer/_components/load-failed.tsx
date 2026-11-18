@@ -3,13 +3,15 @@
 import { useRouter } from 'next/navigation';
 
 import { ErrorState } from '../../../../components/states';
+import { useWebLocalization } from '../../../../lib/i18n';
 
 // The API couldn't be reached to list the caller's clubs.
 export function LoadFailed() {
+  const { t } = useWebLocalization();
   const router = useRouter();
   return (
-    <ErrorState title="We couldn't load your clubs" onRetry={() => router.refresh()}>
-      The portal can&apos;t reach the server right now. Try again in a moment.
+    <ErrorState title={t('trainer.loadClubsFailed')} onRetry={() => router.refresh()}>
+      {t('common.serverUnreachable')}
     </ErrorState>
   );
 }

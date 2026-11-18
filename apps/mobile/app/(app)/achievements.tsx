@@ -33,6 +33,8 @@ import { TabSkeleton } from '../../components/Skeleton';
 import { StatePanel } from '../../components/StatePanel';
 import { StatusChip } from '../../components/StatusChip';
 import { ToastViewport, useToast } from '../../components/Toast';
+import { formatDate } from '../../lib/format';
+import { useMobileLocalization } from '../../lib/i18n';
 import { Feather } from '../../lib/icons';
 import { mutationErrorMessage, type ErrorCopy } from '../../lib/mutation-errors';
 import { isBusy, isFailed } from '../../lib/query-state';
@@ -40,50 +42,14 @@ import { colors } from '../../lib/theme';
 
 type Filter = 'ALL' | 'VERIFIED' | 'PENDING' | 'UNVERIFIED' | 'REJECTED';
 
-const FILTER_LABELS: Record<Filter, string> = {
-  ALL: 'All',
-  VERIFIED: 'Verified',
-  PENDING: 'Pending',
-  UNVERIFIED: 'Unverified',
-  REJECTED: 'Rejected',
-};
-
-const EMPTY_MESSAGES: Record<Filter, string> = {
-  ALL: 'No achievements yet. Add your first one.',
-  VERIFIED: 'No verified achievements yet.',
-  PENDING: 'No achievements waiting for a club decision.',
-  UNVERIFIED: 'No unverified achievements.',
-  REJECTED: 'No rejected achievements.',
-};
+const FILTERS: readonly Filter[] = ['ALL', 'VERIFIED', 'PENDING', 'UNVERIFIED', 'REJECTED'];
 
 const ACHIEVEMENTS_PAGE_SIZE = 20;
 // Requests and memberships are bounded per athlete; one page (server max) is enough here.
 const LOOKUP_PAGE_SIZE = 50;
 
-const REQUEST_ERRORS: ErrorCopy = {
-  CONFLICT: 'This achievement already has an open request.',
-  FORBIDDEN: 'You need an active membership at this club to ask it for certification.',
-  BAD_REQUEST: "This achievement can't be submitted right now.",
-  NOT_FOUND: 'That club or achievement no longer exists.',
-  fallback: "Couldn't send the request. Try again.",
-};
-
-const WITHDRAW_ERRORS: ErrorCopy = {
-  BAD_REQUEST: 'This request was already decided or withdrawn.',
-  NOT_FOUND: 'This request no longer exists.',
-  fallback: "Couldn't withdraw the request. Try again.",
-};
-
-const ADD_ERRORS: ErrorCopy = {
-  FORBIDDEN: "You don't have permission to add achievements.",
-  NOT_FOUND: 'Athlete profile not found.',
-  fallback: "Couldn't save the achievement. Try again.",
-};
-
-const longDate = (date: Date): string =>
-  date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
 export default function AchievementsScreen(): ReactElement {
+  const { t } = useMobileLocalization();
   const myAthlete = useMyAthlete();
   if (isBusy(myAthlete)) return <TabSkeleton variant="list" />;
   if (isFailed(myAthlete) || !myAthlete.data) {
@@ -92,9 +58,9 @@ export default function AchievementsScreen(): ReactElement {
         <StatePanel
           tone="danger"
           icon="alert-circle"
-          title="Couldn't load your achievements"
-          body="Check your connection and try again."
-          primary={{ label: 'Try again', onPress: () => { void myAthlete.refetch(); } }}
+          title={t('achievements.loadFailed')}
+          body={t('common.checkConnection')}
+          primary={{ label: t('common.tryAgain'), onPress: () => { void myAthlete.refetch(); } }}
         />
       </View>
     );
@@ -103,6 +69,7 @@ export default function AchievementsScreen(): ReactElement {
 }
 
 function AchievementsBody({ athleteId }: { athleteId: string }): ReactElement {
+  const { t } = useMobileLocalization();
   const utils = trpc.useUtils();
   const achievementsQuery = trpc.achievement.listAchievements.useInfiniteQuery(
     { athleteId, take: ACHIEVEMENTS_PAGE_SIZE },
@@ -147,7 +114,7 @@ function AchievementsBody({ athleteId }: { athleteId: string }): ReactElement {
   return (
     <View className="flex-1 bg-canvas">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-4 py-3" className="grow-0">
-        {(Object.keys(FILTER_LABELS) as Filter[]).map((f) => (
+        {FILTERS.map((f) => (
           <Pressable
             key={f}
             onPress={() => setActiveFilter(f)}
@@ -155,7 +122,7 @@ function AchievementsBody({ athleteId }: { athleteId: string }): ReactElement {
             accessibilityState={{ selected: activeFilter === f }}
             className={`min-h-[36px] justify-center rounded-pill border px-4 ${activeFilter === f ? 'border-blue bg-blue' : 'border-line bg-paper'}`}
           >
-            <Text className={`text-cta ${activeFilter === f ? 'text-paper' : 'text-muted'}`}>{FILTER_LABELS[f]}</Text>
+            <Text className={`text-cta ${activeFilter === f ? 'text-paper' : 'text-muted'}`}>{t(`achievements.filter.${f}`)}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -167,9 +134,9 @@ function AchievementsBody({ athleteId }: { athleteId: string }): ReactElement {
           <StatePanel
             tone="danger"
             icon="alert-circle"
-            title="Couldn't load your achievements"
-            body="Check your connection and try again."
-            primary={{ label: 'Try again', onPress: () => { void achievementsQuery.refetch(); } }}
+            title={t('achievements.loadFailed')}
+            body={t('common.checkConnection')}
+            primary={{ label: t('common.tryAgain'), onPress: () => { void achievementsQuery.refetch(); } }}
           />
         </View>
       ) : (
@@ -190,7 +157,7 @@ function AchievementsBody({ athleteId }: { athleteId: string }): ReactElement {
           }}
           ListEmptyComponent={
             <Card>
-              <EmptyRow icon="shield">{EMPTY_MESSAGES[activeFilter]}</EmptyRow>
+              <EmptyRow icon="shield">{t(`achievements.empty.${activeFilter}`)}</EmptyRow>
             </Card>
           }
           renderItem={({ item, index }) => (
@@ -219,7 +186,7 @@ function AchievementsBody({ athleteId }: { athleteId: string }): ReactElement {
 
       <View className="absolute bottom-0 left-0 right-0 border-t border-line bg-canvas p-4">
         <PillButton
-          label="Add achievement"
+          label={t('achievements.add')}
           icon="plus"
           onPress={() => setShowForm(true)}
           fullWidth
@@ -258,9 +225,22 @@ function CertificationSheet({
   onClose: () => void;
   onChanged: () => void;
 }): ReactElement {
+  const { locale, t } = useMobileLocalization();
   const requestCertification = useRequestCertification();
   const withdraw = useWithdrawCertification();
   const toast = useToast();
+  const requestErrors: ErrorCopy = {
+    CONFLICT: t('achievements.request.conflict'),
+    FORBIDDEN: t('achievements.request.forbidden'),
+    BAD_REQUEST: t('achievements.request.badRequest'),
+    NOT_FOUND: t('achievements.request.notFound'),
+    fallback: t('achievements.request.fallback'),
+  };
+  const withdrawErrors: ErrorCopy = {
+    BAD_REQUEST: t('achievements.withdrawError.badRequest'),
+    NOT_FOUND: t('achievements.withdrawError.notFound'),
+    fallback: t('achievements.withdrawError.fallback'),
+  };
   const [clubId, setClubId] = useState<string | null>(activeClubs[0]?.id ?? null);
   const status = achievement.verificationStatus;
   const pendingRequest = status === 'PENDING' && latestRequest?.status === 'PENDING' ? latestRequest : null;
@@ -273,12 +253,12 @@ function CertificationSheet({
       {
         onSuccess: () => {
           const club = activeClubs.find((c) => c.id === clubId)?.name;
-          toast.success(club ? `Certification requested from ${club}` : 'Certification requested');
+          toast.success(club ? t('achievements.requestedFrom', { club }) : t('achievements.requested'));
           onChanged();
           onClose();
         },
         onError: (error) => {
-          toast.error(mutationErrorMessage(error, REQUEST_ERRORS));
+          toast.error(mutationErrorMessage(error, requestErrors));
           onChanged();
         },
       },
@@ -286,22 +266,22 @@ function CertificationSheet({
   };
 
   const confirmWithdraw = (requestId: string): void => {
-    Alert.alert('Withdraw request?', 'The achievement goes back to Unverified. You can ask again later.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('achievements.withdrawTitle'), t('achievements.withdrawBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Withdraw',
+        text: t('achievements.withdraw'),
         style: 'destructive',
         onPress: () =>
           withdraw.mutate(
             { requestId },
             {
               onSuccess: () => {
-                toast.success('Request withdrawn');
+                toast.success(t('achievements.withdrawn'));
                 onChanged();
                 onClose();
               },
               onError: (error) => {
-                toast.error(mutationErrorMessage(error, WITHDRAW_ERRORS));
+                toast.error(mutationErrorMessage(error, withdrawErrors));
                 onChanged();
               },
             },
@@ -312,13 +292,13 @@ function CertificationSheet({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable className="flex-1 bg-black/30" onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
+      <Pressable className="flex-1 bg-black/30" onPress={onClose} accessibilityLabel={t('common.close')} accessibilityRole="button" />
       <SafeAreaView edges={['bottom']} style={{ borderTopLeftRadius: 18, borderTopRightRadius: 18, backgroundColor: colors.paper, paddingHorizontal: 20, paddingTop: 20 }}>
         <View className="flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
             <Text className="text-card-title text-text">{achievement.title}</Text>
             <Text className="mt-1 text-meta text-muted">
-              {achievement.organization} · {longDate(achievement.achievedOn)}
+              {achievement.organization} · {formatDate(locale, achievement.achievedOn, 'long')}
             </Text>
           </View>
           <StatusChip status={status} />
@@ -328,8 +308,8 @@ function CertificationSheet({
           {status === 'VERIFIED' ? (
             <Text className="text-state-body text-muted">
               {achievement.certifyingClub
-                ? `Verified by ${achievement.certifyingClub.name}. Others see the club only if your club-membership visibility allows it.`
-                : 'Verified.'}
+                ? t('achievements.verifiedBy', { club: achievement.certifyingClub.name })
+                : t('achievements.verified')}
             </Text>
           ) : null}
 
@@ -337,12 +317,12 @@ function CertificationSheet({
             <>
               <Text className="text-state-body text-muted">
                 {pendingRequest
-                  ? `Waiting for a trainer at ${pendingRequest.club.name} to review it. You can't edit it while it's pending.`
-                  : 'Waiting for a club trainer to review it.'}
+                  ? t('achievements.pendingAt', { club: pendingRequest.club.name })
+                  : t('achievements.pending')}
               </Text>
               {pendingRequest ? (
                 <PillButton
-                  label="Withdraw request"
+                  label={t('achievements.withdrawRequest')}
                   variant="danger"
                   loading={withdraw.isPending}
                   onPress={() => confirmWithdraw(pendingRequest.id)}
@@ -353,7 +333,7 @@ function CertificationSheet({
 
           {rejection ? (
             <View className="rounded-lg border border-danger-line bg-danger-tint p-3">
-              <Text className="text-row-title text-danger">Rejected by {rejection.club.name}</Text>
+              <Text className="text-row-title text-danger">{t('achievements.rejectedBy', { club: rejection.club.name })}</Text>
               {rejection.rejectionReason ? (
                 <Text className="mt-1 text-state-body text-text">“{rejection.rejectionReason}”</Text>
               ) : null}
@@ -362,15 +342,13 @@ function CertificationSheet({
 
           {canRequestCertification(status) ? (
             clubsLoading ? (
-              <Text className="text-meta text-muted">Loading your clubs…</Text>
+              <Text className="text-meta text-muted">{t('achievements.loadingClubs')}</Text>
             ) : activeClubs.length === 0 ? (
               <View className="gap-2">
-                <Text className="text-state-body text-muted">
-                  You need an active club membership before a club can certify this achievement.
-                </Text>
-                <PillButton label={status === 'REJECTED' ? 'Request again' : 'Request certification'} onPress={() => undefined} disabled />
+                <Text className="text-state-body text-muted">{t('achievements.needMembership')}</Text>
+                <PillButton label={status === 'REJECTED' ? t('achievements.requestAgain') : t('achievements.requestCertification')} onPress={() => undefined} disabled />
                 <PillButton
-                  label="View clubs"
+                  label={t('common.viewClubs')}
                   variant="text"
                   onPress={() => {
                     onClose();
@@ -380,7 +358,7 @@ function CertificationSheet({
               </View>
             ) : (
               <View className="gap-2">
-                <Text className="text-eyebrow uppercase text-muted">Ask a club to certify it</Text>
+                <Text className="text-eyebrow uppercase text-muted">{t('achievements.askClub')}</Text>
                 <View accessibilityRole="radiogroup" className="overflow-hidden rounded-lg border border-line">
                   {activeClubs.map((club, index) => {
                     const checked = club.id === clubId;
@@ -399,7 +377,7 @@ function CertificationSheet({
                   })}
                 </View>
                 <PillButton
-                  label={status === 'REJECTED' ? 'Request again' : 'Request certification'}
+                  label={status === 'REJECTED' ? t('achievements.requestAgain') : t('achievements.requestCertification')}
                   loading={requestCertification.isPending}
                   disabled={!clubId}
                   onPress={submit}
@@ -408,7 +386,7 @@ function CertificationSheet({
             )
           ) : null}
 
-          <PillButton label="Close" variant="text" onPress={onClose} />
+          <PillButton label={t('common.close')} variant="text" onPress={onClose} />
         </View>
       </SafeAreaView>
       <ToastViewport />
@@ -419,6 +397,12 @@ function CertificationSheet({
 // ── Add achievement ─────────────────────────────────────────────────────────
 // New achievements start Unverified (ADR-016).
 function AddAchievementForm({ onDone, onClose }: { onDone: () => void; onClose: () => void }): ReactElement {
+  const { t } = useMobileLocalization();
+  const addErrors: ErrorCopy = {
+    FORBIDDEN: t('achievements.addError.forbidden'),
+    NOT_FOUND: t('achievements.addError.notFound'),
+    fallback: t('achievements.addError.fallback'),
+  };
   const addAchievement = useAddAchievement();
   const toast = useToast();
   const { overlap, containerRef } = useKeyboardOverlap();
@@ -429,11 +413,11 @@ function AddAchievementForm({ onDone, onClose }: { onDone: () => void; onClose: 
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (title.trim().length < 2) errs['title'] = 'Title must be at least 2 characters.';
-    if (organization.trim().length < 2) errs['organization'] = 'Organization must be at least 2 characters.';
+    if (title.trim().length < 2) errs['title'] = t('achievements.titleTooShort');
+    if (organization.trim().length < 2) errs['organization'] = t('achievements.organizationTooShort');
     const parsed = fromIsoDate(date);
-    if (!parsed) errs['date'] = 'Choose the date of the achievement.';
-    else if (parsed > new Date()) errs['date'] = "The date can't be in the future.";
+    if (!parsed) errs['date'] = t('achievements.dateRequired');
+    else if (parsed > new Date()) errs['date'] = t('achievements.dateFuture');
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -444,11 +428,11 @@ function AddAchievementForm({ onDone, onClose }: { onDone: () => void; onClose: 
       { title: title.trim(), organization: organization.trim(), achievedOn: date },
       {
         onSuccess: () => {
-          toast.success('Achievement added');
+          toast.success(t('achievements.added'));
           onDone();
         },
         onError: (error) => {
-          const message = mutationErrorMessage(error, ADD_ERRORS);
+          const message = mutationErrorMessage(error, addErrors);
           setErrors({ submit: message });
           toast.error(message);
         },
@@ -484,26 +468,26 @@ function AddAchievementForm({ onDone, onClose }: { onDone: () => void; onClose: 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View ref={containerRef} className="flex-1 justify-end" style={{ paddingBottom: overlap }}>
-        <Pressable className="flex-1 bg-black/30" onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
+        <Pressable className="flex-1 bg-black/30" onPress={onClose} accessibilityLabel={t('common.close')} accessibilityRole="button" />
         <SafeAreaView
           edges={overlap > 0 ? [] : ['bottom']}
           style={{ backgroundColor: colors.canvas, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}
         >
           <View className="mb-4 flex-row items-center justify-between">
-            <Text accessibilityRole="header" className="text-row-title text-text">New achievement</Text>
-            <PillButton label="Cancel" variant="text" onPress={onClose} />
+            <Text accessibilityRole="header" className="text-row-title text-text">{t('achievements.new')}</Text>
+            <PillButton label={t('common.cancel')} variant="text" onPress={onClose} />
           </View>
           {errors['submit'] !== undefined ? (
             <View className="mb-3 rounded-lg border border-danger-line bg-danger-tint p-3">
               <Text className="text-meta text-danger">{errors['submit']}</Text>
             </View>
           ) : null}
-          {field('title', title, setTitle, 'Achievement title', { autoCapitalize: 'sentences', returnKeyType: 'next', autoFocus: true })}
-          {field('organization', organization, setOrganization, 'Organization', { autoCapitalize: 'sentences', returnKeyType: 'done' })}
+          {field('title', title, setTitle, t('achievements.titlePlaceholder'), { autoCapitalize: 'sentences', returnKeyType: 'next', autoFocus: true })}
+          {field('organization', organization, setOrganization, t('achievements.organization'), { autoCapitalize: 'sentences', returnKeyType: 'done' })}
           <View className="mb-4">
             <DateField
-              label="Achievement date"
-              placeholder="Date of the achievement"
+              label={t('achievements.dateLabel')}
+              placeholder={t('achievements.datePlaceholder')}
               value={date}
               onChange={(v) => {
                 setDate(v);
@@ -514,7 +498,7 @@ function AddAchievementForm({ onDone, onClose }: { onDone: () => void; onClose: 
             />
             {errors['date'] !== undefined ? <Text className="mt-1 text-caption text-danger">{errors['date']}</Text> : null}
           </View>
-          <PillButton label="Save achievement" loading={addAchievement.isPending} onPress={submit} fullWidth />
+          <PillButton label={t('achievements.save')} loading={addAchievement.isPending} onPress={submit} fullWidth />
         </SafeAreaView>
       </View>
       <ToastViewport />

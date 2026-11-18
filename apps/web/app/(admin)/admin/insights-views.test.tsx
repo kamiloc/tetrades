@@ -296,7 +296,7 @@ describe('ClubsView search and trainer filter', () => {
     const calls = stubApi({ 'admin.listClubs': ok(emptyPage) });
     renderWithApi(<ClubsView />);
     expect(
-      await screen.findByText('Every club here has an active trainer', {}, { timeout: 5000 }),
+      await screen.findByText('Every club here has an active trainer.', {}, { timeout: 5000 }),
     ).toBeTruthy();
     expect(inputsOf(calls, 'admin.listClubs')[0]).toMatchObject({
       status: 'DEACTIVATED',

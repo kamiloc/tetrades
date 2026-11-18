@@ -16,21 +16,24 @@ import { SegmentedFilter } from '../../../../components/segmented-filter';
 import { EmptyState, ErrorState, LoadingState } from '../../../../components/states';
 import { StatusChip } from '../../../../components/status-chip';
 import { NameCell, Table, type Column } from '../../../../components/table';
+import { formatNumber } from '../../../../lib/format';
 import { withParams } from '../../../../lib/href';
+import { useWebLocalization } from '../../../../lib/i18n';
+import type { MessageKey } from '../../../../lib/translations';
 import { searchTerm, useDebounced } from '../../../../lib/use-debounced';
 
 import { ClubFormDialog } from './club-form-dialog';
 
-const FILTERS: { value: AdminClubStatusFilter; label: string }[] = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'DEACTIVATED', label: 'Deactivated' },
-  { value: 'ALL', label: 'All' },
+const FILTERS: { value: AdminClubStatusFilter; label: MessageKey }[] = [
+  { value: 'ACTIVE', label: 'admin.clubs.filterActive' },
+  { value: 'DEACTIVATED', label: 'admin.clubs.filterDeactivated' },
+  { value: 'ALL', label: 'admin.clubs.filterAll' },
 ];
 
-const EMPTY_COPY: Record<AdminClubStatusFilter, string> = {
-  ACTIVE: 'No active clubs yet.',
-  DEACTIVATED: 'No deactivated clubs.',
-  ALL: 'No clubs yet.',
+const EMPTY_COPY: Record<AdminClubStatusFilter, MessageKey> = {
+  ACTIVE: 'admin.clubs.emptyActive',
+  DEACTIVATED: 'admin.clubs.emptyDeactivated',
+  ALL: 'admin.clubs.emptyAll',
 };
 
 function parseFilter(value: string | null): AdminClubStatusFilter {
@@ -51,39 +54,43 @@ function clubsHref({ status, withoutTrainer, query }: ListState): string {
   });
 }
 
-const COLUMNS: Column<AdminClubOutput>[] = [
-  {
-    header: 'Club',
-    className: 'w-[40%]',
-    cell: (club) => (
-      <Link
-        href={`/admin/clubs/${club.id}`}
-        className={`block min-w-0 rounded-sm hover:underline ${focusRing}`}
-      >
-        <NameCell title={club.name} sub={club.slug} />
-      </Link>
-    ),
-  },
-  {
-    header: 'Location',
-    cell: (club) => (
-      <span className="text-muted">
-        {club.city ? `${club.city}, ${club.countryCode}` : club.countryCode}
-      </span>
-    ),
-  },
-  {
-    header: 'Status',
-    cell: (club) => <StatusChip status={club.isActive ? 'active' : 'deactivated'} />,
-  },
-  {
-    header: 'Active trainers',
-    align: 'right',
-    cell: (club) => <span className="font-semibold tabular-nums">{club.activeTrainerCount}</span>,
-  },
-];
-
 export function ClubsView() {
+
+  const { locale, t } = useWebLocalization();
+
+  const COLUMNS: Column<AdminClubOutput>[] = [
+    {
+      header: t('admin.clubs.colClub'),
+      className: 'w-[40%]',
+      cell: (club) => (
+        <Link
+          href={`/admin/clubs/${club.id}`}
+          className={`block min-w-0 rounded-sm hover:underline ${focusRing}`}
+        >
+          <NameCell title={club.name} sub={club.slug} />
+        </Link>
+      ),
+    },
+    {
+      header: t('admin.clubs.colLocation'),
+      cell: (club) => (
+        <span className="text-muted">
+          {club.city ? t('common.location', { city: club.city, country: club.countryCode }) : club.countryCode}
+        </span>
+      ),
+    },
+    {
+      header: t('common.status'),
+      cell: (club) => <StatusChip status={club.isActive ? 'active' : 'deactivated'} />,
+    },
+    {
+      header: t('admin.clubs.colActiveTrainers'),
+      align: 'right',
+      cell: (club) => <span className="font-semibold tabular-nums">{formatNumber(locale, club.activeTrainerCount)}</span>,
+    },
+  ];
+
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const filter = parseFilter(searchParams.get('status'));
@@ -124,22 +131,22 @@ export function ClubsView() {
   const rows = clubs.data?.pages.flatMap((page) => page.items) ?? [];
   const createButton = (
     <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-      Create club
+      {t('admin.clubs.create')}
     </Button>
   );
 
   return (
     <>
-      <TopBar crumbs={[{ label: 'Admin' }, { label: 'Clubs' }]} action={createButton} />
+      <TopBar crumbs={[{ label: t('admin.crumb') }, { label: t('nav.clubs') }]} action={createButton} />
       <PageBody>
-        <PageHeader title="Clubs" sub="Newest first. Deactivated clubs keep their history." />
+        <PageHeader title={t('nav.clubs')} sub={t('admin.clubs.sub')} />
         {created ? (
           <InlineAlert
             tone="success"
-            title={`${created.name} was created`}
+            title={t('admin.clubs.created', { name: created.name })}
             action={
               <Button size="sm" variant="link" onClick={() => setCreated(null)}>
-                Dismiss
+                {t('common.dismiss')}
               </Button>
             }
           >
@@ -147,7 +154,7 @@ export function ClubsView() {
               href={`/admin/clubs/${created.id}/trainers`}
               className={`rounded-sm text-blue hover:underline ${focusRing}`}
             >
-              Invite its trainers
+              {t('admin.clubs.inviteTrainers')}
             </Link>
           </InlineAlert>
         ) : null}
@@ -155,11 +162,11 @@ export function ClubsView() {
           left={
             <>
               <SegmentedFilter
-                label="Club status"
-                options={FILTERS}
-                value={filter}
-                onChange={setFilter}
-              />
+              label={t('admin.clubs.statusFilter')}
+              options={FILTERS.map((option) => ({ value: option.value, label: t(option.label) }))}
+              value={filter}
+              onChange={setFilter}
+              ></SegmentedFilter>
               <button
                 type="button"
                 aria-pressed={withoutTrainer}
@@ -170,15 +177,15 @@ export function ClubsView() {
                     : 'border-line bg-paper text-muted hover:text-text'
                 } ${focusRing}`}
               >
-                No active trainer
+                {t('admin.clubs.noActiveTrainer')}
               </button>
             </>
           }
           right={
             <TextInput
               type="search"
-              aria-label="Search clubs by name or slug"
-              placeholder="Search by name or slug"
+              aria-label={t('admin.clubs.searchLabel')}
+              placeholder={t('admin.clubs.searchPlaceholder')}
               value={search}
               maxLength={100}
               onChange={(event) => setSearch(event.target.value)}
@@ -187,12 +194,12 @@ export function ClubsView() {
           }
         />
         {clubs.isPending ? (
-          <LoadingState label="Loading clubs…" />
+          <LoadingState label={t('admin.clubs.loading')} />
         ) : clubs.isError ? (
-          <ErrorState title="We couldn't load the clubs" onRetry={() => void clubs.refetch()} />
+          <ErrorState title={t('admin.clubs.loadFailed')} onRetry={() => void clubs.refetch()} />
         ) : (
           <Table
-            caption="Clubs"
+            caption={t('nav.clubs')}
             columns={COLUMNS}
             rows={rows}
             rowKey={(club) => club.id}
@@ -200,15 +207,15 @@ export function ClubsView() {
               query ? (
                 <EmptyState
                   icon="search"
-                  title={`No club matches “${query}”`}
-                  action={<Button onClick={clearSearch}>Clear search</Button>}
+                  title={t('admin.clubs.noResults', { query })}
+                  action={<Button onClick={clearSearch}>{t('admin.clubs.clearSearch')}</Button>}
                 />
               ) : withoutTrainer ? (
-                <EmptyState title="Every club here has an active trainer" />
+                <EmptyState title={t('admin.clubs.withoutTrainer')} />
               ) : (
-                <EmptyState title={EMPTY_COPY[filter]} action={createButton}>
-                  Clubs you create appear here. Trainers can join a club only by invitation.
-                </EmptyState>
+                <EmptyState title={t(EMPTY_COPY[filter])} action={createButton}>
+                {t('admin.clubs.emptyBody')}
+              </EmptyState>
               )
             }
             footer={
@@ -218,7 +225,7 @@ export function ClubsView() {
                     onClick={() => void clubs.fetchNextPage()}
                     disabled={clubs.isFetchingNextPage}
                   >
-                    {clubs.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                    {clubs.isFetchingNextPage ? t('common.loading') : t('common.loadMore')}
                   </Button>
                 </div>
               ) : undefined
