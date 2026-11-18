@@ -2,6 +2,20 @@
 
 Tasks 1.x–3.1 were implemented in an earlier session; 3.2–5.3 in this one (2026-11-11). Nothing outside `apps/web` and `apps/mobile` changed.
 
+## Dependency approval (task 1.1)
+
+- `expo-localization ~55.0.19` (with its transitive `rtl-detect`) was added to `apps/mobile` to read the device locale. The project owner approved it on 2026-11-17. Its version matches the installed Expo SDK 55 packages, and `app.json` registers its plugin.
+
+## Post-merge fixes (2026-11-17)
+
+Merging `master` (cc4f99f) brought in the admin overview, trainer directory and activity log from add-web-admin-insights, written before this change. The pre-archive audit found they broke the web typecheck and still had hardcoded English. Fixed:
+
+- `lib/admin-actions.ts` builds no English sentences any more. Each action has a filter label, a "you" sentence and an "other admin" sentence in the catalog, with `{actor}` and `{club}` placeholders. Spanish conjugates the verb for the actor ("Creaste…" / "Un administrador creó…"), so the actor can't be swapped into one sentence. The activity entry links the club through `rich()`. Changed fields and cancelled counts use catalog messages and plurals.
+- `overview-view.tsx`, `activity/activity-view.tsx`, `activity/activity-entry.tsx`, `trainers/trainers-view.tsx` and `lib/admin-nav.ts` use message keys and pass the locale to the format helpers.
+- `clubs/clubs-view.tsx`: "no results" is a single `{query}` message (the English and Spanish texts previously differed in meaning). The trainer filter toggle, search label and placeholder, and "Clear search" are translated.
+- `admin/layout.tsx`: removed the literal `'Admin'` email fallback; the shell already shows the translated fallback.
+- Tests: `lib/admin-actions.test.ts` covers both languages, Spanish verb forms and plurals; `insights-views.test.tsx` matches the catalog copy.
+
 ## Deviations from the artifacts
 
 - **Mobile screen copy uses typed keys only.** The earlier session had started a `copy(englishSource)` helper backed by an untyped English→Spanish map; it was already missing a string ("Choose who can see what"). It is removed, and every screen uses `t('key')` against the typed catalog (design decision 1).
@@ -21,6 +35,7 @@ Tasks 1.x–3.1 were implemented in an earlier session; 3.2–5.3 in this one (2
 - Searched every `.tsx` in `apps/web/{app,components,lib}` and `apps/mobile/{app,components,lib}` for literal JSX text, string-valued `label`/`title`/`placeholder`/`aria-label`/`accessibilityLabel`/`hint`/`caption`/`header` props, and English string literals. Remaining hits are not interface copy: the `CO` country-code placeholder, server-message comparisons in mobile error mapping, and the API proxy's JSON error bodies.
 - Catalog tests in both apps check that every key has a non-empty Spanish message with the same placeholders, in singular and plural.
 - `apps/mobile/app.json` has no native permission or usage strings to localize.
+- Re-run on 2026-11-17 over the admin screens merged from `master`, after the post-merge fixes: the only remaining literal is the `CO` country-code placeholder.
 
 5.2 Selection, normalization, fallback, metadata, no switcher
 - Selection and normalization: `lib/locale-selection.test.ts` in both apps covers `es-CO`/`es-MX`/`es` → Spanish, `en-US` → English, ordered and `q`-weighted `Accept-Language`, unsupported → English, and an empty or absent header → English.
@@ -37,9 +52,10 @@ Tasks 1.x–3.1 were implemented in an earlier session; 3.2–5.3 in this one (2
 
 ## Checks run
 
-- `apps/web`: `tsc`, `eslint`, `vitest run` (34 files, 207 tests), `next build`.
+- `apps/web`, after the post-merge fixes (2026-11-17): `tsc`, `eslint`, `vitest run` (36 files, 238 tests), `next build`. Before the merge: 34 files, 207 tests.
 - `apps/mobile`: `tsc`, `eslint`, `vitest` on `lib/` (4 files), and `expo export` for Android and iOS (production bundles succeed).
 - API and integration suites were not run (no API changes; they share the deployed DB and Redis).
+- Full `turbo typecheck && turbo test && turbo lint`, run by the project owner on 2026-11-18 with the Azure container stopped: the Redis-backed tests failed because the Upstash request quota was used up. This is an environment limit, not a failure caused by this change (it touches no API, queue or Redis code). Re-run once the quota resets.
 
 ## Follow-ups
 

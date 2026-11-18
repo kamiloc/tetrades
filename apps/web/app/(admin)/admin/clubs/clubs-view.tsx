@@ -177,15 +177,15 @@ export function ClubsView() {
                     : 'border-line bg-paper text-muted hover:text-text'
                 } ${focusRing}`}
               >
-                No active trainer
+                {t('admin.clubs.noActiveTrainer')}
               </button>
             </>
           }
           right={
             <TextInput
               type="search"
-              aria-label="Search clubs by name or slug"
-              placeholder="Search by name or slug"
+              aria-label={t('admin.clubs.searchLabel')}
+              placeholder={t('admin.clubs.searchPlaceholder')}
               value={search}
               maxLength={100}
               onChange={(event) => setSearch(event.target.value)}
@@ -207,8 +207,8 @@ export function ClubsView() {
               query ? (
                 <EmptyState
                   icon="search"
-                  title={`${t('admin.clubs.noResults')} “${query}”`}
-                  action={<Button onClick={clearSearch}>Clear search</Button>}
+                  title={t('admin.clubs.noResults', { query })}
+                  action={<Button onClick={clearSearch}>{t('admin.clubs.clearSearch')}</Button>}
                 />
               ) : withoutTrainer ? (
                 <EmptyState title={t('admin.clubs.withoutTrainer')} />
